@@ -1,0 +1,40 @@
+# 依赖
+node_modules/
+.capacitor/
+
+# 构建产物
+dist/
+android/app/build/
+android/.gradle/
+android/build/
+android/captures/
+android/local.properties
+build/
+*.tsbuildinfo
+
+# APK 与分片大文件（仓库为源码仓，不发二进制）
+*.apk
+*.aab
+learning-manager-split.z*
+learning-manager.zip
+learning-manager-debug.apk
+
+# IDE / 系统
+.DS_Store
+.idea/
+.vscode/
+*.iml
+*.swp
+*.log
+
+# 敏感
+.env
+.env.*
+*.keystore
+*.jks
+!debug.keystore
+
+# 临时
+.tunnel.py
+APK_DOWNLOAD_INFO.md
+download.html
