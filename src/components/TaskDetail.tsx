@@ -11,7 +11,6 @@ import { TaskGroupEditor } from './TaskGroupEditor'
 import { StudyRecords } from './StudyRecords'
 import { TaskEditForm } from './TaskEditForm'
 import { TASK_STATUS_LABELS } from '../types'
-import { getTypeLabel } from '../taskTypes'
 import { formatDuration, formatDate } from '../utils'
 
 interface Props {
@@ -57,7 +56,7 @@ export function TaskDetail({ taskId, onBack }: Props) {
         <div style={{ flex: 1 }}>
           <h2>{task.name}</h2>
           <div className="meta">
-            学习方向 · {getTypeLabel(task.type)} · {TASK_STATUS_LABELS[task.status]} ·
+            学习方向 · {TASK_STATUS_LABELS[task.status]} ·
             创建于 {formatDate(task.createdAt)}
           </div>
         </div>

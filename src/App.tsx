@@ -4,31 +4,31 @@ import { TaskDetail } from './components/TaskDetail'
 import { RandomToolbox } from './components/RandomToolbox'
 import { Settings } from './components/Settings'
 import { ReminderSettings } from './components/ReminderSettings'
-import { TodayStatus } from './components/TodayStatus'
-import { SlackingRules } from './components/SlackingRules'
 import { DataBackup } from './components/DataBackup'
 import { VivoPermissionGuide } from './components/VivoPermissionGuide'
-import { useAppData } from './store'
+import { ReminderActionModal } from './components/ReminderActionModal'
+import { StatsView } from './components/StatsView'
+import { useAppData, pickRandomTask, getRandomPool } from './store'
 import {
   scheduleReminders,
   onNotificationClick,
+  registerSessionEndCallback,
+  endSessionAndReschedule,
+  isSessionActive,
+  setSessionActive,
 } from './reminderService'
-import { runSlackingDetection } from './slackingRulesService'
-import type { SlackingEvaluation } from './slackingRulesService'
 import {
   getStudyTimerStatus,
 } from './studyTimer'
 import type { Task } from './types'
 
-// 三个平级工作区（主导航）
-type Tab = 'todos' | 'tools' | 'settings'
+// 四个平级工作区（主导航）
+type Tab = 'todos' | 'tools' | 'stats' | 'settings'
 
 // 子页面视图（叠加在当前工作区之上，返回时回到对应工作区）
 type View =
   | { name: 'task'; taskId: string }
   | { name: 'reminder' }
-  | { name: 'today' }
-  | { name: 'slacking' }
   | { name: 'backup' }
 
 const GUIDE_KEY = 'learning-manager:vivo-guide-shown:v1'
@@ -39,10 +39,9 @@ export default function App() {
   // 子页面视图：null 时显示工作区主导航 + 当前 tab 内容
   const [view, setView] = useState<View | null>(null)
   const [showGuide, setShowGuide] = useState(false)
-  const [pendingEvaluation, setPendingEvaluation] =
-    useState<SlackingEvaluation | null>(null)
+  // 提醒通知点击后的操作弹窗
+  const [reminderAction, setReminderAction] = useState<Task | null>(null)
   const data = useAppData()
-  const slackingCheckedRef = useRef(false)
   const studyTimerCheckedRef = useRef(false)
 
   // 首次启动显示 vivo 权限引导
@@ -63,6 +62,16 @@ export default function App() {
       /* ignore */
     }
   }
+
+  // 注册会话结束回调：学习会话结束时设置冷却并重新调度提醒
+  useEffect(() => {
+    const off = registerSessionEndCallback(() => {
+      if (data.reminder?.enabled) {
+        endSessionAndReschedule(data.tasks, data.reminder).catch(() => {})
+      }
+    })
+    return off
+  }, [data.tasks, data.reminder])
 
   // 提醒调度：启动时 + 切回前台时自动补充当天提醒
   useEffect(() => {
@@ -97,32 +106,19 @@ export default function App() {
     }
   }, [data.tasks, data.reminder?.enabled])
 
-  // 启动时检测摸鱼规则（仅一次，静默失败）
-  useEffect(() => {
-    if (slackingCheckedRef.current) return
-    slackingCheckedRef.current = true
-    runSlackingDetection(data.tasks, data.records)
-      .then((evaluation) => {
-        if (evaluation && evaluation.shouldTrigger) {
-          setPendingEvaluation(evaluation)
-        }
-      })
-      .catch(() => {
-        /* ignore */
-      })
-  }, [data.tasks, data.records])
-
   // 启动时检查 StudyTimer Service 状态 + 消费 pending action
-  // - 若 Service 在运行（学习被中断）或有 pending action=end，
-  //   根据 taskName 跳转到对应任务详情，让 LearningSession 接管恢复
-  // - 注意：consumePendingAction 仅消费一次；LearningSession 挂载后内部会再消费一次，
-  //   因此这里用一个新的"peek"读取（getStatus 即可，pending action 交由 LearningSession 消费）
   useEffect(() => {
     if (studyTimerCheckedRef.current) return
     studyTimerCheckedRef.current = true
     ;(async () => {
       const status = await getStudyTimerStatus()
-      if (!status?.isRunning) return
+      if (!status?.isRunning) {
+        // Service 未在跑但 sessionActive 标志残留（App 被杀后重启）：清理脏状态
+        if (isSessionActive()) {
+          await setSessionActive(false)
+        }
+        return
+      }
       const taskName = status.taskName
       if (!taskName) return
       const matchedTask = data.tasks.find((t) => t.name === taskName)
@@ -132,73 +128,41 @@ export default function App() {
     })().catch(() => {
       /* ignore */
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.tasks])
 
-  // 前台轮询 + 切回前台检测
-  // 每 10 分钟轮询一次；从其他应用切回时立即检测（silent：只显示卡片，不发通知）
-  useEffect(() => {
-    let cancelled = false
-
-    const detect = () => {
-      if (cancelled) return
-      runSlackingDetection(data.tasks, data.records, true)
-        .then((evaluation) => {
-          if (evaluation && evaluation.shouldTrigger && !cancelled) {
-            setPendingEvaluation(evaluation)
-          }
-        })
-        .catch(() => {
-          /* ignore */
-        })
-    }
-
-    // 定时轮询：每 10 分钟
-    const intervalId = window.setInterval(detect, 10 * 60 * 1000)
-
-    // 切回前台时检测（WebView 重新可见）
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        detect()
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibility)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(intervalId)
-      document.removeEventListener('visibilitychange', onVisibility)
-    }
-  }, [data.tasks, data.records])
-
-  // 监听通知点击，区分普通提醒和摸鱼提醒
+  // 监听通知点击：弹出操作选择弹窗（开始/换一个/延迟/忽略）
   useEffect(() => {
     const off = onNotificationClick((action) => {
-      if (action.action === 'slacking') {
-        // 摸鱼通知点击：跳转到摸鱼规则页面，显示提醒卡片
-        setPendingEvaluation({
-          shouldTrigger: true,
-          situation: 'entertainment_too_long',
-          reason: '点击通知查看',
-          recommendedTaskId: action.taskId,
-        })
-        setView({ name: 'slacking' })
-        return
-      }
-      // 普通提醒：跳转任务详情，或回到待办工作区
       if (action.taskId) {
-        setView({ name: 'task', taskId: action.taskId })
+        const matchedTask = data.tasks.find((t) => t.id === action.taskId)
+        if (matchedTask) {
+          setReminderAction(matchedTask)
+        }
       } else {
         setTab('todos')
         setView(null)
       }
     })
     return off
-  }, [])
+  }, [data.tasks])
+
+  // 提醒操作弹窗回调
+  const handleReminderStart = (task: Task) => {
+    setReminderAction(null)
+    setView({ name: 'task', taskId: task.id })
+    // TaskDetail 中的 LearningSession 会自动启动计时并标记会话活跃
+  }
+
+  const handleReminderReroll = () => {
+    const picked = pickRandomTask(data.tasks)
+    if (picked) {
+      setReminderAction(picked)
+    }
+  }
 
   // ===== 子页面（全屏，叠加在工作区之上）=====
-  // 返回时回到对应工作区 tab
   if (view) {
-    // 待办工作区的子页面
     if (view.name === 'task') {
       return (
         <div className="app">
@@ -212,19 +176,6 @@ export default function App() {
         </div>
       )
     }
-    if (view.name === 'today') {
-      return (
-        <div className="app">
-          <TodayStatus
-            onBack={() => {
-              setTab('todos')
-              setView(null)
-            }}
-          />
-        </div>
-      )
-    }
-    // 设置工作区的子页面
     if (view.name === 'reminder') {
       return (
         <div className="app">
@@ -233,25 +184,6 @@ export default function App() {
               setTab('settings')
               setView(null)
             }}
-          />
-        </div>
-      )
-    }
-    if (view.name === 'slacking') {
-      return (
-        <div className="app">
-          <SlackingRules
-            onBack={() => {
-              setPendingEvaluation(null)
-              setTab('settings')
-              setView(null)
-            }}
-            onOpenTask={(task: Task) => {
-              setPendingEvaluation(null)
-              setView({ name: 'task', taskId: task.id })
-            }}
-            pendingEvaluation={pendingEvaluation}
-            onDismissEvaluation={() => setPendingEvaluation(null)}
           />
         </div>
       )
@@ -281,14 +213,19 @@ export default function App() {
         {tab === 'todos' && (
           <TaskPool
             onOpenTask={(task: Task) => setView({ name: 'task', taskId: task.id })}
-            onOpenTodayStatus={() => setView({ name: 'today' })}
           />
         )}
         {tab === 'tools' && <RandomToolbox />}
+        {tab === 'stats' && (
+          <StatsView
+            onOpenTask={(taskId: string) =>
+              setView({ name: 'task', taskId })
+            }
+          />
+        )}
         {tab === 'settings' && (
           <Settings
             onOpenReminder={() => setView({ name: 'reminder' })}
-            onOpenSlackingRules={() => setView({ name: 'slacking' })}
             onOpenBackup={() => setView({ name: 'backup' })}
           />
         )}
@@ -299,26 +236,40 @@ export default function App() {
           className={`tabbar-item ${tab === 'todos' ? 'active' : ''}`}
           onClick={() => setTab('todos')}
         >
-          <span className="tb-icon">📋</span>
           <span className="tb-name">待办</span>
         </button>
         <button
           className={`tabbar-item ${tab === 'tools' ? 'active' : ''}`}
           onClick={() => setTab('tools')}
         >
-          <span className="tb-icon">🧰</span>
           <span className="tb-name">工具</span>
+        </button>
+        <button
+          className={`tabbar-item ${tab === 'stats' ? 'active' : ''}`}
+          onClick={() => setTab('stats')}
+        >
+          <span className="tb-name">统计</span>
         </button>
         <button
           className={`tabbar-item ${tab === 'settings' ? 'active' : ''}`}
           onClick={() => setTab('settings')}
         >
-          <span className="tb-icon">⚙️</span>
           <span className="tb-name">设置</span>
         </button>
       </nav>
 
       {showGuide && <VivoPermissionGuide onClose={closeGuide} />}
+
+      {reminderAction && data.reminder && (
+        <ReminderActionModal
+          task={reminderAction}
+          cooldownMinutes={data.reminder.cooldownMinutes}
+          randomPoolSize={getRandomPool(data.tasks).length}
+          onStart={handleReminderStart}
+          onReroll={handleReminderReroll}
+          onClose={() => setReminderAction(null)}
+        />
+      )}
     </div>
   )
 }

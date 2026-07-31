@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { Modal } from './Modal'
 import { ICON_CHOICES } from '../constants'
 import { createTask } from '../store'
-import type { TaskType } from '../types'
-import { useTaskTypes } from '../taskTypes'
 
 interface Props {
   onClose: () => void
@@ -12,12 +10,10 @@ interface Props {
 export function TaskForm({ onClose }: Props) {
   const [name, setName] = useState('')
   const [icon, setIcon] = useState(ICON_CHOICES[0])
-  const [type, setType] = useState<TaskType>('reading')
-  const types = useTaskTypes()
 
   const submit = () => {
     if (!name.trim()) return
-    createTask({ name, icon, type })
+    createTask({ name, icon })
     onClose()
   }
 
@@ -47,21 +43,6 @@ export function TaskForm({ onClose }: Props) {
             placeholder="如：历史阅读、Blender 学习"
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
-        </div>
-
-        <div className="field">
-          <label>类型</label>
-          <div className="row wrap">
-            {types.map((t) => (
-              <button
-                key={t.id}
-                className={`btn sm ${type === t.id ? 'primary' : ''}`}
-                onClick={() => setType(t.id)}
-              >
-                {t.icon} {t.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className="field">

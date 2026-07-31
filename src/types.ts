@@ -1,13 +1,5 @@
 // 核心数据结构定义
 
-// 任务类型：动态类型 ID（string）
-// 内置类型 ID 固定，用户可新增自定义类型；删除类型时已用该类型的任务回退为 'custom'
-export type TaskType = string
-
-// 内置类型 ID（不可删除）
-export const BUILTIN_TYPE_IDS = ['reading', 'video', 'practice', 'custom'] as const
-export type BuiltinTypeId = (typeof BUILTIN_TYPE_IDS)[number]
-
 // 任务状态
 export type TaskStatus = 'not_started' | 'in_progress' | 'completed' | 'paused'
 
@@ -38,13 +30,15 @@ export type SequenceProgress = CountProgress | PositionProgress
 export interface LearningObject {
   id: string
   name: string
-  type: string // 类型（自由文本，默认继承任务类型）
   progress: string // 旧：当前进度自由文本（向后兼容，系统优先解析为数字）
   progressUnit: string // 旧：进度单位（如：卷、集、章），可选
   progressTarget: string // 旧：完成目标进度（如：10），可选；为空时不自动完成
   completed: boolean
   enabled: boolean // 是否参与随机接续（暂停=关闭）
   weight: number // 预留：加权随机使用
+  // 倒计时模式：设置后学习会话从该时长倒计时，到 0 自动结束
+  // null/undefined/0 = 正向计时（默认）
+  countdownSeconds?: number | null
   // 新增：进度模型。旧数据迁移时由 progress/progressUnit/progressTarget 推导填充。
   // count 型 -> { type:'count', current, target, unit }
   // position 型 -> { type:'position', text }
@@ -69,8 +63,7 @@ export interface TaskGroup {
 export interface Task {
   id: string
   name: string
-  icon: string // 用户选择的图标（emoji）
-  type: TaskType
+  icon: string // 用户选择的图标（emoji），作为学习方向的图标
   status: TaskStatus // 兼容字段；完成态以序列判定为准
   enabled: boolean // 是否启用（任务池入口开关）
   randomEnabled: boolean // 是否参与随机选择
@@ -100,6 +93,8 @@ export interface StudyRecord {
   endProgress: string // 数量型: "370"；位置型: "卷八十九"
   // 新增：本次完成数量（仅数量型序列有值，位置型为 undefined）
   deltaCount?: number
+  // 新增：学习备注（可选，用户自由填写的备注/想法/总结）
+  note?: string
 }
 
 // 整体数据形态
@@ -116,9 +111,9 @@ export interface ReminderConfig {
   enabled: boolean // 总开关
   intervalMinutes: number // 0=随机提醒；>0=固定间隔提醒（分钟）
   cooldownMinutes: number // 冷却时间，避免频繁打扰
-  // 提醒时间窗（避免深夜打扰），24h 制
-  startHour: number // 0-23
-  endHour: number // 0-23
+  // 提醒时间窗（分钟精度，避免深夜打扰），0-1439
+  startMinute: number // 如 540 = 9:00
+  endMinute: number // 如 1320 = 22:00
   // 参与提醒的具体任务 ID 白名单（空表示所有启用任务都参与）
   enabledTaskIds: string[]
 }
@@ -127,17 +122,9 @@ export const DEFAULT_REMINDER: ReminderConfig = {
   enabled: false,
   intervalMinutes: 0,
   cooldownMinutes: 30,
-  startHour: 9,
-  endHour: 22,
+  startMinute: 9 * 60, // 540 = 9:00
+  endMinute: 22 * 60, // 1320 = 22:00
   enabledTaskIds: [],
-}
-
-// 内置类型标签（动态类型的 fallback）
-export const TASK_TYPE_LABELS: Record<string, string> = {
-  reading: '阅读',
-  video: '视频',
-  practice: '练习',
-  custom: '自定义',
 }
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {

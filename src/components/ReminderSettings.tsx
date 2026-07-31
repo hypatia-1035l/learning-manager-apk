@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useAppData, updateReminder, getReminderPool } from '../store'
-import { getTypeLabel } from '../taskTypes'
 import {
   requestNotificationPermission,
   scheduleReminders,
@@ -11,6 +10,26 @@ interface Props {
   onBack: () => void
 }
 
+// 解析输入框字符串为数字：空或非法时返回 fallback
+function parseNum(s: string, fallback: number): number {
+  const trimmed = s.trim()
+  if (!trimmed) return fallback
+  const n = Number(trimmed)
+  return isNaN(n) ? fallback : n
+}
+
+// 分钟数（0-1439） <-> "HH:MM" 互转（time input 值格式）
+function minuteToTime(m: number): string {
+  const h = Math.floor(m / 60)
+  const mm = m % 60
+  return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+function timeToMinute(t: string): number {
+  const [h, m] = t.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return 0
+  return Math.min(1439, Math.max(0, h * 60 + m))
+}
+
 export function ReminderSettings({ onBack }: Props) {
   const data = useAppData()
   const reminder = data.reminder!
@@ -18,10 +37,29 @@ export function ReminderSettings({ onBack }: Props) {
   const [permGranted, setPermGranted] = useState<boolean | null>(null)
   const [msg, setMsg] = useState<string>('')
 
+  // 数字字段使用本地 state 缓冲，避免清空时被立即重写为默认值
+  // 仅在「应用并重新调度」或「切换开关」时才提交到 store
+  const [interval, setIntervalMin] = useState(String(reminder.intervalMinutes))
+  const [cooldown, setCooldown] = useState(String(reminder.cooldownMinutes))
+  // 时间窗用原生 time 选择器，缓冲 "HH:MM" 字符串
+  const [startTime, setStartTime] = useState(minuteToTime(reminder.startMinute))
+  const [endTime, setEndTime] = useState(minuteToTime(reminder.endMinute))
+
   const pool = getReminderPool(data.tasks, reminder)
 
+  // 由本地缓冲字段构造完整的下一份 reminder 配置
+  const buildNext = (enabled: boolean) => ({
+    ...reminder,
+    enabled,
+    intervalMinutes: Math.max(0, parseNum(interval, 0)),
+    cooldownMinutes: Math.max(1, parseNum(cooldown, 30)),
+    startMinute: timeToMinute(startTime),
+    endMinute: timeToMinute(endTime),
+  })
+
   const handleToggleEnabled = async (enabled: boolean) => {
-    updateReminder({ enabled })
+    const next = buildNext(enabled)
+    updateReminder(next)
     if (enabled) {
       const ok = await requestNotificationPermission()
       setPermGranted(ok)
@@ -29,19 +67,12 @@ export function ReminderSettings({ onBack }: Props) {
         setMsg('未授予通知权限，请在系统设置中开启通知权限')
         return
       }
-      await scheduleReminders(data.tasks, { ...reminder, enabled: true })
+      await scheduleReminders(data.tasks, next)
       setMsg('已开启提醒，调度已生效')
     } else {
       await cancelAllReminders()
       setMsg('已关闭提醒，所有定时通知已取消')
     }
-  }
-
-  const handleNumberChange = async (
-    field: 'intervalMinutes' | 'cooldownMinutes' | 'startHour' | 'endHour',
-    value: number,
-  ) => {
-    updateReminder({ [field]: value } as any)
   }
 
   // 调整后点保存才重新调度，避免频繁调度
@@ -54,7 +85,9 @@ export function ReminderSettings({ onBack }: Props) {
       setBusy(false)
       return
     }
-    await scheduleReminders(data.tasks, data.reminder!)
+    const next = buildNext(reminder.enabled)
+    updateReminder(next)
+    await scheduleReminders(data.tasks, next)
     setBusy(false)
     setMsg('已应用设置并重新调度提醒')
   }
@@ -66,7 +99,7 @@ export function ReminderSettings({ onBack }: Props) {
     updateReminder({ enabledTaskIds: Array.from(set) })
   }
 
-  const isRandomMode = reminder.intervalMinutes === 0
+  const isRandomMode = parseNum(interval, 0) === 0
 
   return (
     <div>
@@ -115,13 +148,8 @@ export function ReminderSettings({ onBack }: Props) {
             className="input"
             min={0}
             step={5}
-            value={reminder.intervalMinutes}
-            onChange={(e) =>
-              handleNumberChange(
-                'intervalMinutes',
-                Math.max(0, Number(e.target.value) || 0),
-              )
-            }
+            value={interval}
+            onChange={(e) => setIntervalMin(e.target.value)}
             disabled={!reminder.enabled}
           />
           <span className="faint" style={{ fontSize: 12 }}>
@@ -137,13 +165,8 @@ export function ReminderSettings({ onBack }: Props) {
             className="input"
             min={1}
             step={5}
-            value={reminder.cooldownMinutes}
-            onChange={(e) =>
-              handleNumberChange(
-                'cooldownMinutes',
-                Math.max(1, Number(e.target.value) || 30),
-              )
-            }
+            value={cooldown}
+            onChange={(e) => setCooldown(e.target.value)}
             disabled={!reminder.enabled}
           />
           <span className="faint" style={{ fontSize: 12 }}>
@@ -152,42 +175,28 @@ export function ReminderSettings({ onBack }: Props) {
         </div>
         <div className="row wrap" style={{ gap: 16 }}>
           <div className="field" style={{ flex: 1, minWidth: 120 }}>
-            <label>窗口开始（小时 0-23）</label>
+            <label>窗口开始</label>
             <input
-              type="number"
+              type="time"
               className="input"
-              min={0}
-              max={23}
-              value={reminder.startHour}
-              onChange={(e) =>
-                handleNumberChange(
-                  'startHour',
-                  Math.min(23, Math.max(0, Number(e.target.value) || 0)),
-                )
-              }
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
               disabled={!reminder.enabled}
             />
           </div>
           <div className="field" style={{ flex: 1, minWidth: 120 }}>
-            <label>窗口结束（小时 0-23）</label>
+            <label>窗口结束</label>
             <input
-              type="number"
+              type="time"
               className="input"
-              min={0}
-              max={23}
-              value={reminder.endHour}
-              onChange={(e) =>
-                handleNumberChange(
-                  'endHour',
-                  Math.min(23, Math.max(0, Number(e.target.value) || 0)),
-                )
-              }
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
               disabled={!reminder.enabled}
             />
           </div>
         </div>
         <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>
-          只在 {reminder.startHour}:00 - {reminder.endHour}:00 之间触发提醒，避免深夜打扰。
+          只在 {startTime} - {endTime} 之间触发提醒，避免深夜打扰。
         </p>
       </section>
 
@@ -213,9 +222,6 @@ export function ReminderSettings({ onBack }: Props) {
                 >
                   <span className="tc-icon">{task.icon}</span>
                   <span className="name">{task.name}</span>
-                  <span className="prog">
-                    {getTypeLabel(task.type)}
-                  </span>
                   <div className="ops">
                     <label className="muted" style={{ fontSize: 13 }}>
                       <input
@@ -264,6 +270,9 @@ export function ReminderSettings({ onBack }: Props) {
             {msg}
           </p>
         )}
+        <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>
+          修改数字后点击「应用并重新调度」才会生效。
+        </p>
       </section>
     </div>
   )

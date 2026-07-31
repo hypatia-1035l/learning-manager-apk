@@ -4,6 +4,8 @@ import { getCurrentObject, formatSequenceProgress } from '../store'
 
 interface Props {
   task: Task
+  // 当前可随机任务池大小：< 2 时禁用「重新随机」（避免重复抽到同一项）
+  randomPoolSize: number
   onStart: () => void // 进入学习会话
   onReroll: () => void // 重新随机
   onClose: () => void
@@ -12,12 +14,15 @@ interface Props {
 
 export function RandomResultModal({
   task,
+  randomPoolSize,
   onStart,
   onReroll,
   onClose,
   onOpenTask,
 }: Props) {
   const obj = getCurrentObject(task)
+  // 可随机任务少于 2 个时，重新随机无意义（必然重复）
+  const canReroll = randomPoolSize >= 2
   return (
     <Modal title="🎲 随机结果" onClose={onClose}>
       <div className="random-result">
@@ -44,7 +49,12 @@ export function RandomResultModal({
           取消
         </button>
         <div className="row">
-          <button className="btn" onClick={onReroll} title="重新随机选择">
+          <button
+            className="btn"
+            onClick={onReroll}
+            disabled={!canReroll}
+            title={canReroll ? '重新随机选择' : '可随机的方向不足 2 个，无法重新随机'}
+          >
             🔄 重新随机
           </button>
           {obj ? (

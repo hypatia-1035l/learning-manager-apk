@@ -21,16 +21,25 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
   const [newName, setNewName] = useState('')
   const [newUnit, setNewUnit] = useState('')
   const [newTarget, setNewTarget] = useState('')
+  const [newCountdown, setNewCountdown] = useState('') // 分钟，空=正向计时
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editProg, setEditProg] = useState('')
   const [editUnit, setEditUnit] = useState('')
   const [editTarget, setEditTarget] = useState('')
+  const [editCountdown, setEditCountdown] = useState('')
 
   // 直接读取任务组（可能为 null，添加首项时自动创建）
   const group = task.group
   const items = group?.items ?? []
   const mode: GroupMode = group?.mode ?? 'sequential'
+
+  // 分钟字符串 → 秒数（空或 0 → null = 正向计时）
+  const parseCountdown = (s: string): number | null => {
+    const n = Number(s)
+    if (!s.trim() || isNaN(n) || n <= 0) return null
+    return Math.floor(n * 60)
+  }
 
   const handleAdd = () => {
     if (!newName.trim()) return
@@ -38,19 +47,22 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
       name: newName,
       progressUnit: newUnit.trim(),
       progressTarget: newTarget.trim(),
+      countdownSeconds: parseCountdown(newCountdown),
     })
     setNewName('')
     setNewUnit('')
     setNewTarget('')
+    setNewCountdown('')
     onTaskMutated()
   }
 
-  const startEdit = (item: { id: string; name: string; progress: string; progressUnit: string; progressTarget: string }) => {
+  const startEdit = (item: { id: string; name: string; progress: string; progressUnit: string; progressTarget: string; countdownSeconds?: number | null }) => {
     setEditingId(item.id)
     setEditName(item.name)
     setEditProg(item.progress)
     setEditUnit(item.progressUnit ?? '')
     setEditTarget(item.progressTarget ?? '')
+    setEditCountdown(item.countdownSeconds ? String(item.countdownSeconds / 60) : '')
   }
 
   const saveEdit = () => {
@@ -60,6 +72,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
       progress: editProg,
       progressUnit: editUnit,
       progressTarget: editTarget,
+      countdownSeconds: parseCountdown(editCountdown),
     })
     setEditingId(null)
     onTaskMutated()
@@ -119,22 +132,48 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
         <div className="row wrap" style={{ gap: 8 }}>
           <input
             className="input"
-            style={{ width: 120 }}
+            style={{ flex: '1 1 140px', minWidth: 120 }}
             value={newUnit}
             onChange={(e) => setNewUnit(e.target.value)}
-            placeholder="进度单位（可选，如：条/卷/集）"
+            placeholder="进度单位，如：条/卷/集"
           />
           <input
             className="input"
-            style={{ width: 120 }}
+            style={{ flex: '1 1 140px', minWidth: 120 }}
             value={newTarget}
             onChange={(e) => setNewTarget(e.target.value)}
-            placeholder="目标进度（可选，如：1000）"
+            placeholder="目标进度，如：1000"
           />
-          <span className="faint" style={{ fontSize: 12, alignSelf: 'center' }}>
-            填写数字目标→数量型序列；留空→位置型序列（自由文本）
-          </span>
         </div>
+        <div className="row wrap" style={{ gap: 8, marginTop: 6 }}>
+          <span className="faint" style={{ fontSize: 12, alignSelf: 'center' }}>持续时间：</span>
+          {[5, 15, 25, 45].map((m) => (
+            <button
+              key={m}
+              className={`btn sm ${newCountdown === String(m) ? 'primary' : ''}`}
+              onClick={() => setNewCountdown(newCountdown === String(m) ? '' : String(m))}
+            >
+              {m}分
+            </button>
+          ))}
+          <input
+            className="input"
+            type="number"
+            min={0}
+            style={{ width: 80 }}
+            value={newCountdown}
+            onChange={(e) => setNewCountdown(e.target.value)}
+            placeholder="自定义分钟"
+          />
+          {newCountdown && (
+            <button className="btn sm ghost" onClick={() => setNewCountdown('')}>
+              清除
+            </button>
+          )}
+        </div>
+        <span className="faint" style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
+          填写数字目标→数量型序列；留空→位置型序列（自由文本）。设持续时间→倒计时模式，到时自动结束。
+        </span>
       </div>
 
       {/* 列表 */}
@@ -175,17 +214,38 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                     <div className="row wrap" style={{ gap: 6 }}>
                       <input
                         className="input"
-                        style={{ width: 140 }}
+                        style={{ flex: '1 1 140px', minWidth: 120 }}
                         value={editUnit}
                         onChange={(e) => setEditUnit(e.target.value)}
-                        placeholder="进度单位（如：条/卷/集）"
+                        placeholder="进度单位，如：条/卷/集"
                       />
                       <input
                         className="input"
-                        style={{ width: 140 }}
+                        style={{ flex: '1 1 140px', minWidth: 120 }}
                         value={editTarget}
                         onChange={(e) => setEditTarget(e.target.value)}
-                        placeholder="目标进度（数字；留空=位置型）"
+                        placeholder="目标进度，如：1000"
+                      />
+                    </div>
+                    <div className="row wrap" style={{ gap: 6 }}>
+                      <span className="faint" style={{ fontSize: 12 }}>持续时间：</span>
+                      {[5, 15, 25, 45].map((m) => (
+                        <button
+                          key={m}
+                          className={`btn sm ${editCountdown === String(m) ? 'primary' : ''}`}
+                          onClick={() => setEditCountdown(editCountdown === String(m) ? '' : String(m))}
+                        >
+                          {m}分
+                        </button>
+                      ))}
+                      <input
+                        className="input"
+                        type="number"
+                        min={0}
+                        style={{ width: 80 }}
+                        value={editCountdown}
+                        onChange={(e) => setEditCountdown(e.target.value)}
+                        placeholder="分钟（空=正向）"
                       />
                       <button className="btn sm primary" onClick={saveEdit}>
                         保存

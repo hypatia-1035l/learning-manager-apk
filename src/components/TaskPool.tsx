@@ -6,28 +6,27 @@ import {
   setTaskRandomEnabled,
   setTaskWeight,
   pickRandomTask,
+  getRandomPool,
   getContinueTask,
   formatSequenceProgress,
 } from '../store'
 import { TASK_STATUS_LABELS } from '../types'
-import { getTypeLabel } from '../taskTypes'
 import { formatDuration } from '../utils'
 import { TaskForm } from './TaskForm'
 import { LearningSession } from './LearningSession'
 import { RandomResultModal } from './RandomResultModal'
-import { TaskTypeManager } from './TaskTypeManager'
 import type { Task } from '../types'
 
 interface Props {
   onOpenTask: (task: Task) => void
-  onOpenTodayStatus: () => void
 }
 
-export function TaskPool({ onOpenTask, onOpenTodayStatus }: Props) {
+export function TaskPool({ onOpenTask }: Props) {
   const data = useAppData()
   const [showForm, setShowForm] = useState(false)
   const [randomTask, setRandomTask] = useState<Task | null>(null)
   const [sessionTaskId, setSessionTaskId] = useState<string | null>(null)
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
 
   const continueTask = getContinueTask(data.tasks, data.records)
   const sessionTask = sessionTaskId
@@ -64,7 +63,19 @@ export function TaskPool({ onOpenTask, onOpenTodayStatus }: Props) {
             <button className="btn primary now-start">开始</button>
           </div>
         ) : (
-          <div className="now-empty">暂无进行中</div>
+          <div className="now-empty">
+            <div className="now-empty-title">还没开始摸鱼 🐟</div>
+            <div className="now-empty-hint">随机抽一个方向开始吧</div>
+            <button
+              className="btn primary"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleRandomStart()
+              }}
+            >
+              🎲 随机开始
+            </button>
+          </div>
         )}
       </section>
 
@@ -72,9 +83,6 @@ export function TaskPool({ onOpenTask, onOpenTodayStatus }: Props) {
       <div className="quick-actions">
         <button className="btn primary lg" onClick={handleRandomStart}>
           🎲 随机开始
-        </button>
-        <button className="btn lg" onClick={onOpenTodayStatus}>
-          📊 今日状态
         </button>
       </div>
 
@@ -106,7 +114,6 @@ export function TaskPool({ onOpenTask, onOpenTodayStatus }: Props) {
                 <div className="tc-head">
                   <span className="tc-icon">{task.icon}</span>
                   <span className="tc-name">{task.name}</span>
-                  <span className="tc-type">{getTypeLabel(task.type)}</span>
                 </div>
 
                 <div className="tc-current">
@@ -149,36 +156,53 @@ export function TaskPool({ onOpenTask, onOpenTodayStatus }: Props) {
                     />
                     启用
                   </label>
-                  <label
-                    className="muted"
-                    title="关闭后不进入随机池"
+                  <button
+                    className="btn sm ghost tc-more-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setExpandedTaskId(expandedTaskId === task.id ? null : task.id)
+                    }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={task.randomEnabled}
-                      onChange={(e) =>
-                        setTaskRandomEnabled(task.id, e.target.checked)
-                      }
-                    />
-                    参与随机
-                  </label>
-                  <label
-                    className="muted weight-ctrl"
-                    title="加权随机预留；普通随机不使用"
-                  >
-                    权重
-                    <input
-                      type="number"
-                      min={0}
-                      className="weight-input"
-                      value={task.weight}
-                      onChange={(e) =>
-                        setTaskWeight(task.id, Number(e.target.value))
-                      }
-                      disabled={!task.randomEnabled}
-                    />
-                  </label>
+                    {expandedTaskId === task.id ? '收起' : '更多'}
+                  </button>
                 </div>
+
+                {expandedTaskId === task.id && (
+                  <div
+                    className="tc-advanced"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <label
+                      className="muted"
+                      title="关闭后不进入随机池"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={task.randomEnabled}
+                        onChange={(e) =>
+                          setTaskRandomEnabled(task.id, e.target.checked)
+                        }
+                      />
+                      参与随机
+                    </label>
+                    <label
+                      className="muted weight-ctrl"
+                      title="加权随机预留；普通随机不使用"
+                    >
+                      权重
+                      <input
+                        type="number"
+                        min={0}
+                        className="weight-input"
+                        value={task.weight}
+                        onChange={(e) =>
+                          setTaskWeight(task.id, Number(e.target.value))
+                        }
+                        disabled={!task.randomEnabled}
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -190,6 +214,7 @@ export function TaskPool({ onOpenTask, onOpenTodayStatus }: Props) {
       {randomTask && (
         <RandomResultModal
           task={randomTask}
+          randomPoolSize={getRandomPool(data.tasks).length}
           onClose={() => setRandomTask(null)}
           onReroll={() => {
             const picked = pickRandomTask(data.tasks)
@@ -213,9 +238,6 @@ export function TaskPool({ onOpenTask, onOpenTodayStatus }: Props) {
           onTaskMutated={() => {}}
         />
       )}
-
-      {/* 类型管理（增删自定义任务类型） */}
-      <TaskTypeManager />
     </div>
   )
 }

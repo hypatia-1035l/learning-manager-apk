@@ -20,9 +20,13 @@ import {
   detectImportFormat,
   importBank,
   importAll,
+  addRandomRecord,
   type ImportedFormat,
 } from '../../randomStore'
 import type { WordBank, WordEntry, Preset } from '../../randomTypes'
+
+// 单次抽取数量选项
+const COUNT_OPTIONS = [1, 3, 5, 10]
 
 // 解析标签输入（逗号/空格/中文逗号分隔）
 function parseTagInput(raw: string): string[] {
@@ -525,35 +529,40 @@ function RandomPanel({
   onSavePreset: () => void
 }) {
   const isSingle = banks.length === 1
-  const [result, setResult] = useState<string | null>(null)
-  const [comboResult, setComboResult] = useState<string[] | null>(null)
+  const [drawCount, setDrawCount] = useState(1)
+  const [results, setResults] = useState<string[][]>([])
   const allHasItems = banks.every((b) => b.words.length > 0)
 
   const handleDraw = () => {
-    if (isSingle) {
-      const pick = pickWeighted(banks[0].words)
-      setResult(pick?.text ?? null)
-    } else {
-      const picks = banks.map((b) => {
+    const picks: string[][] = []
+    for (let i = 0; i < drawCount; i++) {
+      const row = banks.map((b) => {
         const pick = pickWeighted(b.words)
         return pick?.text ?? '—'
       })
-      setComboResult(picks)
-      setResult(null)
+      picks.push(row)
     }
+    setResults(picks)
+    // 写入随机记录
+    const bankNames = banks.map((b) => b.name).join(separator)
+    const resultText = picks
+      .map((row) => row.join(separator))
+      .join('\n')
+    addRandomRecord({
+      type: 'wordbank',
+      summary: `${bankNames} ×${drawCount}`,
+      result: resultText,
+    })
   }
 
   const bankKey = banks.map((b) => b.id).join(',')
-  const currentResult = isSingle
-    ? result
-    : comboResult
-      ? comboResult.join(separator)
-      : null
 
   return (
     <div className="form-stack" key={bankKey}>
       <div className="section-title">
-        {isSingle ? `单抽：${banks[0].name}` : `组合随机（${banks.length} 个词库）`}
+        {isSingle
+          ? `单抽：${banks[0].name}`
+          : `组合随机（${banks.length} 个词库）`}
       </div>
 
       {/* 选中词库标签 + 分隔符 */}
@@ -580,10 +589,45 @@ function RandomPanel({
         </>
       )}
 
+      {/* 单次抽取数量 */}
+      <div className="field">
+        <label>单次抽取数量</label>
+        <div className="row wrap">
+          {COUNT_OPTIONS.map((n) => (
+            <button
+              key={n}
+              className={`btn sm ${drawCount === n ? 'primary' : ''}`}
+              onClick={() => setDrawCount(n)}
+            >
+              ×{n}
+            </button>
+          ))}
+          <input
+            type="number"
+            min={1}
+            max={50}
+            className="input"
+            style={{ width: 80 }}
+            value={drawCount}
+            onChange={(e) =>
+              setDrawCount(
+                Math.max(1, Math.min(50, Math.floor(Number(e.target.value) || 1))),
+              )
+            }
+          />
+        </div>
+      </div>
+
       {/* 结果 */}
       <div className="rt-result">
-        {currentResult ? (
-          <span className="rt-text">{currentResult}</span>
+        {results.length ? (
+          <div className="rt-text-list">
+            {results.map((row, i) => (
+              <div key={i} className="rt-text-row">
+                {row.join(separator)}
+              </div>
+            ))}
+          </div>
         ) : (
           <span className="faint">
             {allHasItems
@@ -600,7 +644,7 @@ function RandomPanel({
         onClick={handleDraw}
         disabled={!allHasItems}
       >
-        🎲 {isSingle ? '随机抽取（按权重）' : '组合随机（按权重）'}
+        🎲 {isSingle ? '随机抽取' : '组合随机'} ×{drawCount}
       </button>
 
       {/* 保存预设入口 */}

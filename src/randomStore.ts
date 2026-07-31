@@ -5,10 +5,14 @@ import type {
   WordBank,
   WordEntry,
   Preset,
+  RandomRecord,
 } from './randomTypes'
 
 // 独立的 LocalStorage key，与学习系统完全分离
 const STORAGE_KEY = 'learning-manager:random-toolbox:v1'
+
+// 随机记录保留上限：超过自动截断旧记录，避免长期使用无限增长
+const MAX_RANDOM_RECORDS = 200
 
 const uid = (): string =>
   (typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -129,20 +133,38 @@ function migrateLegacy(raw: LegacyData): RandomData {
     )
   }
 
-  return { ranges, banks, presets }
+  return { ranges, banks, presets, records: [] }
 }
 
 function load(): RandomData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as LegacyData
-      return migrateLegacy(parsed)
+      const parsed = JSON.parse(raw) as LegacyData & { records?: RandomRecord[] }
+      const migrated = migrateLegacy(parsed)
+      // 旧数据可能无 records 字段，补默认空数组
+      if (!Array.isArray(parsed.records)) {
+        migrated.records = []
+      } else {
+        // 防御性清理：按时间降序排序后截断到上限
+        // 旧版本数据可能超过 MAX_RANDOM_RECORDS 或顺序紊乱，这里统一规整
+        migrated.records = trimRecords(parsed.records)
+      }
+      return migrated
     }
   } catch {
     /* ignore */
   }
-  return { ranges: [], banks: [], presets: [] }
+  return { ranges: [], banks: [], presets: [], records: [] }
+}
+
+// 按时间降序排序并截断到 MAX_RANDOM_RECORDS，避免长期使用数据无限增长
+function trimRecords(records: RandomRecord[]): RandomRecord[] {
+  if (!records.length) return []
+  const sorted = [...records].sort((a, b) => b.createdAt - a.createdAt)
+  if (sorted.length <= MAX_RANDOM_RECORDS) return sorted
+  sorted.length = MAX_RANDOM_RECORDS
+  return sorted
 }
 
 let state: RandomData = load()
@@ -427,6 +449,36 @@ export function deletePreset(id: string) {
   }))
 }
 
+// ---------- 随机记录 CRUD ----------
+// 新增随机记录；默认只保留最近 MAX_RANDOM_RECORDS 条，超出自动截断
+export function addRandomRecord(input: {
+  type: 'number' | 'wordbank'
+  summary: string
+  result: string
+}): RandomRecord {
+  const rec: RandomRecord = {
+    id: uid(),
+    type: input.type,
+    summary: input.summary,
+    result: input.result,
+    createdAt: Date.now(),
+  }
+  setState((p) => {
+    // 复用 trimRecords：统一排序 + 截断到 MAX_RANDOM_RECORDS，与 load 路径行为一致
+    const next = trimRecords([rec, ...p.records])
+    return { ...p, records: next }
+  })
+  return rec
+}
+
+// 清空记录；type 为空时清空全部
+export function clearRandomRecords(type?: 'number' | 'wordbank') {
+  setState((p) => ({
+    ...p,
+    records: type ? p.records.filter((r) => r.type !== type) : [],
+  }))
+}
+
 // ---------- 辅助查询 ----------
 export function getAllCategories(banks: WordBank[]): string[] {
   const set = new Set<string>()
@@ -687,6 +739,7 @@ export function importAll(data: ExportedAll): ImportAllResult {
 
   // 4. 应用变更
   setState((p) => ({
+    ...p,
     ranges: [...p.ranges, ...newRanges],
     banks: [...p.banks, ...newBanks],
     presets: [...p.presets, ...newPresets],

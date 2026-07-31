@@ -5,37 +5,46 @@ import {
   updateRange,
   deleteRange,
   randNum,
+  addRandomRecord,
 } from '../../randomStore'
 
-const DECIMAL_OPTIONS = [
-  { value: 0, label: '整数' },
-  { value: 1, label: '1 位小数' },
-  { value: 2, label: '2 位小数' },
-  { value: 3, label: '3 位小数' },
-  { value: 4, label: '4 位小数' },
-  { value: 5, label: '5 位小数' },
-]
+// 单次抽取数量选项
+const COUNT_OPTIONS = [1, 3, 5, 10]
 
 export function NumberRandomizer() {
   const data = useRandomData()
   const [min, setMin] = useState('1')
   const [max, setMax] = useState('100')
   const [decimals, setDecimals] = useState(0)
-  const [result, setResult] = useState<number | null>(null)
+  const [drawCount, setDrawCount] = useState(1)
+  const [results, setResults] = useState<number[]>([])
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const minNum = Number(min)
   const maxNum = Number(max)
+  const decimalsLabel = decimals === 0 ? '整数' : `${decimals} 位小数`
 
   const handleRoll = () => {
-    setResult(randNum(minNum, maxNum, decimals))
+    if (isNaN(minNum) || isNaN(maxNum)) return
+    const picks: number[] = []
+    for (let i = 0; i < drawCount; i++) {
+      picks.push(randNum(minNum, maxNum, decimals))
+    }
+    setResults(picks)
+    // 写入随机记录
+    const resultText = picks.map((n) => formatNumber(n, decimals)).join('、')
+    addRandomRecord({
+      type: 'number',
+      summary: `${minNum}–${maxNum} · ${decimalsLabel} ×${drawCount}`,
+      result: resultText,
+    })
   }
 
   const handleLoadRange = (r: typeof data.ranges[0]) => {
     setMin(String(r.min))
     setMax(String(r.max))
-    setResult(null)
+    setResults([])
   }
 
   const handleSave = () => {
@@ -59,7 +68,7 @@ export function NumberRandomizer() {
                 value={min}
                 onChange={(e) => {
                   setMin(e.target.value)
-                  setResult(null)
+                  setResults([])
                 }}
               />
             </div>
@@ -71,40 +80,80 @@ export function NumberRandomizer() {
                 value={max}
                 onChange={(e) => {
                   setMax(e.target.value)
-                  setResult(null)
+                  setResults([])
                 }}
               />
             </div>
           </div>
 
           <div className="field">
-            <label>小数点位数</label>
+            <label>小数点位数（0 = 整数）</label>
+            <div className="row">
+              <input
+                type="number"
+                min={0}
+                max={10}
+                className="input"
+                style={{ width: 100 }}
+                value={decimals}
+                onChange={(e) => {
+                  const v = Math.max(0, Math.floor(Number(e.target.value) || 0))
+                  setDecimals(v)
+                  setResults([])
+                }}
+              />
+              <span className="faint" style={{ fontSize: 13 }}>
+                {decimalsLabel}
+              </span>
+            </div>
+          </div>
+
+          <div className="field">
+            <label>单次抽取数量</label>
             <div className="row wrap">
-              {DECIMAL_OPTIONS.map((opt) => (
+              {COUNT_OPTIONS.map((n) => (
                 <button
-                  key={opt.value}
-                  className={`btn sm ${decimals === opt.value ? 'primary' : ''}`}
-                  onClick={() => {
-                    setDecimals(opt.value)
-                    setResult(null)
-                  }}
+                  key={n}
+                  className={`btn sm ${drawCount === n ? 'primary' : ''}`}
+                  onClick={() => setDrawCount(n)}
                 >
-                  {opt.label}
+                  ×{n}
                 </button>
               ))}
+              <input
+                type="number"
+                min={1}
+                max={50}
+                className="input"
+                style={{ width: 80 }}
+                value={drawCount}
+                onChange={(e) =>
+                  setDrawCount(Math.max(1, Math.min(50, Math.floor(Number(e.target.value) || 1))))
+                }
+              />
             </div>
           </div>
 
           <div className="rt-result">
-            {result !== null ? (
-              <span className="rt-number">{result}</span>
+            {results.length ? (
+              <div className="rt-number-list">
+                {results.map((n, i) => (
+                  <span key={i} className="rt-number">
+                    {formatNumber(n, decimals)}
+                  </span>
+                ))}
+              </div>
             ) : (
               <span className="faint">点击下方按钮开始随机</span>
             )}
           </div>
 
-          <button className="btn primary lg" onClick={handleRoll}>
-            🎲 随机
+          <button
+            className="btn primary lg"
+            onClick={handleRoll}
+            disabled={isNaN(minNum) || isNaN(maxNum)}
+          >
+            🎲 随机 ×{drawCount}
           </button>
 
           <div className="field">
@@ -191,6 +240,12 @@ export function NumberRandomizer() {
       </div>
     </div>
   )
+}
+
+// 数字格式化：decimals=0 时显示整数；否则保留指定小数位
+function formatNumber(n: number, decimals: number): string {
+  if (decimals <= 0) return String(Math.floor(n))
+  return n.toFixed(decimals)
 }
 
 function RangeEditRow({

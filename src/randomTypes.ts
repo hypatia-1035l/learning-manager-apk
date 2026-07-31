@@ -26,11 +26,23 @@ export interface WordBank {
   createdAt: number
 }
 
+// ===== 随机记录：单次点击随机按钮的快照 =====
+// type=number: 数字随机；type=wordbank: 词库随机
+// result 为本次抽取结果的可读文本（多个结果合并展示）
+export interface RandomRecord {
+  id: string
+  type: 'number' | 'wordbank'
+  summary: string // 简短描述，如「1-100 整数 ×3」「水果+颜色」
+  result: string // 完整结果文本（多行用 \n 分隔）
+  createdAt: number
+}
+
 // 整体数据形态
 export interface RandomData {
   ranges: NumberRange[]
   banks: WordBank[] // 统一词库
   presets: Preset[] // 随机预设
+  records: RandomRecord[] // 随机记录
 }
 
 // 随机预设：保存常用词库组合

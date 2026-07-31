@@ -1,47 +1,38 @@
 import { useState } from 'react'
 import { NumberRandomizer } from './random/NumberRandomizer'
 import { WordBankRandomizer } from './random/WordBankRandomizer'
+import { RandomRecords } from './random/RandomRecords'
 
-type Tool = 'number' | 'wordbank'
+type Tool = 'number' | 'wordbank' | 'records'
 
-const TOOLS: { id: Tool; label: string; icon: string; desc: string }[] = [
-  { id: 'number', label: '数字随机', icon: '🔢', desc: '设置范围抽数字' },
-  { id: 'wordbank', label: '词库随机', icon: '📝', desc: '统一词库 · 单抽/组合 · 权重' },
+const TABS: { id: Tool; label: string; icon: string }[] = [
+  { id: 'number', label: '数字随机', icon: '🔢' },
+  { id: 'wordbank', label: '词库随机', icon: '📝' },
+  { id: 'records', label: '随机记录', icon: '📜' },
 ]
 
-interface Props {}
-
-export function RandomToolbox({}: Props = {}) {
+export function RandomToolbox() {
   const [tool, setTool] = useState<Tool>('number')
 
   return (
-    <div>
-      <header className="app-header">
-        <h1 className="app-title">🧰 工具</h1>
-      </header>
-      <p className="app-tagline">
-        数字随机 · 词库随机 · 结果仅提供选择参考
-      </p>
-
-      {/* 工具选择卡 */}
-      <div className="tool-cards">
-        {TOOLS.map((t) => (
+    <div className="pool-compact">
+      <div className="tabs rt-tabs">
+        {TABS.map((t) => (
           <button
             key={t.id}
-            className={`tool-card ${tool === t.id ? 'active' : ''}`}
+            className={`tab ${tool === t.id ? 'active' : ''}`}
             onClick={() => setTool(t.id)}
           >
-            <span className="tc2-icon">{t.icon}</span>
-            <span className="tc2-name">{t.label}</span>
-            <span className="tc2-desc">{t.desc}</span>
+            <span style={{ marginRight: 4 }}>{t.icon}</span>
+            {t.label}
           </button>
         ))}
       </div>
 
-      {/* 工具内容 */}
-      <div style={{ marginTop: 16 }}>
+      <div>
         {tool === 'number' && <NumberRandomizer />}
         {tool === 'wordbank' && <WordBankRandomizer />}
+        {tool === 'records' && <RandomRecords />}
       </div>
     </div>
   )

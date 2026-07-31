@@ -16,9 +16,6 @@ interface Props {
 const KEY_LABELS: Record<string, string> = {
   'learning-manager:data:v1': '学习数据（任务/任务组/学习记录/提醒）',
   'learning-manager:random-toolbox:v1': '工具（数字/词库随机）',
-  'learning-manager:slacking-rules:v1': '摸鱼检测规则',
-  'learning-manager:app-category-map:v1': '应用分类设置',
-  'learning-manager:slacking-alert:v1': '摸鱼提醒（旧版）',
   'learning-manager:vivo-guide-shown:v1': '引导标记',
 }
 

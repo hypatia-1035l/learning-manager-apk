@@ -16,9 +16,31 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            // 从 gradle.properties 或环境变量读取，避免明文密码入库
+            def keystorePath = System.getenv('RELEASE_STORE_FILE') ?: (project.findProperty('RELEASE_STORE_FILE') ?: '')
+            def storePwd = System.getenv('RELEASE_STORE_PASSWORD') ?: (project.findProperty('RELEASE_STORE_PASSWORD') ?: '')
+            def alias = System.getenv('RELEASE_KEY_ALIAS') ?: (project.findProperty('RELEASE_KEY_ALIAS') ?: '')
+            def keyPwd = System.getenv('RELEASE_KEY_PASSWORD') ?: (project.findProperty('RELEASE_KEY_PASSWORD') ?: '')
+            if (keystorePath && storePwd && alias && keyPwd) {
+                storeFile file(keystorePath)
+                storePassword storePwd
+                keyAlias alias
+                keyPassword keyPwd
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
+            // 仅当 release 签名配置完整时才使用；否则回退到 debug 签名
+            // （CI / 本地未配置 release keystore 时仍能产出可安装 APK 便于测试）
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }

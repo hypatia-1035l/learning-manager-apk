@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { Modal } from './Modal'
 import { ICON_CHOICES } from '../constants'
 import { updateTask } from '../store'
-import type { Task, TaskType } from '../types'
-import { useTaskTypes } from '../taskTypes'
+import type { Task } from '../types'
 
 interface Props {
   task: Task
@@ -13,17 +12,14 @@ interface Props {
 export function TaskEditForm({ task, onClose }: Props) {
   const [name, setName] = useState(task.name)
   const [icon, setIcon] = useState(task.icon)
-  const [type, setType] = useState<TaskType>(task.type)
   const [randomEnabled, setRandomEnabled] = useState(task.randomEnabled)
   const [weight, setWeight] = useState(task.weight)
-  const types = useTaskTypes()
 
   const submit = () => {
     if (!name.trim()) return
     updateTask(task.id, {
       name: name.trim(),
       icon,
-      type,
       randomEnabled,
       weight: Math.max(0, Math.floor(Number(weight) || 0)),
     })
@@ -55,21 +51,6 @@ export function TaskEditForm({ task, onClose }: Props) {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
-        </div>
-
-        <div className="field">
-          <label>类型</label>
-          <div className="row wrap">
-            {types.map((t) => (
-              <button
-                key={t.id}
-                className={`btn sm ${type === t.id ? 'primary' : ''}`}
-                onClick={() => setType(t.id)}
-              >
-                {t.icon} {t.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className="field">

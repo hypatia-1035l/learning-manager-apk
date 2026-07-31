@@ -2,19 +2,23 @@ import { useSyncExternalStore } from 'react'
 import type {
   AppData,
   Task,
-  TaskType,
   TaskStatus,
   TaskGroup,
   GroupMode,
   LearningObject,
   Sequence,
   SequenceProgress,
-  CountProgress,
-  PositionProgress,
   StudyRecord,
   ReminderConfig,
 } from './types'
 import { DEFAULT_REMINDER } from './types'
+import {
+  parseProgressNumber,
+  deriveProgressModel,
+  migrateAppData,
+  writeSchemaVersion,
+  CURRENT_SCHEMA_VERSION,
+} from './migrate'
 
 const STORAGE_KEY = 'learning-manager:data:v1'
 
@@ -25,131 +29,18 @@ const uid = (): string =>
     : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`)
 
 // ---------- 进度解析（迁移与学习会话共用） ----------
-// 解析进度字符串为数字：支持 "卷五"→5、"第12集"→12、"3.5"→3.5
-// 失败返回 NaN
-export function parseProgressNumber(s: string): number {
-  if (!s) return NaN
-  const trimmed = s.trim()
-  const direct = Number(trimmed)
-  if (!isNaN(direct) && trimmed !== '') return direct
-  const m = trimmed.match(/(\d+(?:\.\d+)?)/)
-  if (m) return Number(m[1])
-  const cnMap: Record<string, number> = {
-    一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
-  }
-  if (trimmed.length === 1 && cnMap[trimmed]) return cnMap[trimmed]
-  if (trimmed.startsWith('十') && trimmed.length === 2) return 10 + (cnMap[trimmed[1]] ?? 0)
-  if (trimmed.startsWith('廿') && trimmed.length === 2) return 20 + (cnMap[trimmed[1]] ?? 0)
-  if (trimmed.length === 2 && cnMap[trimmed[0]]) {
-    const a = cnMap[trimmed[0]]
-    return trimmed[1] === '十' ? a * 10 : NaN
-  }
-  return NaN
-}
-
-// 由旧 LearningObject 字段推导进度模型（迁移用）：
-//   - progressTarget 可解析为数字 → count 型
-//   - 否则 → position 型（保留原文本）
-function deriveProgressModel(i: {
-  progress: string
-  progressUnit: string
-  progressTarget: string
-}): SequenceProgress {
-  const tgt = parseProgressNumber(i.progressTarget)
-  if (i.progressTarget.trim() && !isNaN(tgt)) {
-    const cur = parseProgressNumber(i.progress)
-    const model: CountProgress = {
-      type: 'count',
-      current: isNaN(cur) ? 0 : cur,
-      target: tgt,
-      unit: i.progressUnit ?? '',
-    }
-    return model
-  }
-  const pos: PositionProgress = { type: 'position', text: i.progress ?? '' }
-  return pos
-}
+// parseProgressNumber / deriveProgressModel 已迁移至 ./migrate.ts，此处按需 import
 
 function load(): AppData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as AppData
-      parsed.tasks = parsed.tasks.map((t) => {
-        // 迁移：任务组模式（旧数据默认顺序接续）
-        const group = t.group
-          ? {
-              ...t.group,
-              mode:
-                (t.group as TaskGroup & { mode?: GroupMode }).mode ??
-                'sequential',
-              // 迁移：学习对象 weight（旧数据默认 1）
-              // 迁移：学习对象 enabled（旧数据默认 true）
-              items: t.group.items.map((i) => {
-                const merged: LearningObject = {
-                  ...i,
-                  weight:
-                    typeof (i as LearningObject & { weight?: number }).weight ===
-                    'number'
-                      ? (i as LearningObject & { weight?: number }).weight!
-                      : 1,
-                  enabled:
-                    typeof (i as LearningObject & { enabled?: boolean }).enabled ===
-                    'boolean'
-                      ? (i as LearningObject & { enabled?: boolean }).enabled!
-                      : true,
-                  // 迁移：进度目标和单位（旧数据无，默认空字符串）
-                  progressUnit:
-                    typeof (i as LearningObject & { progressUnit?: string }).progressUnit ===
-                    'string'
-                      ? (i as LearningObject & { progressUnit?: string }).progressUnit!
-                      : '',
-                  progressTarget:
-                    typeof (i as LearningObject & { progressTarget?: string }).progressTarget ===
-                    'string'
-                      ? (i as LearningObject & { progressTarget?: string }).progressTarget!
-                      : '',
-                }
-                // 迁移：推导进度模型 progressModel（数量型/位置型）
-                // 已有 progressModel 的（新版本写入）保持不变
-                if (!merged.progressModel) {
-                  merged.progressModel = deriveProgressModel(merged)
-                }
-                return merged
-              }),
-            }
-          : t.group
-        return {
-          ...t,
-          randomEnabled:
-            typeof (t as Task & { randomEnabled?: boolean }).randomEnabled ===
-            'boolean'
-              ? (t as Task & { randomEnabled?: boolean }).randomEnabled!
-              : true,
-          weight:
-            typeof (t as Task & { weight?: number }).weight === 'number'
-              ? (t as Task & { weight?: number }).weight!
-              : 1,
-          group,
-        }
-      })
-      return {
-        ...parsed,
-        // 迁移：旧数据无 reminder 字段时使用默认配置
-        // 迁移：旧 reminder 可能有 mode/enabledTypes 字段，已移除
-        // 迁移：旧 reminder 可能无 cooldownMinutes 字段，默认 30
-        reminder: parsed.reminder
-          ? {
-              enabled: parsed.reminder.enabled ?? false,
-              intervalMinutes: parsed.reminder.intervalMinutes ?? 0,
-              cooldownMinutes:
-                (parsed.reminder as ReminderConfig & { cooldownMinutes?: number }).cooldownMinutes ?? 30,
-              startHour: parsed.reminder.startHour ?? 9,
-              endHour: parsed.reminder.endHour ?? 22,
-              enabledTaskIds: parsed.reminder.enabledTaskIds ?? [],
-            }
-          : { ...DEFAULT_REMINDER },
-      }
+      const parsed = JSON.parse(raw)
+      // 统一走 migrateAppData：处理字段补全 / progressModel 推导 / reminder 兼容
+      const data = migrateAppData(parsed)
+      // 标记当前 schema 版本，便于后续升级判定
+      writeSchemaVersion(CURRENT_SCHEMA_VERSION)
+      return data
     }
   } catch {
     /* ignore */
@@ -196,14 +87,12 @@ export const newId = uid
 export function createTask(input: {
   name: string
   icon: string
-  type: TaskType
 }): Task {
   const now = Date.now()
   const task: Task = {
     id: uid(),
     name: input.name.trim() || '未命名任务',
     icon: input.icon,
-    type: input.type,
     status: 'not_started',
     enabled: true,
     randomEnabled: true,
@@ -323,10 +212,10 @@ export function addLearningObject(
   taskId: string,
   input: {
     name: string
-    type?: string
     progress?: string
     progressUnit?: string
     progressTarget?: string
+    countdownSeconds?: number | null
   },
 ) {
   setState((prev) => ({
@@ -336,13 +225,13 @@ export function addLearningObject(
       const obj: LearningObject = {
         id: uid(),
         name: input.name.trim() || '未命名',
-        type: input.type ?? t.type,
         progress: input.progress ?? '',
         progressUnit: input.progressUnit ?? '',
         progressTarget: input.progressTarget ?? '',
         completed: false,
         enabled: true,
         weight: 1,
+        countdownSeconds: input.countdownSeconds ?? null,
         // 推导进度模型：有数字目标→count 型；否则 position 型
         progressModel: deriveProgressModel({
           progress: input.progress ?? '',
@@ -395,6 +284,19 @@ export function updateLearningObject(
             ) {
               if (!('progressModel' in patch)) {
                 merged.progressModel = deriveProgressModel(merged)
+              }
+            }
+            // 反向同步：显式传入 progressModel 时，同步推导旧字段
+            // 保证 4 个字段（progress/progressUnit/progressTarget/progressModel）始终一致
+            if (patch.progressModel) {
+              const m = patch.progressModel
+              if (m.type === 'count') {
+                merged.progress = String(m.current)
+                merged.progressUnit = m.unit
+                merged.progressTarget = String(m.target)
+              } else {
+                merged.progress = m.text
+                // position 型不强制清空 unit/target（保留旧值兼容旧读取路径）
               }
             }
             return merged
@@ -548,6 +450,8 @@ export function finishStudySession(args: {
   endProgress: string
   // 数量型序列本次完成数量（增量），如 +20；位置型不传
   deltaCount?: number
+  // 学习备注（可选）
+  note?: string
 }) {
   setState((prev) => {
     const task = prev.tasks.find((t) => t.id === args.taskId)
@@ -568,6 +472,8 @@ export function finishStudySession(args: {
       startProgress: args.startProgress,
       endProgress: args.endProgress,
       deltaCount: args.deltaCount,
+      // 学习备注（可选；不填则 undefined，不写空字符串）
+      note: args.note?.trim() || undefined,
     }
     const tasks = prev.tasks.map((t) => {
       if (t.id !== args.taskId) return t
@@ -652,9 +558,86 @@ export function finishStudySession(args: {
   })
 }
 
+// 更新学习记录备注（记录详情页内联编辑）
+export function updateStudyRecordNote(recordId: string, note: string | undefined) {
+  setState((prev) => {
+    const finalNote = note?.trim() || undefined
+    return {
+      ...prev,
+      records: prev.records.map((r) =>
+        r.id === recordId ? { ...r, note: finalNote } : r,
+      ),
+    }
+  })
+}
+
 // ---------- 学习记录查询 ----------
 export function getRecordsByTask(records: StudyRecord[], taskId: string) {
   return records.filter((r) => r.taskId === taskId)
+}
+
+// 获取今天 0 点时间戳（本地时区）
+function startOfToday(): number {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+// ---------- 统计：总学习时长（秒） ----------
+export function getTotalStudyDuration(records: StudyRecord[]): number {
+  return records.reduce((s, r) => s + (r.duration || 0), 0)
+}
+
+// ---------- 统计：今日学习时长（秒） ----------
+export function getTodayStudyDuration(records: StudyRecord[]): number {
+  const todayStart = startOfToday()
+  return records
+    .filter((r) => r.date >= todayStart)
+    .reduce((s, r) => s + (r.duration || 0), 0)
+}
+
+// ---------- 统计：按方向汇总学习时长 ----------
+// 返回 [{ taskId, taskName, totalDuration, recordCount }] 按时长降序
+export function getStatsByTask(records: StudyRecord[]): Array<{
+  taskId: string
+  taskName: string
+  totalDuration: number
+  recordCount: number
+}> {
+  const map = new Map<string, {
+    taskId: string
+    taskName: string
+    totalDuration: number
+    recordCount: number
+  }>()
+  for (const r of records) {
+    if (!r.taskId) continue
+    const cur = map.get(r.taskId)
+    if (cur) {
+      cur.totalDuration += r.duration || 0
+      cur.recordCount += 1
+    } else {
+      map.set(r.taskId, {
+        taskId: r.taskId,
+        taskName: r.taskName || '（未知方向）',
+        totalDuration: r.duration || 0,
+        recordCount: 1,
+      })
+    }
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => b.totalDuration - a.totalDuration,
+  )
+}
+
+// ---------- 统计：最近 N 条学习记录（全任务合并） ----------
+export function getRecentRecords(
+  records: StudyRecord[],
+  limit = 10,
+): StudyRecord[] {
+  return [...records]
+    .sort((a, b) => b.date - a.date)
+    .slice(0, limit)
 }
 
 // ---------- 任务选择系统 ----------
