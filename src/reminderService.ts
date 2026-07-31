@@ -2,9 +2,13 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import type {
   ReminderConfig,
   Task,
-  LearningObject,
+  Sequence,
 } from './types'
-import { getCurrentObject, getReminderPool } from './store'
+import {
+  getReminderPool,
+  pickSequence,
+  formatSequenceProgress,
+} from './store'
 
 // 通知 ID 命名空间：1 起递增，用于窗口内多次提醒
 export const NOTIF_ID_BASE = 1
@@ -24,13 +28,14 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 // ---------- 通知内容构建 ----------
-// 标题：今天摸啥鱼
-// 内容：该摸一条鱼了：\n任务：{任务名}\n当前：{对象名}\n进度：{进度}
-function buildBody(task: Task, obj: LearningObject | null): string {
-  const lines = ['该摸一条鱼了：', `任务：${task.name}`]
-  if (obj) {
-    lines.push(`当前：${obj.name}`)
-    lines.push(`进度：${obj.progress || '尚未记录'}`)
+// 数据来源由「Task + 当前 object」改为「Task + Sequence（学习序列）」
+// 展示语义：学习方向 / 当前序列 / 进度
+// 注：仅替换数据来源，通知展示逻辑不变。
+function buildBody(task: Task, seq: Sequence | null): string {
+  const lines = ['该摸一条鱼了：', `学习方向：${task.name}`]
+  if (seq) {
+    lines.push(`当前序列：${seq.name}`)
+    lines.push(`进度：${formatSequenceProgress(seq)}`)
   }
   return lines.join('\n')
 }
@@ -97,13 +102,14 @@ export async function scheduleReminders(
     while (at < end && i < 50) {
       if (isInWindow(at.getHours(), reminder.startHour, reminder.endHour)) {
         const task = pickWeightedTask(pool)
-        const obj = getCurrentObject(task)
+        // 选定学习方向后，再从其下选一个具体序列（保留原随机算法，仅替换数据来源）
+        const seq = pickSequence(task)
         notifications.push({
           id: NOTIF_ID_BASE + i,
           title: '今天摸啥鱼',
-          body: buildBody(task, obj),
+          body: buildBody(task, seq),
           schedule: { at },
-          extra: { taskId: task.id },
+          extra: { taskId: task.id, sequenceId: seq?.id ?? null },
         })
         i++
       }
@@ -126,13 +132,13 @@ export async function scheduleReminders(
         continue
       }
       const task = pickWeightedTask(pool)
-      const obj = getCurrentObject(task)
+      const seq = pickSequence(task)
       notifications.push({
         id: NOTIF_ID_BASE + i,
         title: '今天摸啥鱼',
-        body: buildBody(task, obj),
+        body: buildBody(task, seq),
         schedule: { at: fireAt },
-        extra: { taskId: task.id },
+        extra: { taskId: task.id, sequenceId: seq?.id ?? null },
       })
       i++
       // 下一次提醒至少在冷却时间之后

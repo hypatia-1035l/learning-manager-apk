@@ -9,26 +9,18 @@ const TOOLS: { id: Tool; label: string; icon: string; desc: string }[] = [
   { id: 'wordbank', label: '词库随机', icon: '📝', desc: '统一词库 · 单抽/组合 · 权重' },
 ]
 
-interface Props {
-  onBack: () => void
-}
+interface Props {}
 
-export function RandomToolbox({ onBack }: Props) {
+export function RandomToolbox({}: Props = {}) {
   const [tool, setTool] = useState<Tool>('number')
 
   return (
     <div>
-      <button className="back-link" onClick={onBack}>
-        ← 返回首页
-      </button>
-
       <header className="app-header">
-        <h1 className="app-title">
-          🎲 随机工具<span className="sub">Random Toolbox</span>
-        </h1>
+        <h1 className="app-title">🧰 工具</h1>
       </header>
       <p className="app-tagline">
-        通用随机能力 · 与学习系统独立 · 结果仅提供选择参考
+        数字随机 · 词库随机 · 结果仅提供选择参考
       </p>
 
       {/* 工具选择卡 */}

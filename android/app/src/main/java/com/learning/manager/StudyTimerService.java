@@ -37,6 +37,11 @@ public class StudyTimerService extends Service {
     public static final String EXTRA_TASK_NAME = "taskName";
     public static final String EXTRA_OBJECT_NAME = "objectName";
     public static final String EXTRA_ELAPSED_SECONDS = "elapsedSeconds";
+    public static final String EXTRA_IS_UPDATE = "isUpdate";
+
+    // 标记是否为用户主动停止（用于 onDestroy 中区分主动停止 vs 系统杀死）
+    // 当 true 时 onDestroy 会清除持久化状态；当 false（系统杀死）时保留状态用于恢复
+    public static volatile boolean explicitlyStopped = false;
 
     // 运行时计时
     private Handler handler;
@@ -70,11 +75,19 @@ public class StudyTimerService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         // 1. 读取 Intent / 恢复状态
         if (intent != null && intent.hasExtra(EXTRA_TASK_NAME)) {
-            taskName = intent.getStringExtra(EXTRA_TASK_NAME);
-            objectName = intent.getStringExtra(EXTRA_OBJECT_NAME);
-            int elapsedSec = intent.getIntExtra(EXTRA_ELAPSED_SECONDS, 0);
-            accumulatedMs = elapsedSec * 1000L;
-            startedAtElapsedRealtime = SystemClock.elapsedRealtime();
+            boolean isUpdate = intent.getBooleanExtra(EXTRA_IS_UPDATE, false);
+            if (isUpdate) {
+                // update：仅更新名称，不重置计时
+                taskName = intent.getStringExtra(EXTRA_TASK_NAME);
+                objectName = intent.getStringExtra(EXTRA_OBJECT_NAME);
+            } else {
+                // start：全新开始，重置计时
+                taskName = intent.getStringExtra(EXTRA_TASK_NAME);
+                objectName = intent.getStringExtra(EXTRA_OBJECT_NAME);
+                int elapsedSec = intent.getIntExtra(EXTRA_ELAPSED_SECONDS, 0);
+                accumulatedMs = elapsedSec * 1000L;
+                startedAtElapsedRealtime = SystemClock.elapsedRealtime();
+            }
         } else {
             // Service 被系统重建（START_STICKY），从 SharedPreferences 恢复
             restoreState();
@@ -208,8 +221,12 @@ public class StudyTimerService extends Service {
         if (handler != null && tickRunnable != null) {
             handler.removeCallbacks(tickRunnable);
         }
-        // Service 被销毁（用户结束学习 / App 被杀）时清除持久化状态
-        clearState();
+        // 仅在用户主动停止时清除持久化状态
+        // 系统杀死（内存回收）时保留状态，确保重启后可恢复
+        if (explicitlyStopped) {
+            clearState();
+            explicitlyStopped = false;
+        }
         super.onDestroy();
     }
 

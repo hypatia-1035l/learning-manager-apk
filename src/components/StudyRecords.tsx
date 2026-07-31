@@ -25,9 +25,12 @@ export function StudyRecords({ taskId }: Props) {
           {records.map((r) => (
             <div key={r.id} className="record-item">
               <span className="date">{formatDateTime(r.date)}</span>
-              <span className="obj">{r.objectName}</span>
+              <span className="obj">{r.sequenceName ?? r.objectName}</span>
               <span className="change">
                 {r.startProgress || '—'} → {r.endProgress || '—'}
+                {typeof r.deltaCount === 'number' && r.deltaCount !== 0
+                  ? `（+${r.deltaCount}）`
+                  : ''}
               </span>
               <span className="dur">{formatDuration(r.duration)}</span>
             </div>

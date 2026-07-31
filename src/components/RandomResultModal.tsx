@@ -1,13 +1,13 @@
 import { Modal } from './Modal'
 import type { Task } from '../types'
-import { getCurrentObject } from '../store'
+import { getCurrentObject, formatSequenceProgress } from '../store'
 
 interface Props {
   task: Task
   onStart: () => void // 进入学习会话
   onReroll: () => void // 重新随机
   onClose: () => void
-  onOpenTask: () => void // 该方向无学习对象时跳转去配置
+  onOpenTask: () => void // 该方向无学习序列时跳转去配置
 }
 
 export function RandomResultModal({
@@ -25,16 +25,16 @@ export function RandomResultModal({
         <div className="rr-name">{task.name}</div>
 
         <div className="rr-block">
-          <div className="label">当前学习对象</div>
+          <div className="label">当前学习序列</div>
           <div className="obj">
-            {obj ? obj.name : '（尚未设置学习对象）'}
+            {obj ? obj.name : '（尚未设置学习序列）'}
           </div>
         </div>
 
         <div className="rr-block">
           <div className="label">当前进度</div>
           <div className="prog">
-            {obj ? obj.progress || '尚未记录' : '—'}
+            {obj ? formatSequenceProgress(obj) : '—'}
           </div>
         </div>
       </div>
@@ -57,7 +57,7 @@ export function RandomResultModal({
             </button>
           ) : (
             <button className="btn primary" onClick={onOpenTask}>
-              去添加学习对象
+              去添加学习序列
             </button>
           )}
         </div>

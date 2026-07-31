@@ -1267,4 +1267,187 @@ textarea {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ===== 工作区 Shell：顶部标题 + 底部 TabBar ===== */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  padding: 10px 16px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.shell-header .app-title {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+}
+.shell-main {
+  flex: 1;
+  padding: 4px 0 72px; /* 底部留出 TabBar 高度 */
+}
+.tabbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  background: var(--bg-card);
+  border-top: 1px solid var(--line);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+}
+.tabbar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  transition: color 0.12s ease;
+}
+.tabbar-item .tb-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.tabbar-item .tb-name {
+  font-size: 11px;
+  font-weight: 600;
+}
+.tabbar-item.active {
+  color: var(--accent);
+}
+
+/* ===== 设置列表 ===== */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 18px 0;
+}
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  text-align: left;
+}
+.settings-item:hover {
+  border-color: var(--accent-soft);
+  background: var(--accent-bg);
+}
+.settings-item .si-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.settings-item .si-icon {
+  font-size: 22px;
+}
+.settings-item .si-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.settings-item .si-desc {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.settings-item .si-arrow {
+  font-size: 20px;
+  color: var(--muted);
+}
+
+/* ===== 待办工作区紧凑布局 ===== */
+.pool-compact {
+  padding: 0 16px;
+}
+/* 当前状态卡片 */
+.now-card {
+  margin: 10px 0;
+}
+.now-active {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-soft);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.now-active:hover {
+  border-color: var(--accent);
+}
+.now-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.now-icon {
+  font-size: 22px;
+}
+.now-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+.now-seq {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 500;
+}
+.now-prog {
+  font-size: 13px;
+  color: var(--muted);
+}
+.now-start {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+.now-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted);
+  background: var(--bg-card);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+/* 快速操作行 */
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+.quick-actions .btn {
+  flex: 1;
+}
+/* 紧凑空状态 */
+.compact-empty {
+  padding: 24px 0;
+  text-align: center;
+}
+.compact-empty .big {
+  font-size: 32px;
+  margin-bottom: 6px;
+}
+.compact-empty p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
 

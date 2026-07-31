@@ -1,6 +1,6 @@
-# 今天摸啥鱼 - Learning Manager
+# 今天摸啥鱼
 
-Android APK for learning management system.
+Android APK — 一个帮你随机决定今天摸什么鱼、记录摸鱼进度的小工具。
 
 ## Download
 

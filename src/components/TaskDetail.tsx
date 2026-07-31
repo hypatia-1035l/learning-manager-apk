@@ -4,6 +4,7 @@ import {
   getCurrentObject,
   completeCurrentObject,
   deleteTask,
+  formatSequenceProgress,
 } from '../store'
 import { LearningSession } from './LearningSession'
 import { TaskGroupEditor } from './TaskGroupEditor'
@@ -56,7 +57,7 @@ export function TaskDetail({ taskId, onBack }: Props) {
         <div style={{ flex: 1 }}>
           <h2>{task.name}</h2>
           <div className="meta">
-            {getTypeLabel(task.type)} · {TASK_STATUS_LABELS[task.status]} ·
+            学习方向 · {getTypeLabel(task.type)} · {TASK_STATUS_LABELS[task.status]} ·
             创建于 {formatDate(task.createdAt)}
           </div>
         </div>
@@ -76,17 +77,17 @@ export function TaskDetail({ taskId, onBack }: Props) {
         </button>
       </div>
 
-      {/* 当前学习对象面板 */}
+      {/* 当前学习序列面板 */}
       <div className="current-panel">
-        <div className="label">当前学习对象</div>
+        <div className="label">当前学习序列</div>
         <div className="obj-name">{obj ? obj.name : '尚未设置'}</div>
         <div className="prog-row">
           <span>
-            当前进度：<span className="val">{obj ? obj.progress || '尚未记录' : '—'}</span>
+            当前进度：<span className="val">{obj ? formatSequenceProgress(obj) : '—'}</span>
           </span>
           {items.length > 0 && (
             <span className="faint">
-              {doneCount}/{items.length} 项完成
+              {doneCount}/{items.length} 序列完成
             </span>
           )}
         </div>
@@ -95,7 +96,7 @@ export function TaskDetail({ taskId, onBack }: Props) {
             className="btn primary"
             onClick={() => setSessionOpen(true)}
             disabled={!canStart}
-            title={canStart ? '开始正向计时学习' : '请先在下方添加学习对象'}
+            title={canStart ? '开始正向计时学习' : '请先在下方添加学习序列'}
           >
             ▶ 开始学习
           </button>
@@ -105,13 +106,14 @@ export function TaskDetail({ taskId, onBack }: Props) {
               completeCurrentObject(task.id)
             }}
             disabled={!canStart}
+            title="手动完成当前序列并按接续模式切换下一项"
           >
             完成当前内容
           </button>
         </div>
         {!canStart && (
           <p className="faint" style={{ fontSize: 12, marginTop: 10 }}>
-            在下方「任务组」中添加学习对象后即可开始学习。
+            在下方「内容序列」中添加学习序列后即可开始学习。
           </p>
         )}
       </div>
@@ -123,7 +125,7 @@ export function TaskDetail({ taskId, onBack }: Props) {
           <div className="v">{formatDuration(task.totalStudyTime)}</div>
         </div>
         <div className="stat">
-          <div className="k">学习对象</div>
+          <div className="k">学习序列</div>
           <div className="v">{items.length}</div>
         </div>
         <div className="stat">
@@ -138,7 +140,7 @@ export function TaskDetail({ taskId, onBack }: Props) {
           className={`tab ${tab === 'group' ? 'active' : ''}`}
           onClick={() => setTab('group')}
         >
-          任务组 · 内容序列
+          内容序列
         </button>
         <button
           className={`tab ${tab === 'records' ? 'active' : ''}`}

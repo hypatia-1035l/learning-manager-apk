@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { TaskPool } from './components/TaskPool'
 import { TaskDetail } from './components/TaskDetail'
 import { RandomToolbox } from './components/RandomToolbox'
+import { Settings } from './components/Settings'
 import { ReminderSettings } from './components/ReminderSettings'
 import { TodayStatus } from './components/TodayStatus'
 import { SlackingRules } from './components/SlackingRules'
@@ -19,10 +20,12 @@ import {
 } from './studyTimer'
 import type { Task } from './types'
 
+// 三个平级工作区（主导航）
+type Tab = 'todos' | 'tools' | 'settings'
+
+// 子页面视图（叠加在当前工作区之上，返回时回到对应工作区）
 type View =
-  | { name: 'pool' }
   | { name: 'task'; taskId: string }
-  | { name: 'toolbox' }
   | { name: 'reminder' }
   | { name: 'today' }
   | { name: 'slacking' }
@@ -31,12 +34,14 @@ type View =
 const GUIDE_KEY = 'learning-manager:vivo-guide-shown:v1'
 
 export default function App() {
-  const [view, setView] = useState<View>({ name: 'pool' })
+  // 当前工作区，默认进入「待办」
+  const [tab, setTab] = useState<Tab>('todos')
+  // 子页面视图：null 时显示工作区主导航 + 当前 tab 内容
+  const [view, setView] = useState<View | null>(null)
   const [showGuide, setShowGuide] = useState(false)
   const [pendingEvaluation, setPendingEvaluation] =
     useState<SlackingEvaluation | null>(null)
   const data = useAppData()
-  const scheduledRef = useRef(false)
   const slackingCheckedRef = useRef(false)
   const studyTimerCheckedRef = useRef(false)
 
@@ -59,14 +64,38 @@ export default function App() {
     }
   }
 
-  // 启动时根据提醒配置调度通知（仅一次）
+  // 提醒调度：启动时 + 切回前台时自动补充当天提醒
   useEffect(() => {
-    if (scheduledRef.current) return
-    scheduledRef.current = true
-    if (data.reminder?.enabled) {
-      scheduleReminders(data.tasks, data.reminder).catch(() => {})
+    if (!data.reminder?.enabled) return
+
+    const checkAndSchedule = () => {
+      try {
+        const lastDate = localStorage.getItem('learning-manager:last-scheduled-date')
+        const today = new Date().toISOString().slice(0, 10)
+        if (lastDate !== today) {
+          scheduleReminders(data.tasks, data.reminder!).catch(() => {})
+          localStorage.setItem('learning-manager:last-scheduled-date', today)
+        }
+      } catch {
+        /* ignore */
+      }
     }
-  }, [data.reminder?.enabled])
+
+    // 启动时检查
+    checkAndSchedule()
+
+    // 切回前台时检查（用户可能隔夜后切回）
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndSchedule()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [data.tasks, data.reminder?.enabled])
 
   // 启动时检测摸鱼规则（仅一次，静默失败）
   useEffect(() => {
@@ -155,88 +184,140 @@ export default function App() {
         setView({ name: 'slacking' })
         return
       }
-      // 普通提醒：跳转任务详情或首页
+      // 普通提醒：跳转任务详情，或回到待办工作区
       if (action.taskId) {
         setView({ name: 'task', taskId: action.taskId })
       } else {
-        setView({ name: 'pool' })
+        setTab('todos')
+        setView(null)
       }
     })
     return off
   }, [])
 
-  if (view.name === 'task') {
-    return (
-      <div className="app">
-        <TaskDetail
-          taskId={view.taskId}
-          onBack={() => setView({ name: 'pool' })}
-        />
-      </div>
-    )
+  // ===== 子页面（全屏，叠加在工作区之上）=====
+  // 返回时回到对应工作区 tab
+  if (view) {
+    // 待办工作区的子页面
+    if (view.name === 'task') {
+      return (
+        <div className="app">
+          <TaskDetail
+            taskId={view.taskId}
+            onBack={() => {
+              setTab('todos')
+              setView(null)
+            }}
+          />
+        </div>
+      )
+    }
+    if (view.name === 'today') {
+      return (
+        <div className="app">
+          <TodayStatus
+            onBack={() => {
+              setTab('todos')
+              setView(null)
+            }}
+          />
+        </div>
+      )
+    }
+    // 设置工作区的子页面
+    if (view.name === 'reminder') {
+      return (
+        <div className="app">
+          <ReminderSettings
+            onBack={() => {
+              setTab('settings')
+              setView(null)
+            }}
+          />
+        </div>
+      )
+    }
+    if (view.name === 'slacking') {
+      return (
+        <div className="app">
+          <SlackingRules
+            onBack={() => {
+              setPendingEvaluation(null)
+              setTab('settings')
+              setView(null)
+            }}
+            onOpenTask={(task: Task) => {
+              setPendingEvaluation(null)
+              setView({ name: 'task', taskId: task.id })
+            }}
+            pendingEvaluation={pendingEvaluation}
+            onDismissEvaluation={() => setPendingEvaluation(null)}
+          />
+        </div>
+      )
+    }
+    if (view.name === 'backup') {
+      return (
+        <div className="app">
+          <DataBackup
+            onBack={() => {
+              setTab('settings')
+              setView(null)
+            }}
+          />
+        </div>
+      )
+    }
   }
 
-  if (view.name === 'toolbox') {
-    return (
-      <div className="app">
-        <RandomToolbox onBack={() => setView({ name: 'pool' })} />
-      </div>
-    )
-  }
-
-  if (view.name === 'reminder') {
-    return (
-      <div className="app">
-        <ReminderSettings onBack={() => setView({ name: 'pool' })} />
-      </div>
-    )
-  }
-
-  if (view.name === 'today') {
-    return (
-      <div className="app">
-        <TodayStatus onBack={() => setView({ name: 'pool' })} />
-      </div>
-    )
-  }
-
-  if (view.name === 'slacking') {
-    return (
-      <div className="app">
-        <SlackingRules
-          onBack={() => {
-            setPendingEvaluation(null)
-            setView({ name: 'pool' })
-          }}
-          onOpenTask={(task: Task) => {
-            setPendingEvaluation(null)
-            setView({ name: 'task', taskId: task.id })
-          }}
-          pendingEvaluation={pendingEvaluation}
-          onDismissEvaluation={() => setPendingEvaluation(null)}
-        />
-      </div>
-    )
-  }
-
-  if (view.name === 'backup') {
-    return (
-      <div className="app">
-        <DataBackup onBack={() => setView({ name: 'pool' })} />
-      </div>
-    )
-  }
-
+  // ===== 工作区 Shell：顶部标题 + 内容区 + 底部 TabBar =====
   return (
-    <div className="app">
-      <TaskPool
-        onOpenTask={(task: Task) => setView({ name: 'task', taskId: task.id })}
-        onOpenToolbox={() => setView({ name: 'toolbox' })}
-        onOpenReminder={() => setView({ name: 'reminder' })}
-        onOpenTodayStatus={() => setView({ name: 'today' })}
-        onOpenSlackingRules={() => setView({ name: 'slacking' })}
-        onOpenBackup={() => setView({ name: 'backup' })}
-      />
+    <div className="app app-shell">
+      <header className="shell-header">
+        <h1 className="app-title">今天摸啥鱼</h1>
+      </header>
+
+      <main className="shell-main">
+        {tab === 'todos' && (
+          <TaskPool
+            onOpenTask={(task: Task) => setView({ name: 'task', taskId: task.id })}
+            onOpenTodayStatus={() => setView({ name: 'today' })}
+          />
+        )}
+        {tab === 'tools' && <RandomToolbox />}
+        {tab === 'settings' && (
+          <Settings
+            onOpenReminder={() => setView({ name: 'reminder' })}
+            onOpenSlackingRules={() => setView({ name: 'slacking' })}
+            onOpenBackup={() => setView({ name: 'backup' })}
+          />
+        )}
+      </main>
+
+      <nav className="tabbar">
+        <button
+          className={`tabbar-item ${tab === 'todos' ? 'active' : ''}`}
+          onClick={() => setTab('todos')}
+        >
+          <span className="tb-icon">📋</span>
+          <span className="tb-name">待办</span>
+        </button>
+        <button
+          className={`tabbar-item ${tab === 'tools' ? 'active' : ''}`}
+          onClick={() => setTab('tools')}
+        >
+          <span className="tb-icon">🧰</span>
+          <span className="tb-name">工具</span>
+        </button>
+        <button
+          className={`tabbar-item ${tab === 'settings' ? 'active' : ''}`}
+          onClick={() => setTab('settings')}
+        >
+          <span className="tb-icon">⚙️</span>
+          <span className="tb-name">设置</span>
+        </button>
+      </nav>
+
       {showGuide && <VivoPermissionGuide onClose={closeGuide} />}
     </div>
   )

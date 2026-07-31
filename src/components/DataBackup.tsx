@@ -15,7 +15,7 @@ interface Props {
 // localStorage key → 友好名称
 const KEY_LABELS: Record<string, string> = {
   'learning-manager:data:v1': '学习数据（任务/任务组/学习记录/提醒）',
-  'learning-manager:random-toolbox:v1': '随机工具箱（数字/词库随机）',
+  'learning-manager:random-toolbox:v1': '工具（数字/词库随机）',
   'learning-manager:slacking-rules:v1': '摸鱼检测规则',
   'learning-manager:app-category-map:v1': '应用分类设置',
   'learning-manager:slacking-alert:v1': '摸鱼提醒（旧版）',
@@ -113,7 +113,7 @@ export function DataBackup({ onBack }: Props) {
         </p>
         <ul className="muted" style={{ fontSize: 13, marginBottom: 14, paddingLeft: 20 }}>
           <li>学习数据（任务、任务组、学习记录、提醒设置）</li>
-          <li>随机工具箱（数字范围、词库随机）</li>
+          <li>工具（数字范围、词库随机）</li>
           <li>摸鱼检测规则（规则、阈值、冷却）</li>
           <li>应用分类设置（自定义分类映射）</li>
         </ul>

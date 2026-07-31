@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Task } from '../types'
-import { getCurrentObject, finishStudySession, completeCurrentObject } from '../store'
+import {
+  getCurrentObject,
+  finishStudySession,
+  completeCurrentObject,
+  getSequenceProgress,
+  formatSequenceProgress,
+} from '../store'
 import { formatTimer } from '../utils'
 import {
   startStudyTimer,
@@ -26,14 +32,20 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
   const resumeAtRef = useRef<number>(Date.now())
   const [elapsed, setElapsed] = useState(0)
   const [phase, setPhase] = useState<'timing' | 'ending'>('timing')
+  // 数量型：本次完成数量（增量）；位置型：当前进度文本
   const [endProgress, setEndProgress] = useState('')
+  const [deltaInput, setDeltaInput] = useState('')
 
   const obj = getCurrentObject(task)
   const startProgress = obj?.progress ?? ''
+  // 序列进度模型：count 型输入增量，position 型输入文本
+  const prog = obj ? getSequenceProgress(obj) : null
+  const isCount = prog?.type === 'count'
 
   useEffect(() => {
-    // 预填结束进度为当前进度，方便微调
-    setEndProgress(startProgress)
+    // 预填：count 型默认本次完成 0；position 型预填当前进度方便微调
+    setDeltaInput('')
+    setEndProgress(isCount ? '' : startProgress)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task.currentObjectId])
 
@@ -121,12 +133,25 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
   }
 
   const handleSave = () => {
-    finishStudySession({
-      taskId: task.id,
-      duration: elapsed,
-      startProgress,
-      endProgress: endProgress.trim(),
-    })
+    if (isCount) {
+      // 数量型：本次完成数量（增量），如 +20
+      const delta = Number(deltaInput) || 0
+      finishStudySession({
+        taskId: task.id,
+        duration: elapsed,
+        startProgress,
+        endProgress: '',
+        deltaCount: delta,
+      })
+    } else {
+      // 位置型：填写当前进度文本
+      finishStudySession({
+        taskId: task.id,
+        duration: elapsed,
+        startProgress,
+        endProgress: endProgress.trim(),
+      })
+    }
     onTaskMutated()
     onClose()
   }
@@ -151,9 +176,9 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
   return (
     <div className="session-overlay">
       <div className="session-task">{task.icon} {task.name}</div>
-      <div className="session-obj">{obj ? obj.name : '（未设置学习对象）'}</div>
+      <div className="session-obj">{obj ? obj.name : '（未设置学习序列）'}</div>
       <div className="session-prog">
-        起始进度：{startProgress || '尚未记录'}
+        当前进度：{obj ? formatSequenceProgress(obj) : '尚未记录'}
       </div>
 
       <div className="session-timer">{formatTimer(elapsed)}</div>
@@ -169,19 +194,42 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
         </div>
       ) : (
         <div className="session-end-form">
-          <div className="field">
-            <label>记录当前位置</label>
-            <input
-              className="input"
-              autoFocus
-              value={endProgress}
-              onChange={(e) => setEndProgress(e.target.value)}
-              placeholder="如：卷八十九 / 第12集 / 第三卷第五章"
-            />
-            <div className="hint">
-              原：{startProgress || '（空）'} → 填写后更新为当前进度
+          {isCount ? (
+            <div className="field">
+              <label>
+                本次完成数量
+                {prog?.type === 'count' && prog.unit ? `（${prog.unit}）` : ''}
+              </label>
+              <input
+                className="input"
+                autoFocus
+                type="number"
+                min={0}
+                value={deltaInput}
+                onChange={(e) => setDeltaInput(e.target.value)}
+                placeholder="如：20"
+              />
+              <div className="hint">
+                {prog?.type === 'count'
+                  ? `${prog.current} → ${prog.current + (Number(deltaInput) || 0)} / ${prog.target}${prog.unit ? ' ' + prog.unit : ''}`
+                  : '填写本次完成的数量，达到目标后自动完成'}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="field">
+              <label>记录当前位置</label>
+              <input
+                className="input"
+                autoFocus
+                value={endProgress}
+                onChange={(e) => setEndProgress(e.target.value)}
+                placeholder="如：卷八十九 / 第12集 / 第三卷第五章"
+              />
+              <div className="hint">
+                原：{startProgress || '（空）'} → 填写后更新为当前进度
+              </div>
+            </div>
+          )}
           <div className="row" style={{ justifyContent: 'flex-end' }}>
             <button className="btn" onClick={handleResume}>
               继续学习

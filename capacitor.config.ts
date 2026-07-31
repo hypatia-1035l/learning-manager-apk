@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.learning.manager',
-  appName: '学习管理',
+  appName: '今天摸啥鱼',
   webDir: 'dist',
   // Android 使用 https scheme，便于 localStorage / module 加载
   server: {

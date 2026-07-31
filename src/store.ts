@@ -7,6 +7,10 @@ import type {
   TaskGroup,
   GroupMode,
   LearningObject,
+  Sequence,
+  SequenceProgress,
+  CountProgress,
+  PositionProgress,
   StudyRecord,
   ReminderConfig,
 } from './types'
@@ -19,6 +23,52 @@ const uid = (): string =>
   (typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+
+// ---------- 进度解析（迁移与学习会话共用） ----------
+// 解析进度字符串为数字：支持 "卷五"→5、"第12集"→12、"3.5"→3.5
+// 失败返回 NaN
+export function parseProgressNumber(s: string): number {
+  if (!s) return NaN
+  const trimmed = s.trim()
+  const direct = Number(trimmed)
+  if (!isNaN(direct) && trimmed !== '') return direct
+  const m = trimmed.match(/(\d+(?:\.\d+)?)/)
+  if (m) return Number(m[1])
+  const cnMap: Record<string, number> = {
+    一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
+  }
+  if (trimmed.length === 1 && cnMap[trimmed]) return cnMap[trimmed]
+  if (trimmed.startsWith('十') && trimmed.length === 2) return 10 + (cnMap[trimmed[1]] ?? 0)
+  if (trimmed.startsWith('廿') && trimmed.length === 2) return 20 + (cnMap[trimmed[1]] ?? 0)
+  if (trimmed.length === 2 && cnMap[trimmed[0]]) {
+    const a = cnMap[trimmed[0]]
+    return trimmed[1] === '十' ? a * 10 : NaN
+  }
+  return NaN
+}
+
+// 由旧 LearningObject 字段推导进度模型（迁移用）：
+//   - progressTarget 可解析为数字 → count 型
+//   - 否则 → position 型（保留原文本）
+function deriveProgressModel(i: {
+  progress: string
+  progressUnit: string
+  progressTarget: string
+}): SequenceProgress {
+  const tgt = parseProgressNumber(i.progressTarget)
+  if (i.progressTarget.trim() && !isNaN(tgt)) {
+    const cur = parseProgressNumber(i.progress)
+    const model: CountProgress = {
+      type: 'count',
+      current: isNaN(cur) ? 0 : cur,
+      target: tgt,
+      unit: i.progressUnit ?? '',
+    }
+    return model
+  }
+  const pos: PositionProgress = { type: 'position', text: i.progress ?? '' }
+  return pos
+}
 
 function load(): AppData {
   try {
@@ -35,19 +85,38 @@ function load(): AppData {
                 'sequential',
               // 迁移：学习对象 weight（旧数据默认 1）
               // 迁移：学习对象 enabled（旧数据默认 true）
-              items: t.group.items.map((i) => ({
-                ...i,
-                weight:
-                  typeof (i as LearningObject & { weight?: number }).weight ===
-                  'number'
-                    ? (i as LearningObject & { weight?: number }).weight!
-                    : 1,
-                enabled:
-                  typeof (i as LearningObject & { enabled?: boolean }).enabled ===
-                  'boolean'
-                    ? (i as LearningObject & { enabled?: boolean }).enabled!
-                    : true,
-              })),
+              items: t.group.items.map((i) => {
+                const merged: LearningObject = {
+                  ...i,
+                  weight:
+                    typeof (i as LearningObject & { weight?: number }).weight ===
+                    'number'
+                      ? (i as LearningObject & { weight?: number }).weight!
+                      : 1,
+                  enabled:
+                    typeof (i as LearningObject & { enabled?: boolean }).enabled ===
+                    'boolean'
+                      ? (i as LearningObject & { enabled?: boolean }).enabled!
+                      : true,
+                  // 迁移：进度目标和单位（旧数据无，默认空字符串）
+                  progressUnit:
+                    typeof (i as LearningObject & { progressUnit?: string }).progressUnit ===
+                    'string'
+                      ? (i as LearningObject & { progressUnit?: string }).progressUnit!
+                      : '',
+                  progressTarget:
+                    typeof (i as LearningObject & { progressTarget?: string }).progressTarget ===
+                    'string'
+                      ? (i as LearningObject & { progressTarget?: string }).progressTarget!
+                      : '',
+                }
+                // 迁移：推导进度模型 progressModel（数量型/位置型）
+                // 已有 progressModel 的（新版本写入）保持不变
+                if (!merged.progressModel) {
+                  merged.progressModel = deriveProgressModel(merged)
+                }
+                return merged
+              }),
             }
           : t.group
         return {
@@ -192,6 +261,45 @@ export function getCurrentObject(task: Task): LearningObject | null {
   return task.group.items.find((i) => i.id === task.currentObjectId) ?? null
 }
 
+// 取得任务当前的学习序列（语义别名）
+export function getCurrentSequence(task: Task): Sequence | null {
+  return getCurrentObject(task)
+}
+
+// 读取序列进度模型（缺省时按旧字段推导，保证旧数据可用）
+export function getSequenceProgress(obj: LearningObject): SequenceProgress {
+  if (obj.progressModel) return obj.progressModel
+  return deriveProgressModel(obj)
+}
+
+// 把序列进度格式化为展示文本：
+//   count 型  -> "350 / 1000 条"（无目标时仅显示当前）
+//   position 型 -> 原文本
+export function formatSequenceProgress(obj: LearningObject): string {
+  const p = getSequenceProgress(obj)
+  if (p.type === 'count') {
+    const unit = p.unit ? ` ${p.unit}` : ''
+    return p.target > 0 ? `${p.current} / ${p.target}${unit}` : `${p.current}${unit}`
+  }
+  return p.text || '尚未记录'
+}
+
+// 选择任务下要学习/提醒的序列：
+//   - 优先返回当前序列（若存在且未完成且启用）
+//   - 否则按 group.mode 从未完成序列中选择
+//   - 全部完成返回 null
+// 复用 pickNextObject 的接续规则，保持原随机算法不变。
+export function pickSequence(task: Task): Sequence | null {
+  if (!task.group || !task.group.items.length) return null
+  const items = task.group.items
+  const mode: GroupMode = task.group.mode ?? 'sequential'
+  const cur = getCurrentSequence(task)
+  if (cur && !cur.completed && cur.enabled) return cur
+  const nextId = pickNextObject(items, task.currentObjectId, mode)
+  if (!nextId) return null
+  return items.find((i) => i.id === nextId) ?? null
+}
+
 // ---------- 任务组操作 ----------
 
 export function setGroupMode(taskId: string, mode: GroupMode) {
@@ -213,7 +321,13 @@ export function setGroupMode(taskId: string, mode: GroupMode) {
 // 添加学习对象；若任务尚无任务组，则同时创建组
 export function addLearningObject(
   taskId: string,
-  input: { name: string; type?: string; progress?: string },
+  input: {
+    name: string
+    type?: string
+    progress?: string
+    progressUnit?: string
+    progressTarget?: string
+  },
 ) {
   setState((prev) => ({
     ...prev,
@@ -224,9 +338,17 @@ export function addLearningObject(
         name: input.name.trim() || '未命名',
         type: input.type ?? t.type,
         progress: input.progress ?? '',
+        progressUnit: input.progressUnit ?? '',
+        progressTarget: input.progressTarget ?? '',
         completed: false,
         enabled: true,
         weight: 1,
+        // 推导进度模型：有数字目标→count 型；否则 position 型
+        progressModel: deriveProgressModel({
+          progress: input.progress ?? '',
+          progressUnit: input.progressUnit ?? '',
+          progressTarget: input.progressTarget ?? '',
+        }),
       }
       const group: TaskGroup = t.group ?? {
         id: uid(),
@@ -261,9 +383,22 @@ export function updateLearningObject(
         ...t,
         group: {
           ...t.group,
-          items: t.group.items.map((i) =>
-            i.id === objectId ? { ...i, ...patch } : i,
-          ),
+          items: t.group.items.map((i) => {
+            if (i.id !== objectId) return i
+            const merged: LearningObject = { ...i, ...patch }
+            // 当进度相关旧字段被修改时，重新推导 progressModel（保持一致）
+            // 注：显式传入 progressModel 时不覆盖
+            if (
+              'progress' in patch ||
+              'progressUnit' in patch ||
+              'progressTarget' in patch
+            ) {
+              if (!('progressModel' in patch)) {
+                merged.progressModel = deriveProgressModel(merged)
+              }
+            }
+            return merged
+          }),
         },
         updatedAt: Date.now(),
       }
@@ -390,47 +525,126 @@ export function completeCurrentObject(taskId: string) {
 }
 
 // ---------- 学习会话：计时 + 记录 ----------
+// 注：parseProgressNumber 已提升至文件顶部并导出（迁移与学习会话共用）
+
+// 判断进度是否达成目标
+function isProgressReached(current: string, target: string): boolean {
+  if (!target.trim()) return false
+  const cur = parseProgressNumber(current)
+  const tgt = parseProgressNumber(target)
+  if (isNaN(cur) || isNaN(tgt)) return false
+  return cur >= tgt
+}
+
 // 结束学习：写入记录、更新当前进度、累计时间
+// 进度更新支持两类序列：
+//   - count 型（数量型）：传 deltaCount，新进度 = 当前 + 增量；达到 target 自动完成
+//   - position 型（位置型）：传 endProgress 文本；不自动完成（无数字目标）
+//   - 兼容旧调用：未传 deltaCount 时退化为按 endProgress 文本覆盖，并保留旧的 target 自动完成判定
 export function finishStudySession(args: {
   taskId: string
   duration: number // 秒
   startProgress: string
   endProgress: string
+  // 数量型序列本次完成数量（增量），如 +20；位置型不传
+  deltaCount?: number
 }) {
   setState((prev) => {
     const task = prev.tasks.find((t) => t.id === args.taskId)
     if (!task) return prev
     const obj = getCurrentObject(task)
+    // 记录默认值；count 型会在下方按累加结果回填 start/end/delta
     const record: StudyRecord = {
       id: uid(),
       taskId: task.id,
       taskName: task.name,
       objectId: obj?.id ?? '',
-      objectName: obj?.name ?? '（无对象）',
+      objectName: obj?.name ?? '（无序列）',
+      // 新增：序列字段（与 objectId/objectName 同值，便于按序列语义展示）
+      sequenceId: obj?.id,
+      sequenceName: obj?.name,
       date: Date.now(),
       duration: args.duration,
       startProgress: args.startProgress,
       endProgress: args.endProgress,
+      deltaCount: args.deltaCount,
     }
     const tasks = prev.tasks.map((t) => {
       if (t.id !== args.taskId) return t
       const totalStudyTime = t.totalStudyTime + args.duration
-      const group =
-        t.group && t.currentObjectId
+      if (!t.group || !t.currentObjectId) {
+        return { ...t, totalStudyTime, status: t.status === 'not_started' ? 'in_progress' : t.status, updatedAt: Date.now() }
+      }
+      const curObj = t.group.items.find((i) => i.id === t.currentObjectId)
+      if (!curObj) {
+        return { ...t, totalStudyTime, status: t.status === 'not_started' ? 'in_progress' : t.status, updatedAt: Date.now() }
+      }
+      const prog = getSequenceProgress(curObj)
+      // 计算新进度文本与 progressModel
+      let newProgressText = args.endProgress
+      let newModel: SequenceProgress = prog
+      let autoComplete = false
+      if (prog.type === 'count') {
+        // 数量型：按 delta 累加（缺省 delta 时尝试解析 endProgress 为绝对值）
+        const delta = typeof args.deltaCount === 'number' ? args.deltaCount : 0
+        const baseCurrent = prog.current
+        const newCurrent = delta !== 0
+          ? baseCurrent + delta
+          : (isNaN(parseProgressNumber(args.endProgress)) ? baseCurrent : parseProgressNumber(args.endProgress))
+        newProgressText = String(newCurrent)
+        newModel = { ...prog, current: newCurrent }
+        // 回填记录为本次实际变化
+        record.startProgress = String(baseCurrent)
+        record.endProgress = newProgressText
+        record.deltaCount = newCurrent - baseCurrent
+        // 达到目标自动完成
+        if (prog.target > 0 && newCurrent >= prog.target) {
+          autoComplete = true
+        }
+      } else {
+        // 位置型：用 endProgress 文本覆盖；无数字目标，不自动完成
+        newProgressText = args.endProgress
+        newModel = { ...prog, text: args.endProgress }
+      }
+      // 更新当前序列进度（同步旧字段与 progressModel）
+      let items = t.group.items.map((i) =>
+        i.id === t.currentObjectId
           ? {
-              ...t.group,
-              items: t.group.items.map((i) =>
-                i.id === t.currentObjectId
-                  ? { ...i, progress: args.endProgress }
-                  : i,
-              ),
+              ...i,
+              progress: newProgressText,
+              progressModel: newModel,
+              // 旧字段同步（兼容旧读取路径）
+              progressUnit: newModel.type === 'count' ? newModel.unit : i.progressUnit,
+              progressTarget: newModel.type === 'count' ? String(newModel.target) : i.progressTarget,
             }
-          : t.group
+          : i,
+      )
+      let currentObjectId = t.currentObjectId
+      let status: Task['status'] = t.status === 'not_started' ? 'in_progress' : t.status
+      // 自动完成判定：
+      //   count 型由上面 autoComplete 决定；
+      //   旧路径（无 progressModel 的 position 型仍带数字 progressTarget）保留原判定
+      const updatedCur = items.find((i) => i.id === t.currentObjectId)!
+      const shouldComplete =
+        autoComplete ||
+        (!updatedCur.completed &&
+          isProgressReached(updatedCur.progress, updatedCur.progressTarget))
+      if (shouldComplete) {
+        items = items.map((i) =>
+          i.id === t.currentObjectId ? { ...i, completed: true } : i,
+        )
+        const mode: GroupMode = t.group.mode ?? 'sequential'
+        const nextId = pickNextObject(items, t.currentObjectId, mode)
+        const allDone = items.every((i) => i.completed)
+        currentObjectId = nextId ?? currentObjectId
+        status = allDone ? 'completed' : 'in_progress'
+      }
       return {
         ...t,
-        group,
+        group: { ...t.group, items },
+        currentObjectId,
         totalStudyTime,
-        status: t.status === 'not_started' ? 'in_progress' : t.status,
+        status,
         updatedAt: Date.now(),
       }
     })

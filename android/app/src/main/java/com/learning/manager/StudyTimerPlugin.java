@@ -68,6 +68,8 @@ public class StudyTimerPlugin extends Plugin {
         i.putExtra(StudyTimerService.EXTRA_TASK_NAME, taskName);
         i.putExtra(StudyTimerService.EXTRA_OBJECT_NAME, objectName);
         i.putExtra(StudyTimerService.EXTRA_ELAPSED_SECONDS, elapsedSeconds);
+        // 标记为 update：Service 仅更新名称，不重置计时
+        i.putExtra(StudyTimerService.EXTRA_IS_UPDATE, true);
         try {
             ContextCompat.startForegroundService(ctx, i);
         } catch (Exception ignored) {
@@ -78,6 +80,8 @@ public class StudyTimerPlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         Context ctx = getContext();
+        // 标记为用户主动停止：Service.onDestroy 中据此清除持久化状态
+        StudyTimerService.explicitlyStopped = true;
         try {
             ctx.stopService(new Intent(ctx, StudyTimerService.class));
         } catch (Exception ignored) {
