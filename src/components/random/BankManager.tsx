@@ -138,7 +138,7 @@ export function BankManager({ selectedIds, onSelectChange }: Props) {
   return (
     <div className="section">
       <div className="section-title">
-        📝 词库池
+        词库池
         <span className="count">（{data.banks.length}）</span>
       </div>
 
@@ -185,13 +185,13 @@ export function BankManager({ selectedIds, onSelectChange }: Props) {
       {/* 导入 / 导出按钮 */}
       <div className="row" style={{ gap: 6, marginBottom: 10 }}>
         <button className="btn sm" onClick={() => setShowImport(!showImport)}>
-          📥 导入
+          导入
         </button>
         <button
           className="btn sm"
           onClick={() => downloadJson('banks.json', exportAll())}
         >
-          📤 导出全部
+          导出全部
         </button>
       </div>
 
@@ -223,11 +223,11 @@ export function BankManager({ selectedIds, onSelectChange }: Props) {
             >
               {importPreview.type === 'invalid' ? (
                 <span style={{ color: 'var(--red)' }}>
-                  ⚠ {importPreview.error}
+                  {importPreview.error}
                 </span>
               ) : importPreview.type === 'bank' ? (
                 <span>
-                  ✅ 单词库：{importPreview.data.name}（
+                  单词库：{importPreview.data.name}（
                   {importPreview.data.words?.length ?? 0} 词条
                   {Array.isArray(importPreview.data.tags) && importPreview.data.tags.length
                     ? `，${importPreview.data.tags.length} 标签`
@@ -236,7 +236,7 @@ export function BankManager({ selectedIds, onSelectChange }: Props) {
                 </span>
               ) : (
                 <span>
-                  ✅ 全量备份：{importPreview.data.banks?.length ?? 0} 词库，
+                  全量备份：{importPreview.data.banks?.length ?? 0} 词库，
                   {importPreview.data.ranges?.length ?? 0} 范围，
                   {importPreview.data.presets?.length ?? 0} 预设
                   <br />
@@ -340,11 +340,14 @@ export function BankManager({ selectedIds, onSelectChange }: Props) {
                 />
                 <span className="idx">{b.words.length}</span>
                 <div
-                  style={{ flex: 1, minWidth: 0 }}
+                  className="bm-bank-info"
+                  style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}
                   onClick={() => toggleSelect(b.id)}
                 >
-                  <div style={{ fontWeight: 600 }}>{b.name}</div>
-                  <div className="faint" style={{ fontSize: 11 }}>
+                  <div className="bm-bank-name">
+                    {b.name}
+                  </div>
+                  <div className="faint bm-bank-meta" style={{ fontSize: 11 }}>
                     {b.category || '未分类'}
                     {b.tags.length > 0 && (
                       <span style={{ marginLeft: 6 }}>
@@ -352,14 +355,7 @@ export function BankManager({ selectedIds, onSelectChange }: Props) {
                         {b.tags.map((t) => (
                           <span
                             key={t}
-                            style={{
-                              display: 'inline-block',
-                              padding: '0 6px',
-                              margin: '0 2px',
-                              borderRadius: 999,
-                              background: 'var(--bg-soft)',
-                              fontSize: 10,
-                            }}
+                            className="bm-tag"
                           >
                             #{t}
                           </span>
@@ -368,40 +364,42 @@ export function BankManager({ selectedIds, onSelectChange }: Props) {
                     )}
                   </div>
                 </div>
-                <button
-                  className="icon-btn"
-                  title="导出此词库"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    const json = exportBank(b.id)
-                    if (json) downloadJson(`${b.name}.json`, json)
-                  }}
-                >
-                  ⇩
-                </button>
-                <button
-                  className="icon-btn"
-                  title="编辑词库"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setEditingId(b.id)
-                  }}
-                >
-                  ✎
-                </button>
-                <button
-                  className="icon-btn danger"
-                  title="删除词库"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (confirm(`删除词库「${b.name}」？`)) {
-                      deleteBank(b.id)
-                      onSelectChange(selectedIds.filter((x) => x !== b.id))
-                    }
-                  }}
-                >
-                  ✕
-                </button>
+                <div className="bm-bank-ops">
+                  <button
+                    className="icon-btn"
+                    title="导出此词库"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const json = exportBank(b.id)
+                      if (json) downloadJson(`${b.name}.json`, json)
+                    }}
+                  >
+                    导出
+                  </button>
+                  <button
+                    className="icon-btn"
+                    title="编辑词库"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditingId(b.id)
+                    }}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    className="icon-btn danger"
+                    title="删除词库"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (confirm(`删除词库「${b.name}」？`)) {
+                        deleteBank(b.id)
+                        onSelectChange(selectedIds.filter((x) => x !== b.id))
+                      }
+                    }}
+                  >
+                    删除
+                  </button>
+                </div>
               </div>
             )
           })}
@@ -454,7 +452,7 @@ function BankEditor({ bank, onBack }: { bank: WordBank; onBack: () => void }) {
       </button>
 
       <div className="section-title">
-        📝 编辑词库：{bank.name}
+        编辑词库：{bank.name}
         <span className="count">（{bank.words.length} 词条）</span>
       </div>
 
@@ -516,14 +514,14 @@ function BankEditor({ bank, onBack }: { bank: WordBank; onBack: () => void }) {
                 if (json) downloadJson(`${bank.name}.json`, json)
               }}
             >
-              📤 导出此词库
+              导出此词库
             </button>
           </div>
         </div>
       ) : (
         <div className="row" style={{ gap: 6 }}>
           <button className="btn sm ghost" onClick={() => setEditingName(true)}>
-            ✎ 重命名 / 分类 / 标签
+            重命名 / 分类 / 标签
           </button>
           <button
             className="btn sm ghost"
@@ -532,7 +530,7 @@ function BankEditor({ bank, onBack }: { bank: WordBank; onBack: () => void }) {
               if (json) downloadJson(`${bank.name}.json`, json)
             }}
           >
-            📤 导出此词库
+            导出此词库
           </button>
           {bank.tags.length > 0 && (
             <div className="row wrap" style={{ gap: 4, flex: 1 }}>
@@ -569,7 +567,7 @@ function BankEditor({ bank, onBack }: { bank: WordBank; onBack: () => void }) {
       <div className="row" style={{ gap: 6 }}>
         <input
           className="input"
-          style={{ flex: 1 }}
+          style={{ flex: 2, minWidth: 0 }}
           placeholder="词条文本"
           value={newWord}
           onChange={(e) => setNewWord(e.target.value)}
@@ -588,7 +586,6 @@ function BankEditor({ bank, onBack }: { bank: WordBank; onBack: () => void }) {
           value={newWeight}
           onChange={(e) => setNewWeight(Math.max(1, Number(e.target.value) || 1))}
           title="权重"
-          style={{ width: 60 }}
         />
         <button
           className="btn sm"
@@ -600,10 +597,10 @@ function BankEditor({ bank, onBack }: { bank: WordBank; onBack: () => void }) {
             }
           }}
         >
-          + 添加
+          添加
         </button>
         <button className="btn sm" onClick={() => setShowImport(!showImport)}>
-          📋 导入
+          导入
         </button>
       </div>
 
@@ -677,7 +674,7 @@ function WordRow({
       <div className="obj-item" style={{ gap: 6 }}>
         <input
           className="input"
-          style={{ flex: 1 }}
+          style={{ flex: 2, minWidth: 0 }}
           value={text}
           onChange={(e) => setText(e.target.value)}
           autoFocus
@@ -688,7 +685,6 @@ function WordRow({
           min={1}
           value={weight}
           onChange={(e) => setWeight(Math.max(1, Number(e.target.value) || 1))}
-          style={{ width: 60 }}
           title="权重"
         />
         <button
@@ -736,14 +732,14 @@ function WordRow({
       )}
       <div className="ops">
         <button className="icon-btn" title="编辑" onClick={() => setEditing(true)}>
-          ✎
+          编辑
         </button>
         <button
           className="icon-btn danger"
           title="删除"
           onClick={() => confirm(`删除词条「${word.text}」？`) && deleteWord(bankId, index)}
         >
-          ✕
+          删除
         </button>
       </div>
     </div>

@@ -24,7 +24,7 @@ export function RandomResultModal({
   // 可随机任务少于 2 个时，重新随机无意义（必然重复）
   const canReroll = randomPoolSize >= 2
   return (
-    <Modal title="🎲 随机结果" onClose={onClose}>
+    <Modal title="随机结果" onClose={onClose}>
       <div className="random-result">
         <div className="rr-icon">{task.icon}</div>
         <div className="rr-name">{task.name}</div>
@@ -55,7 +55,7 @@ export function RandomResultModal({
             disabled={!canReroll}
             title={canReroll ? '重新随机选择' : '可随机的方向不足 2 个，无法重新随机'}
           >
-            🔄 重新随机
+            重新随机
           </button>
           {obj ? (
             <button
@@ -63,7 +63,7 @@ export function RandomResultModal({
               onClick={onStart}
               title="进入正向计时学习"
             >
-              ▶ 开始学习
+              开始学习
             </button>
           ) : (
             <button className="btn primary" onClick={onOpenTask}>

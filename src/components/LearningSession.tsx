@@ -329,7 +329,7 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
           type="button"
         >
           <span className="session-hint-ico">
-            {phase === 'paused' ? '⏸️' : '⏯️'}
+            {phase === 'paused' ? '暂停' : '继续'}
           </span>
           <span className="session-hint-text">
             {phase === 'paused'
@@ -337,7 +337,7 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
               : `已恢复上次未完成计时（${formatTimer(elapsed)}）`}
           </span>
           <span className="session-hint-close" title="关闭提示">
-            ✕
+            关闭
           </span>
         </button>
       )}

@@ -6,11 +6,11 @@ import { RandomRecords } from './random/RandomRecords'
 
 type Tool = 'number' | 'wordbank' | 'banks' | 'records'
 
-const TABS: { id: Tool; label: string; icon: string }[] = [
-  { id: 'number', label: '数字随机', icon: '🔢' },
-  { id: 'wordbank', label: '词库随机', icon: '🎲' },
-  { id: 'banks', label: '词库管理', icon: '📝' },
-  { id: 'records', label: '随机记录', icon: '📜' },
+const TABS: { id: Tool; label: string }[] = [
+  { id: 'number', label: '数字随机' },
+  { id: 'wordbank', label: '词库随机' },
+  { id: 'banks', label: '词库管理' },
+  { id: 'records', label: '随机记录' },
 ]
 
 export function RandomToolbox() {
@@ -27,7 +27,6 @@ export function RandomToolbox() {
             className={`tab ${tool === t.id ? 'active' : ''}`}
             onClick={() => setTool(t.id)}
           >
-            <span style={{ marginRight: 4 }}>{t.icon}</span>
             {t.label}
           </button>
         ))}

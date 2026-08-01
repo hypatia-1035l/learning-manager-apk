@@ -81,7 +81,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
   return (
     <div className="section">
       <div className="section-title">
-        📑 内容序列
+        内容序列
         <span className="count">（{items.length} 个序列）</span>
       </div>
 
@@ -289,7 +289,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                           onTaskMutated()
                         }}
                       >
-                        ◎
+                        设为当前
                       </button>
                       <button
                         className="icon-btn"
@@ -299,7 +299,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                           onTaskMutated()
                         }}
                       >
-                        ↑
+                        上移
                       </button>
                       <button
                         className="icon-btn"
@@ -309,14 +309,14 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                           onTaskMutated()
                         }}
                       >
-                        ↓
+                        下移
                       </button>
                       <button
                         className="icon-btn"
                         title="编辑"
                         onClick={() => startEdit(item)}
                       >
-                        ✎
+                        编辑
                       </button>
                       {!item.completed && (
                       <label
@@ -346,7 +346,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                           onTaskMutated()
                         }}
                       >
-                        ✓
+                        完成
                       </button>
                     )}
                       <button
@@ -359,7 +359,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                           }
                         }}
                       >
-                        ✕
+                        删除
                       </button>
                     </div>
                   </>

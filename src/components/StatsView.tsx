@@ -83,7 +83,7 @@ export function StatsView({ onOpenTask }: Props) {
       {/* ===== 按方向汇总 ===== */}
       <section className="section">
         <div className="section-title">
-          📊 按方向统计
+          按方向统计
           <span className="count">（{byTask.length} 个）</span>
         </div>
         {byTask.length === 0 ? (
@@ -96,7 +96,7 @@ export function StatsView({ onOpenTask }: Props) {
               const max = byTask[0]?.totalDuration || 1
               return byTask.map((item) => {
                 const task = data.tasks.find((t) => t.id === item.taskId)
-                const icon = task?.icon ?? '📚'
+                const icon = task?.icon ?? ''
                 const pct = Math.round((item.totalDuration / max) * 100)
                 return (
                   <button
@@ -134,7 +134,7 @@ export function StatsView({ onOpenTask }: Props) {
       {/* ===== 最近记录 ===== */}
       <section className="section">
         <div className="section-title">
-          🕒 最近学习
+          最近学习
           <span className="count">（最多 {recent.length} 条）</span>
         </div>
         {recent.length === 0 ? (
@@ -145,7 +145,7 @@ export function StatsView({ onOpenTask }: Props) {
           <div className="record-list">
             {recent.map((r) => {
               const task = data.tasks.find((t) => t.id === r.taskId)
-              const icon = task?.icon ?? '📚'
+              const icon = task?.icon ?? ''
               return (
                 <div
                   key={r.id}

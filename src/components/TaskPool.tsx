@@ -64,7 +64,7 @@ export function TaskPool({ onOpenTask }: Props) {
           </div>
         ) : (
           <div className="now-empty">
-            <div className="now-empty-title">还没开始摸鱼 🐟</div>
+            <div className="now-empty-title">还没开始摸鱼</div>
             <div className="now-empty-hint">随机抽一个方向开始吧</div>
             <button
               className="btn primary"
@@ -73,7 +73,7 @@ export function TaskPool({ onOpenTask }: Props) {
                 handleRandomStart()
               }}
             >
-              🎲 随机开始
+              随机开始
             </button>
           </div>
         )}
@@ -82,7 +82,7 @@ export function TaskPool({ onOpenTask }: Props) {
       {/* ===== 快速操作 ===== */}
       <div className="quick-actions">
         <button className="btn primary lg" onClick={handleRandomStart}>
-          🎲 随机开始
+          随机开始
         </button>
       </div>
 
@@ -98,7 +98,6 @@ export function TaskPool({ onOpenTask }: Props) {
 
       {data.tasks.length === 0 ? (
         <div className="empty-state compact-empty">
-          <div className="big">📚</div>
           <p>暂无方向</p>
         </div>
       ) : (

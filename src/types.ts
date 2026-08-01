@@ -102,18 +102,6 @@ export interface AppData {
   tasks: Task[]
   records: StudyRecord[]
   reminder?: ReminderConfig
-  // 用户保存的方向模板：从已创建方向保存，下次新建时可套用
-  // 内置模板在 constants.ts，这里只存用户自定义的
-  taskTemplates?: UserTaskTemplate[]
-}
-
-// 用户保存的方向模板（含序列名列表）
-export interface UserTaskTemplate {
-  id: string
-  name: string
-  icon: string
-  sequences: string[]
-  createdAt: number
 }
 
 // ===== 提醒功能 =====

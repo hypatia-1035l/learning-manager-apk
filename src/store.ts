@@ -10,7 +10,6 @@ import type {
   SequenceProgress,
   StudyRecord,
   ReminderConfig,
-  UserTaskTemplate,
 } from './types'
 import { DEFAULT_REMINDER } from './types'
 import {
@@ -658,34 +657,6 @@ export function getRecentRecords(
   return [...records]
     .sort((a, b) => b.date - a.date)
     .slice(0, limit)
-}
-
-// ---------- 用户方向模板 ----------
-// 从已创建方向保存为模板，下次新建时可套用
-export function saveTaskTemplate(input: {
-  name: string
-  icon: string
-  sequences: string[]
-}): UserTaskTemplate {
-  const tpl: UserTaskTemplate = {
-    id: uid(),
-    name: input.name.trim() || '未命名模板',
-    icon: input.icon,
-    sequences: input.sequences.map((s) => s.trim()).filter(Boolean),
-    createdAt: Date.now(),
-  }
-  setState((prev) => ({
-    ...prev,
-    taskTemplates: [...(prev.taskTemplates ?? []), tpl],
-  }))
-  return tpl
-}
-
-export function deleteTaskTemplate(id: string) {
-  setState((prev) => ({
-    ...prev,
-    taskTemplates: (prev.taskTemplates ?? []).filter((t) => t.id !== id),
-  }))
 }
 
 // ---------- 任务选择系统 ----------

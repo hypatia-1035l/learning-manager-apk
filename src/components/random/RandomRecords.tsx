@@ -11,8 +11,8 @@ type DateFilter = 'all' | 'today' | 'week'
 
 const FILTER_LABELS: Record<Filter, string> = {
   all: '全部',
-  number: '🔢 数字',
-  wordbank: '📝 词库',
+  number: '数字',
+  wordbank: '词库',
 }
 
 const DATE_FILTER_LABELS: Record<DateFilter, string> = {
@@ -125,7 +125,7 @@ export function RandomRecords() {
   return (
     <div className="section">
       <div className="section-title">
-        📜 随机记录
+        随机记录
         <span className="count">（{filtered.length}）</span>
       </div>
 
@@ -141,13 +141,13 @@ export function RandomRecords() {
           className={`btn sm ${filter === 'number' ? 'primary' : ''}`}
           onClick={() => setFilter('number')}
         >
-          🔢 数字 · {counts.number}
+          数字 · {counts.number}
         </button>
         <button
           className={`btn sm ${filter === 'wordbank' ? 'primary' : ''}`}
           onClick={() => setFilter('wordbank')}
         >
-          📝 词库 · {counts.wordbank}
+          词库 · {counts.wordbank}
         </button>
         <span className="spacer" />
         <button
@@ -197,7 +197,7 @@ export function RandomRecords() {
               >
                 <div className="rec-head">
                   <span className={`rec-type rec-${r.type}`}>
-                    {r.type === 'number' ? '🔢' : '📝'}
+                    {r.type === 'number' ? '数字' : '词库'}
                   </span>
                   <span className="rec-summary">{r.summary}</span>
                   <span className="rec-time">{formatTime(r.createdAt)}</span>
@@ -245,14 +245,14 @@ export function RandomRecords() {
                         className="faint"
                         style={{ fontSize: 12 }}
                       >
-                        ✓ 已保存为预设
+                        已保存为预设
                       </span>
                     ) : (
                       <button
                         className="btn sm ghost"
                         onClick={() => startEditPreset(r.id)}
                       >
-                        💾 存为预设
+                        存为预设
                       </button>
                     )}
                   </div>

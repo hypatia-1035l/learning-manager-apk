@@ -37,7 +37,7 @@ export function ReminderActionModal({ task, cooldownMinutes, randomPoolSize, onS
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>该摸一条鱼了 🐟</h3>
+        <h3>该摸一条鱼了</h3>
 
         <div className="reminder-action-card">
           <div className="rac-head">
@@ -54,7 +54,7 @@ export function ReminderActionModal({ task, cooldownMinutes, randomPoolSize, onS
 
         <div className="reminder-actions">
           <button className="btn primary lg" onClick={() => onStart(task)}>
-            ▶ 开始计时
+            开始计时
           </button>
           <button
             className="btn lg"
@@ -62,13 +62,13 @@ export function ReminderActionModal({ task, cooldownMinutes, randomPoolSize, onS
             disabled={!canReroll}
             title={canReroll ? '换一个随机方向' : '可随机的方向不足 2 个，无法更换'}
           >
-            🎲 换一个
+            换一个
           </button>
           <button className="btn lg" onClick={handleDelay}>
-            ⏰ 延迟（{cooldownMinutes}分）
+            延迟（{cooldownMinutes}分）
           </button>
           <button className="btn lg ghost" onClick={handleIgnore}>
-            ✕ 忽略
+            忽略
           </button>
         </div>
 

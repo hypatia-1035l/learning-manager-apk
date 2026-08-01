@@ -36,7 +36,7 @@ export function StudyRecords({ taskId }: Props) {
   return (
     <div className="section">
       <div className="section-title">
-        🕒 学习记录
+        学习记录
         <span className="count">（{records.length} 条）</span>
       </div>
 

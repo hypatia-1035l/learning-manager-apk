@@ -14,7 +14,6 @@ export function Settings({
       <div className="settings-list">
         <button className="settings-item" onClick={onOpenReminder}>
           <span className="si-left">
-            <span className="si-icon">🔔</span>
             <span>
               <div className="si-name">提醒设置</div>
               <div className="si-desc">定时提醒 / 随机提醒摸鱼</div>
@@ -25,7 +24,6 @@ export function Settings({
 
         <button className="settings-item" onClick={onOpenBackup}>
           <span className="si-left">
-            <span className="si-icon">💾</span>
             <span>
               <div className="si-name">数据备份</div>
               <div className="si-desc">导出 / 导入恢复</div>

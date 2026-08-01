@@ -76,7 +76,7 @@ export function WordBankRandomizer({ selectedIds, onSelectChange }: Props) {
       <div className="section">
         {selectedBanks.length === 0 ? (
           <div>
-            <div className="section-title">🎲 随机抽取</div>
+            <div className="section-title">随机抽取</div>
             <p className="faint" style={{ fontSize: 13 }}>
               先从下方选择词库参与随机。选 1 个为单抽，选多个为组合随机。
             </p>
@@ -94,7 +94,7 @@ export function WordBankRandomizer({ selectedIds, onSelectChange }: Props) {
                 onClick={handleSavePreset}
                 disabled={!presetName.trim() || selectedIds.length === 0}
               >
-                💾 保存预设
+                保存预设
               </button>
             </div>
           </div>
@@ -116,7 +116,7 @@ export function WordBankRandomizer({ selectedIds, onSelectChange }: Props) {
       {data.presets.length > 0 && (
         <div className="section">
           <div className="section-title">
-            ⚡ 快捷预设
+            快捷预设
             <span className="count">（{data.presets.length}）</span>
           </div>
           <div className="row wrap" style={{ gap: 8 }}>
@@ -142,7 +142,7 @@ export function WordBankRandomizer({ selectedIds, onSelectChange }: Props) {
                       if (confirm(`删除预设「${pre.name}」？`)) deletePreset(pre.id)
                     }}
                   >
-                    ✕
+                    删除
                   </button>
                 </div>
               )
@@ -159,7 +159,7 @@ export function WordBankRandomizer({ selectedIds, onSelectChange }: Props) {
           type="button"
         >
           <span className="wb-picker-label">
-            📝 选择词库
+            选择词库
             <span className="count">（已选 {selectedIds.length}）</span>
           </span>
           <span className="wb-picker-chev">{pickerOpen ? '收起' : '展开'}</span>
@@ -437,7 +437,7 @@ function RandomPanel({
               onClick={handleCopy}
               title="复制当前结果到剪贴板"
             >
-              {copied ? '✓ 已复制' : '📋 复制结果'}
+              {copied ? '已复制' : '复制结果'}
             </button>
           </>
         ) : (
@@ -456,7 +456,7 @@ function RandomPanel({
         onClick={handleDraw}
         disabled={!allHasItems}
       >
-        🎲 {isSingle ? '随机抽取' : '组合随机'} ×{drawCount}
+        {isSingle ? '随机抽取' : '组合随机'} ×{drawCount}
       </button>
 
       {/* 保存预设入口 */}
@@ -473,7 +473,7 @@ function RandomPanel({
           onClick={onSavePreset}
           disabled={!presetName.trim()}
         >
-          💾 保存预设
+          保存预设
         </button>
       </div>
     </div>

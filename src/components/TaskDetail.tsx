@@ -97,7 +97,7 @@ export function TaskDetail({ taskId, onBack }: Props) {
             disabled={!canStart}
             title={canStart ? '开始正向计时学习' : '请先在下方添加学习序列'}
           >
-            ▶ 开始学习
+            开始学习
           </button>
           <button
             className="btn"

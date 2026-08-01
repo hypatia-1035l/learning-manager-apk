@@ -15,7 +15,8 @@ export function NumberRandomizer() {
   const data = useRandomData()
   const [min, setMin] = useState('1')
   const [max, setMax] = useState('100')
-  const [decimals, setDecimals] = useState(0)
+  // 小数点位数：用字符串缓冲，允许清空输入；提交时再转数字
+  const [decimalsInput, setDecimalsInput] = useState('0')
   const [drawCount, setDrawCount] = useState(1)
   const [results, setResults] = useState<number[]>([])
   const [newName, setNewName] = useState('')
@@ -23,6 +24,7 @@ export function NumberRandomizer() {
 
   const minNum = Number(min)
   const maxNum = Number(max)
+  const decimals = Math.min(10, Math.max(0, Math.floor(Number(decimalsInput) || 0)))
   const decimalsLabel = decimals === 0 ? '整数' : `${decimals} 位小数`
 
   const handleRoll = () => {
@@ -58,7 +60,7 @@ export function NumberRandomizer() {
   return (
     <div className="rt-grid">
       <div className="section">
-        <div className="section-title">🔢 数字随机</div>
+        <div className="section-title">数字随机</div>
 
         <div className="form-stack">
           <div className="row">
@@ -89,7 +91,7 @@ export function NumberRandomizer() {
           </div>
 
           <div className="field">
-            <label>小数点位数（0 = 整数）</label>
+            <label>小数点位数（0 = 整数，最大 10）</label>
             <div className="row">
               <input
                 type="number"
@@ -97,11 +99,15 @@ export function NumberRandomizer() {
                 max={10}
                 className="input"
                 style={{ width: 100 }}
-                value={decimals}
+                value={decimalsInput}
                 onChange={(e) => {
-                  const v = Math.max(0, Math.floor(Number(e.target.value) || 0))
-                  setDecimals(v)
+                  setDecimalsInput(e.target.value)
                   setResults([])
+                }}
+                onBlur={() => {
+                  // 失焦时规整：清空或非法回退为 0；超过 10 截到 10
+                  const n = Math.min(10, Math.max(0, Math.floor(Number(decimalsInput) || 0)))
+                  setDecimalsInput(String(n))
                 }}
               />
               <span className="faint" style={{ fontSize: 13 }}>
@@ -155,7 +161,7 @@ export function NumberRandomizer() {
             onClick={handleRoll}
             disabled={isNaN(minNum) || isNaN(maxNum) || minNum > maxNum}
           >
-            🎲 随机 ×{drawCount}
+            随机 ×{drawCount}
           </button>
 
           <div className="field">
@@ -214,14 +220,14 @@ export function NumberRandomizer() {
                         title="加载到当前"
                         onClick={() => handleLoadRange(r)}
                       >
-                        ↺
+                        加载
                       </button>
                       <button
                         className="icon-btn"
                         title="编辑"
                         onClick={() => setEditingId(r.id)}
                       >
-                        ✎
+                        编辑
                       </button>
                       <button
                         className="icon-btn danger"
@@ -230,7 +236,7 @@ export function NumberRandomizer() {
                           confirm(`删除范围「${r.name}」？`) && deleteRange(r.id)
                         }
                       >
-                        ✕
+                        删除
                       </button>
                     </div>
                   </>
