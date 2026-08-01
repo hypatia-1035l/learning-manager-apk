@@ -102,7 +102,9 @@ export function TaskDetail({ taskId, onBack }: Props) {
           <button
             className="btn"
             onClick={() => {
-              completeCurrentObject(task.id)
+              if (confirm(`确认完成「${obj?.name ?? '当前内容'}」？`)) {
+                completeCurrentObject(task.id)
+              }
             }}
             disabled={!canStart}
             title="手动完成当前序列并按接续模式切换下一项"

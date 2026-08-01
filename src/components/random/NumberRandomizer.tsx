@@ -27,6 +27,7 @@ export function NumberRandomizer() {
 
   const handleRoll = () => {
     if (isNaN(minNum) || isNaN(maxNum)) return
+    if (minNum > maxNum) return
     const picks: number[] = []
     for (let i = 0; i < drawCount; i++) {
       picks.push(randNum(minNum, maxNum, decimals))
@@ -49,6 +50,7 @@ export function NumberRandomizer() {
 
   const handleSave = () => {
     if (!newName.trim()) return
+    if (isNaN(minNum) || isNaN(maxNum) || minNum > maxNum) return
     addRange({ name: newName, min: minNum, max: maxNum })
     setNewName('')
   }
@@ -151,7 +153,7 @@ export function NumberRandomizer() {
           <button
             className="btn primary lg"
             onClick={handleRoll}
-            disabled={isNaN(minNum) || isNaN(maxNum)}
+            disabled={isNaN(minNum) || isNaN(maxNum) || minNum > maxNum}
           >
             🎲 随机 ×{drawCount}
           </button>
@@ -169,7 +171,7 @@ export function NumberRandomizer() {
               <button
                 className="btn"
                 onClick={handleSave}
-                disabled={!newName.trim()}
+                disabled={!newName.trim() || isNaN(minNum) || isNaN(maxNum) || minNum > maxNum}
               >
                 保存
               </button>

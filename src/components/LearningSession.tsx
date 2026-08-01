@@ -236,7 +236,7 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
     const note = noteInput.trim() || undefined
     if (isCount) {
       // 数量型：本次完成数量（增量），如 +20
-      const delta = Number(deltaInput) || 0
+      const delta = Math.max(0, Number(deltaInput) || 0)
       finishStudySession({
         taskId: task.id,
         duration: elapsed,
@@ -289,6 +289,7 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
   }
 
   const handleCompleteObject = () => {
+    if (!confirm(`确认完成「${obj?.name ?? '当前内容'}」？`)) return
     completeCurrentObject(task.id)
     onTaskMutated()
     // 完成后任务对象切换，同步新对象名到常驻通知

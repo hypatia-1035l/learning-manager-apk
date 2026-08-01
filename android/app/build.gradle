@@ -33,7 +33,10 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            // 开启代码混淆与压缩：移除未使用代码、缩短类/方法名，显著减小包体
+            minifyEnabled true
+            // 移除未引用的资源（图片/字符串等），配合 minifyEnabled 使用
+            shrinkResources true
             // 仅当 release 签名配置完整时才使用；否则回退到 debug 签名
             // （CI / 本地未配置 release keystore 时仍能产出可安装 APK 便于测试）
             if (signingConfigs.release.storeFile != null) {

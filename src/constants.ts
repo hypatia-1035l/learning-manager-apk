@@ -8,3 +8,41 @@ export const ICON_CHOICES = [
   '🎬', '🎥', '📹', '🎞️', '📷', '🚀', '✨', '🎯',
   '💡', '🔍', '🧩', '♟️', '🪐', '🌙', '☀️', '⭐',
 ]
+
+// ===== 学习方向模板 =====
+// 内置常用模板，用户在「新建方向」时可选「从模板创建」，一键套用方向名+图标+预置序列
+// 模板只用于初始化，创建后用户可自由编辑/删除，不会被同步或覆盖
+export interface TaskTemplate {
+  name: string
+  icon: string
+  // 预置的学习序列名称列表，创建时逐个生成
+  sequences: string[]
+}
+
+export const TASK_TEMPLATES: TaskTemplate[] = [
+  {
+    name: '历史阅读',
+    icon: '🏛️',
+    sequences: ['资治通鉴', '左传', '史记'],
+  },
+  {
+    name: '编程学习',
+    icon: '💻',
+    sequences: ['算法刷题', '源码阅读', '项目实战'],
+  },
+  {
+    name: '绘画练习',
+    icon: '🎨',
+    sequences: ['线条训练', '透视训练', '色彩练习'],
+  },
+  {
+    name: '语言学习',
+    icon: '🗣️',
+    sequences: ['听力训练', '口语练习', '词汇积累'],
+  },
+  {
+    name: '健身计划',
+    icon: '🧭',
+    sequences: ['力量训练', '有氧运动', '拉伸放松'],
+  },
+]

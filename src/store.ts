@@ -10,6 +10,7 @@ import type {
   SequenceProgress,
   StudyRecord,
   ReminderConfig,
+  UserTaskTemplate,
 } from './types'
 import { DEFAULT_REMINDER } from './types'
 import {
@@ -87,8 +88,27 @@ export const newId = uid
 export function createTask(input: {
   name: string
   icon: string
+  // 可选：初始学习序列名称列表（从模板创建时用），创建后逐个生成空进度的序列
+  sequenceNames?: string[]
 }): Task {
   const now = Date.now()
+  // 预置序列：空进度、未完成、启用，第一个作为 currentObjectId
+  const items: LearningObject[] = (input.sequenceNames ?? []).map((n) => ({
+    id: uid(),
+    name: n.trim() || '未命名',
+    progress: '',
+    progressUnit: '',
+    progressTarget: '',
+    completed: false,
+    enabled: true,
+    weight: 1,
+    countdownSeconds: null,
+    progressModel: { type: 'position', text: '' },
+  }))
+  const group: TaskGroup | null =
+    items.length > 0
+      ? { id: uid(), name: '默认序列', mode: 'sequential', items }
+      : null
   const task: Task = {
     id: uid(),
     name: input.name.trim() || '未命名任务',
@@ -97,8 +117,8 @@ export function createTask(input: {
     enabled: true,
     randomEnabled: true,
     weight: 1,
-    group: null,
-    currentObjectId: null,
+    group,
+    currentObjectId: items[0]?.id ?? null,
     totalStudyTime: 0,
     createdAt: now,
     updatedAt: now,
@@ -638,6 +658,34 @@ export function getRecentRecords(
   return [...records]
     .sort((a, b) => b.date - a.date)
     .slice(0, limit)
+}
+
+// ---------- 用户方向模板 ----------
+// 从已创建方向保存为模板，下次新建时可套用
+export function saveTaskTemplate(input: {
+  name: string
+  icon: string
+  sequences: string[]
+}): UserTaskTemplate {
+  const tpl: UserTaskTemplate = {
+    id: uid(),
+    name: input.name.trim() || '未命名模板',
+    icon: input.icon,
+    sequences: input.sequences.map((s) => s.trim()).filter(Boolean),
+    createdAt: Date.now(),
+  }
+  setState((prev) => ({
+    ...prev,
+    taskTemplates: [...(prev.taskTemplates ?? []), tpl],
+  }))
+  return tpl
+}
+
+export function deleteTaskTemplate(id: string) {
+  setState((prev) => ({
+    ...prev,
+    taskTemplates: (prev.taskTemplates ?? []).filter((t) => t.id !== id),
+  }))
 }
 
 // ---------- 任务选择系统 ----------

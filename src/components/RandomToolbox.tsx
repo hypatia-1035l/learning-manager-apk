@@ -1,18 +1,22 @@
 import { useState } from 'react'
 import { NumberRandomizer } from './random/NumberRandomizer'
 import { WordBankRandomizer } from './random/WordBankRandomizer'
+import { BankManager } from './random/BankManager'
 import { RandomRecords } from './random/RandomRecords'
 
-type Tool = 'number' | 'wordbank' | 'records'
+type Tool = 'number' | 'wordbank' | 'banks' | 'records'
 
 const TABS: { id: Tool; label: string; icon: string }[] = [
   { id: 'number', label: '数字随机', icon: '🔢' },
-  { id: 'wordbank', label: '词库随机', icon: '📝' },
+  { id: 'wordbank', label: '词库随机', icon: '🎲' },
+  { id: 'banks', label: '词库管理', icon: '📝' },
   { id: 'records', label: '随机记录', icon: '📜' },
 ]
 
 export function RandomToolbox() {
   const [tool, setTool] = useState<Tool>('number')
+  // 选中的词库 ID（词库随机 / 词库管理 共享）
+  const [selectedBankIds, setSelectedBankIds] = useState<string[]>([])
 
   return (
     <div className="pool-compact">
@@ -31,7 +35,18 @@ export function RandomToolbox() {
 
       <div>
         {tool === 'number' && <NumberRandomizer />}
-        {tool === 'wordbank' && <WordBankRandomizer />}
+        {tool === 'wordbank' && (
+          <WordBankRandomizer
+            selectedIds={selectedBankIds}
+            onSelectChange={setSelectedBankIds}
+          />
+        )}
+        {tool === 'banks' && (
+          <BankManager
+            selectedIds={selectedBankIds}
+            onSelectChange={setSelectedBankIds}
+          />
+        )}
         {tool === 'records' && <RandomRecords />}
       </div>
     </div>

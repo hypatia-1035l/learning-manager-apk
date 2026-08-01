@@ -14,6 +14,92 @@ const STORAGE_KEY = 'learning-manager:random-toolbox:v1'
 // 随机记录保留上限：超过自动截断旧记录，避免长期使用无限增长
 const MAX_RANDOM_RECORDS = 200
 
+// 内置预设词库标记：首次启动写入一次，用户可自由编辑删除
+const SEED_KEY = 'learning-manager:random-seeded:v1'
+
+// ---------- 内置预设词库 ----------
+// 首次使用自动填充，用户可自由编辑/删除，不会被重复填充
+const SEED_BANKS: Array<{
+  name: string
+  category: string
+  tags: string[]
+  words: Array<{ text: string; weight?: number }>
+}> = [
+  {
+    name: '今天吃啥',
+    category: '日常',
+    tags: ['吃货'],
+    words: [
+      { text: '米饭 + 炒菜' },
+      { text: '面条' },
+      { text: '饺子' },
+      { text: '汉堡' },
+      { text: '披萨' },
+      { text: '寿司' },
+      { text: '麻辣烫' },
+      { text: '黄焖鸡' },
+      { text: '螺蛳粉' },
+      { text: '兰州拉面' },
+      { text: '沙县小吃' },
+      { text: '盖浇饭' },
+      { text: '煎饼果子' },
+      { text: '肉夹馍' },
+      { text: '凉皮' },
+      { text: '炒饭' },
+      { text: '冒菜' },
+      { text: '炸鸡' },
+      { text: '烤肉' },
+      { text: '火锅' },
+      { text: '便利店饭团' },
+      { text: '沙拉' },
+      { text: '三明治' },
+      { text: '越南粉' },
+      { text: '咖喱饭' },
+    ],
+  },
+  {
+    name: '这不是迟到这只是',
+    category: '摸鱼',
+    tags: ['借口'],
+    words: [
+      { text: '地铁延误了' },
+      { text: '闹钟没响' },
+      { text: '公交堵车' },
+      { text: '肚子不舒服' },
+      { text: '电梯坏了，爬楼梯上来的' },
+      { text: '手机充一晚电自动关机了' },
+      { text: '出门发现钥匙忘带了' },
+      { text: '帮你带了早餐，排队等了会儿' },
+      { text: '昨天加班太晚，起猛了' },
+      { text: '路由器重启了一下' },
+      { text: '路上扶老奶奶过马路' },
+      { text: '电动车没电了，推过来的' },
+    ],
+  },
+  {
+    name: '摸鱼借口',
+    category: '摸鱼',
+    tags: ['借口'],
+    words: [
+      { text: '上厕所' },
+      { text: '接杯水' },
+      { text: '看窗外放松眼睛' },
+      { text: '活动颈椎' },
+      { text: '找同事对一下需求' },
+      { text: '脑子卡了，换个环境想想' },
+      { text: '去楼下透透气' },
+      { text: '泡杯咖啡' },
+      { text: '伸个懒腰' },
+      { text: '整理一下桌面' },
+      { text: '查个资料' },
+      { text: '等编译，趁机摸一把' },
+      { text: '去茶水间看看有没有零食' },
+      { text: '闭眼冥想五分钟' },
+      { text: '盯着屏幕发呆思考人生' },
+    ],
+  },
+]
+
 const uid = (): string =>
   (typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -150,12 +236,42 @@ function load(): RandomData {
         // 旧版本数据可能超过 MAX_RANDOM_RECORDS 或顺序紊乱，这里统一规整
         migrated.records = trimRecords(parsed.records)
       }
+      // 首次启动填充内置预设词库
+      seedDefaults(migrated)
       return migrated
     }
   } catch {
     /* ignore */
   }
-  return { ranges: [], banks: [], presets: [], records: [] }
+  // 全新用户：填充内置预设词库
+  const fresh: RandomData = { ranges: [], banks: [], presets: [], records: [] }
+  seedDefaults(fresh)
+  return fresh
+}
+
+// 首次使用时填充内置预设词库（仅执行一次，由 SEED_KEY 标记）
+// 用户可自由编辑/删除，不会被重复填充
+function seedDefaults(data: RandomData): void {
+  try {
+    if (localStorage.getItem(SEED_KEY)) return
+  } catch {
+    return
+  }
+  const newBanks: WordBank[] = SEED_BANKS.map((s) => ({
+    id: uid(),
+    name: s.name,
+    category: s.category,
+    enabled: true,
+    tags: s.tags,
+    words: s.words.map((w) => ({ text: w.text, weight: w.weight ?? 1 })),
+    createdAt: Date.now(),
+  }))
+  data.banks = [...data.banks, ...newBanks]
+  try {
+    localStorage.setItem(SEED_KEY, '1')
+  } catch {
+    /* ignore */
+  }
 }
 
 // 按时间降序排序并截断到 MAX_RANDOM_RECORDS，避免长期使用数据无限增长

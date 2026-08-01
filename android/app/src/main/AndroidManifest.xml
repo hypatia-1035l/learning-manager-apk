@@ -75,9 +75,6 @@
     <!-- 学习计时前台服务 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <!-- 应用使用情况统计（今日状态） -->
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
-        tools:ignore="ProtectedPermissions" />
 
     <!-- 设置通知渠道（兼容旧版本） -->
     <queries>

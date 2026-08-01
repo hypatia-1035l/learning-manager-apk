@@ -5,7 +5,6 @@ import { RandomToolbox } from './components/RandomToolbox'
 import { Settings } from './components/Settings'
 import { ReminderSettings } from './components/ReminderSettings'
 import { DataBackup } from './components/DataBackup'
-import { VivoPermissionGuide } from './components/VivoPermissionGuide'
 import { ReminderActionModal } from './components/ReminderActionModal'
 import { StatsView } from './components/StatsView'
 import { useAppData, pickRandomTask, getRandomPool } from './store'
@@ -16,6 +15,7 @@ import {
   endSessionAndReschedule,
   isSessionActive,
   setSessionActive,
+  requestNotificationPermission,
 } from './reminderService'
 import {
   getStudyTimerStatus,
@@ -31,37 +31,31 @@ type View =
   | { name: 'reminder' }
   | { name: 'backup' }
 
-const GUIDE_KEY = 'learning-manager:vivo-guide-shown:v1'
+const PERM_REQUESTED_KEY = 'learning-manager:notif-perm-requested'
 
 export default function App() {
   // 当前工作区，默认进入「待办」
   const [tab, setTab] = useState<Tab>('todos')
   // 子页面视图：null 时显示工作区主导航 + 当前 tab 内容
   const [view, setView] = useState<View | null>(null)
-  const [showGuide, setShowGuide] = useState(false)
   // 提醒通知点击后的操作弹窗
   const [reminderAction, setReminderAction] = useState<Task | null>(null)
   const data = useAppData()
   const studyTimerCheckedRef = useRef(false)
 
-  // 首次启动显示 vivo 权限引导
+  // 首次启动：直接请求通知权限（Android 13+ 需运行时申请）
   useEffect(() => {
     try {
-      const shown = localStorage.getItem(GUIDE_KEY)
-      if (!shown) setShowGuide(true)
+      const requested = localStorage.getItem(PERM_REQUESTED_KEY)
+      if (!requested) {
+        requestNotificationPermission().finally(() => {
+          localStorage.setItem(PERM_REQUESTED_KEY, '1')
+        })
+      }
     } catch {
       /* ignore */
     }
   }, [])
-
-  const closeGuide = () => {
-    setShowGuide(false)
-    try {
-      localStorage.setItem(GUIDE_KEY, '1')
-    } catch {
-      /* ignore */
-    }
-  }
 
   // 注册会话结束回调：学习会话结束时设置冷却并重新调度提醒
   useEffect(() => {
@@ -257,8 +251,6 @@ export default function App() {
           <span className="tb-name">设置</span>
         </button>
       </nav>
-
-      {showGuide && <VivoPermissionGuide onClose={closeGuide} />}
 
       {reminderAction && data.reminder && (
         <ReminderActionModal

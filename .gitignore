@@ -18,6 +18,10 @@ build/
 learning-manager-split.z*
 learning-manager.zip
 learning-manager-debug.apk
+# 防止把构建产物误放进 vite public 目录（会被打包进 web 资源 → 嵌套进 APK）
+public/*.apk
+public/*.aab
+apk-download/
 
 # IDE / 系统
 .DS_Store
