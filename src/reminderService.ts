@@ -301,6 +301,60 @@ async function scheduleNextWindowStart(reminder: ReminderConfig) {
   }
 }
 
+// ---------- 下次提醒预览 ----------
+// 计算下次提醒的预计触发时间（用于 UI 预览，不实际调度）
+// 返回 { at: Date, mode: 'fixed' | 'random' | 'windowStart' } 或 null
+export interface NextReminderPreview {
+  at: Date
+  mode: 'fixed' | 'random' | 'windowStart'
+}
+export function getNextReminderPreview(
+  tasks: Task[],
+  reminder: ReminderConfig,
+): NextReminderPreview | null {
+  if (!reminder.enabled) return null
+  const pool = getReminderPool(tasks, reminder)
+  if (pool.length === 0) return null
+
+  const now = new Date()
+  const minuteOfDay = now.getHours() * 60 + now.getMinutes()
+  const inWindow = isInWindow(minuteOfDay, reminder.startMinute, reminder.endMinute)
+
+  if (!inWindow) {
+    return { at: nextWindowStart(reminder), mode: 'windowStart' }
+  }
+
+  const cooldownEnd = Math.max(cooldownUntil, now.getTime())
+  if (reminder.intervalMinutes > 0) {
+    const intervalMs = reminder.intervalMinutes * 60 * 1000
+    let firstAt = now.getTime() + intervalMs
+    if (cooldownEnd > firstAt) firstAt = cooldownEnd
+    return { at: new Date(firstAt), mode: 'fixed' }
+  }
+  // 随机模式：返回冷却结束时间作为最早可能时间
+  return { at: new Date(cooldownEnd), mode: 'random' }
+}
+
+// ---------- 立即测试提醒 ----------
+// 5 秒后发送一条测试通知，用于验证权限与通道
+export async function sendTestReminder(): Promise<void> {
+  try {
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: 99,
+          title: '今天摸啥鱼',
+          body: '这是一条测试提醒，证明通知通道工作正常。',
+          schedule: { at: new Date(Date.now() + 5000) },
+          extra: { taskId: null },
+        },
+      ],
+    })
+  } catch {
+    /* ignore */
+  }
+}
+
 // ---------- 取消 ----------
 export async function cancelAllReminders() {
   try {

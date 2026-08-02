@@ -4,7 +4,10 @@ import {
   requestNotificationPermission,
   scheduleReminders,
   cancelAllReminders,
+  getNextReminderPreview,
+  sendTestReminder,
 } from '../reminderService'
+import type { ReminderConfig } from '../types'
 
 interface Props {
   onBack: () => void
@@ -30,10 +33,23 @@ function timeToMinute(t: string): number {
   return Math.min(1439, Math.max(0, h * 60 + m))
 }
 
+// 把 Date 格式化为 "HH:MM"，跨天则标 "明天 HH:MM"
+function formatPreviewTime(d: Date): string {
+  const now = new Date()
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return sameDay ? `${hh}:${mm}` : `明天 ${hh}:${mm}`
+}
+
 export function ReminderSettings({ onBack }: Props) {
   const data = useAppData()
   const reminder = data.reminder!
   const [busy, setBusy] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [permGranted, setPermGranted] = useState<boolean | null>(null)
   const [msg, setMsg] = useState<string>('')
 
@@ -48,7 +64,7 @@ export function ReminderSettings({ onBack }: Props) {
   const pool = getReminderPool(data.tasks, reminder)
 
   // 由本地缓冲字段构造完整的下一份 reminder 配置
-  const buildNext = (enabled: boolean) => ({
+  const buildNext = (enabled: boolean): ReminderConfig => ({
     ...reminder,
     enabled,
     intervalMinutes: Math.max(0, parseNum(interval, 0)),
@@ -92,14 +108,50 @@ export function ReminderSettings({ onBack }: Props) {
     setMsg('已应用设置并重新调度提醒')
   }
 
-  const toggleTask = (taskId: string, checked: boolean) => {
+  // 任务白名单变更后自动重新调度（提醒开启时）
+  const toggleTask = async (taskId: string, checked: boolean) => {
     const set = new Set(reminder.enabledTaskIds)
     if (checked) set.add(taskId)
     else set.delete(taskId)
-    updateReminder({ enabledTaskIds: Array.from(set) })
+    const next = { ...reminder, enabledTaskIds: Array.from(set) }
+    updateReminder(next)
+    if (reminder.enabled) {
+      await scheduleReminders(data.tasks, next)
+    }
+  }
+
+  // 发送测试提醒，验证通知权限与通道
+  const handleTest = async () => {
+    setTesting(true)
+    const ok = await requestNotificationPermission()
+    setPermGranted(ok)
+    if (!ok) {
+      setMsg('未授予通知权限，无法发送测试提醒')
+      setTesting(false)
+      return
+    }
+    await sendTestReminder()
+    setMsg('测试提醒已安排，5 秒后弹出')
+    setTesting(false)
   }
 
   const isRandomMode = parseNum(interval, 0) === 0
+  const startMin = timeToMinute(startTime)
+  const endMin = timeToMinute(endTime)
+  const isCrossNight = startMin > endMin
+  const isEmptyWindow = startMin === endMin
+
+  // 下次提醒预览：基于本地缓冲 + 当前白名单构造的配置
+  const preview = getNextReminderPreview(data.tasks, buildNext(reminder.enabled))
+  const previewText = preview
+    ? preview.mode === 'fixed'
+      ? `下次提醒约 ${formatPreviewTime(preview.at)}`
+      : preview.mode === 'windowStart'
+        ? `下次窗口开始 ${formatPreviewTime(preview.at)} 触发`
+        : `窗口内随机触发（最早 ${formatPreviewTime(preview.at)}）`
+    : reminder.enabled
+      ? '提醒池为空，暂无提醒可调度'
+      : '提醒已关闭'
 
   return (
     <div>
@@ -134,6 +186,11 @@ export function ReminderSettings({ onBack }: Props) {
             未授予通知权限。请到系统设置 → 应用 → 今天摸啥鱼 → 通知，开启通知权限。
           </p>
         )}
+        {reminder.enabled && (
+          <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>
+            {previewText}
+          </p>
+        )}
       </section>
 
       {/* 时间参数 */}
@@ -141,12 +198,13 @@ export function ReminderSettings({ onBack }: Props) {
         <div className="section-title">时间设置</div>
         <div className="field" style={{ marginBottom: 14 }}>
           <label>
-            提醒间隔（分钟）<span className="faint" style={{ fontSize: 12 }}>· 0 = 随机提醒</span>
+            提醒间隔（分钟）<span className="faint" style={{ fontSize: 12 }}>· 0 = 随机提醒 · 上限 1440</span>
           </label>
           <input
             type="number"
             className="input"
             min={0}
+            max={1440}
             step={5}
             value={interval}
             onChange={(e) => setIntervalMin(e.target.value)}
@@ -159,11 +217,12 @@ export function ReminderSettings({ onBack }: Props) {
           </span>
         </div>
         <div className="field" style={{ marginBottom: 14 }}>
-          <label>冷却时间（分钟）</label>
+          <label>冷却时间（分钟）<span className="faint" style={{ fontSize: 12 }}>· 上限 720</span></label>
           <input
             type="number"
             className="input"
             min={1}
+            max={720}
             step={5}
             value={cooldown}
             onChange={(e) => setCooldown(e.target.value)}
@@ -185,7 +244,10 @@ export function ReminderSettings({ onBack }: Props) {
             />
           </div>
           <div className="field" style={{ flex: 1, minWidth: 120 }}>
-            <label>窗口结束</label>
+            <label>
+              窗口结束
+              {isCrossNight && <span className="faint" style={{ fontSize: 12 }}> · 跨夜</span>}
+            </label>
             <input
               type="time"
               className="input"
@@ -196,8 +258,13 @@ export function ReminderSettings({ onBack }: Props) {
           </div>
         </div>
         <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>
-          只在 {startTime} - {endTime} 之间触发提醒，避免深夜打扰。
+          只在 {startTime} - {endTime}{isCrossNight ? '（跨夜）' : ''} 之间触发提醒，避免深夜打扰。
         </p>
+        {isEmptyWindow && (
+          <p className="muted" style={{ color: 'var(--amber)', fontSize: 12, marginTop: 4 }}>
+            开始与结束时间相同，窗口为空，不会触发任何提醒。请调整结束时间。
+          </p>
+        )}
       </section>
 
       {/* 提醒池：具体任务 */}
@@ -239,19 +306,26 @@ export function ReminderSettings({ onBack }: Props) {
           </div>
         )}
         <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>
-          注：未启用的任务无法参与提醒。白名单为空时，所有已启用任务都参与。
+          注：未启用的任务无法参与提醒。白名单为空时，所有已启用任务都参与。勾选后自动重新调度。
         </p>
       </section>
 
       {/* 操作 */}
       <section className="section">
-        <div className="row">
+        <div className="row wrap" style={{ gap: 8 }}>
           <button
             className="btn primary"
             onClick={handleApply}
             disabled={busy || !reminder.enabled}
           >
             {busy ? '调度中…' : '应用并重新调度'}
+          </button>
+          <button
+            className="btn"
+            onClick={handleTest}
+            disabled={testing}
+          >
+            {testing ? '发送中…' : '发送测试提醒'}
           </button>
           <button
             className="btn"
@@ -271,7 +345,7 @@ export function ReminderSettings({ onBack }: Props) {
           </p>
         )}
         <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>
-          修改数字后点击「应用并重新调度」才会生效。
+          修改数字/时间后点击「应用并重新调度」生效；任务勾选会自动重调度；测试提醒 5 秒后弹出。
         </p>
       </section>
     </div>
