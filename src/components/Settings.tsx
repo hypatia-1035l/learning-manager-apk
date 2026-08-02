@@ -1,5 +1,6 @@
-// 设置页 —— 系统配置入口：提醒 / 数据备份
-// 作为「设置」工作区内容，顶部标题由 Shell 统一展示，这里只渲染列表
+// 设置页 —— 系统配置入口：提醒 / 数据备份 / 版本信息
+import { BUILD_VERSION, BUILD_TIME } from '../buildInfo'
+
 interface Props {
   onOpenReminder: () => void
   onOpenBackup: () => void
@@ -32,6 +33,25 @@ export function Settings({
           <span className="si-arrow">›</span>
         </button>
       </div>
+
+      <section className="section" style={{ marginTop: 20 }}>
+        <div className="section-title">版本信息</div>
+        <div className="obj-list">
+          <div className="obj-item">
+            <span className="name">版本号</span>
+            <div className="ops" />
+            <span className="prog">v{BUILD_VERSION}</span>
+          </div>
+          <div className="obj-item">
+            <span className="name">构建时间</span>
+            <div className="ops" />
+            <span className="prog">{BUILD_TIME}</span>
+          </div>
+        </div>
+        <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>
+          安装后若版本号/构建时间与页面一致，即为最新 APK。
+        </p>
+      </section>
     </div>
   )
 }

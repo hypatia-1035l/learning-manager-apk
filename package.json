@@ -1,10 +1,11 @@
 {
   "name": "learning-manager",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "prebuild": "node scripts/writeBuildInfo.cjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host",
     "clean:android": "node -e \"require('fs').rmSync('android/app/src/main/assets/public',{recursive:true,force:true})\"",
