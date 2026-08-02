@@ -10,6 +10,7 @@ import type {
   SequenceProgress,
   StudyRecord,
   ReminderConfig,
+  ProgressNode,
 } from './types'
 import { DEFAULT_REMINDER } from './types'
 import {
@@ -89,21 +90,51 @@ export function createTask(input: {
   icon: string
   // 可选：初始学习序列名称列表（从模板创建时用），创建后逐个生成空进度的序列
   sequenceNames?: string[]
+  // 可选：每个序列名对应的进阶字段（长度与 sequenceNames 对齐则一一对应，空时用 templateDefault）
+  sequenceTemplates?: Array<{
+    progress?: string
+    progressUnit?: string
+    progressTarget?: string
+    countdownSeconds?: number | null
+    progressNodes?: ProgressNode[]
+  } | null | undefined>
+  // 可选：所有序列共用的默认模板（单独字段未覆盖时用）
+  templateDefault?: {
+    progressUnit?: string
+    progressTarget?: string
+    countdownSeconds?: number | null
+  }
 }): Task {
   const now = Date.now()
+  const templ = input.templateDefault
   // 预置序列：空进度、未完成、启用，第一个作为 currentObjectId
-  const items: LearningObject[] = (input.sequenceNames ?? []).map((n) => ({
-    id: uid(),
-    name: n.trim() || '未命名',
-    progress: '',
-    progressUnit: '',
-    progressTarget: '',
-    completed: false,
-    enabled: true,
-    weight: 1,
-    countdownSeconds: null,
-    progressModel: { type: 'position', text: '' },
-  }))
+  const items: LearningObject[] = (input.sequenceNames ?? []).map((n, idx) => {
+    const per = input.sequenceTemplates?.[idx]
+    const unit = per?.progressUnit ?? templ?.progressUnit ?? ''
+    const target = per?.progressTarget ?? templ?.progressTarget ?? ''
+    const countdown =
+      typeof per?.countdownSeconds === 'number'
+        ? per.countdownSeconds
+        : typeof templ?.countdownSeconds === 'number'
+          ? templ.countdownSeconds
+          : null
+    const progressRaw = per?.progress ?? (target ? '0' : '')
+    const obj: LearningObject = {
+      id: uid(),
+      name: n.trim() || '未命名',
+      progress: progressRaw,
+      progressUnit: unit,
+      progressTarget: target,
+      completed: false,
+      enabled: true,
+      weight: 1,
+      countdownSeconds: countdown,
+      progressNodes: per?.progressNodes && per.progressNodes.length > 0 ? per.progressNodes : undefined,
+      progressModel: { type: 'position', text: '' },
+    }
+    obj.progressModel = deriveProgressModel(obj)
+    return obj
+  })
   const group: TaskGroup | null =
     items.length > 0
       ? { id: uid(), name: '默认序列', mode: 'sequential', items }

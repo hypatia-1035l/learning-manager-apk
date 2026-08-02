@@ -227,20 +227,20 @@ select {
 .task-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .task-card {
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 16px 16px 14px;
+  padding: 12px 14px;
   box-shadow: var(--shadow);
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.12s ease;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   position: relative;
 }
 .task-card:hover {
@@ -365,7 +365,8 @@ select {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  margin-bottom: 10px;
 }
 .field label {
   font-size: 12px;
@@ -398,14 +399,14 @@ select {
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 18px;
-  margin-bottom: 16px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
   box-shadow: var(--shadow);
 }
 .section-title {
   font-size: 14px;
   font-weight: 700;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2049,8 +2050,8 @@ textarea {
 .now-active {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
+  gap: 3px;
+  padding: 10px 14px;
   background: var(--accent-bg);
   border: 1px solid var(--accent-soft);
   border-radius: var(--radius);

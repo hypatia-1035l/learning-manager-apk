@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { App as CapApp } from '@capacitor/app'
 import { TaskPool } from './components/TaskPool'
 import { TaskDetail } from './components/TaskDetail'
 import { RandomToolbox } from './components/RandomToolbox'
@@ -8,6 +9,7 @@ import { DataBackup } from './components/DataBackup'
 import { ReminderActionModal } from './components/ReminderActionModal'
 import { StatsView } from './components/StatsView'
 import { useAppData, pickRandomTask, getRandomPool } from './store'
+import { setCanExitAppNative } from './backNavigation'
 import {
   scheduleReminders,
   onNotificationClick,
@@ -145,6 +147,48 @@ export default function App() {
     })
     return off
   }, [data.tasks])
+
+  // 同步「是否允许退桌面」标志位给原生层：
+  //   - 子页面或有弹窗 → false，原生层不得 moveTaskToBack
+  //   - 顶层 Tab        → true，原生层可把 App 退到桌面
+  useEffect(() => {
+    const canExitApp = !view && !reminderAction
+    setCanExitAppNative(canExitApp).catch(() => { /* ignore */ })
+  }, [view, reminderAction])
+
+  // 监听系统返回键/边缘滑动返回（Android 手势导航）：
+  //   有子页面（任务详情/提醒设置/备份）或弹窗时先回上一层，不直接退出应用
+  useEffect(() => {
+    let listener: { remove: () => Promise<void> } | null = null
+    let cancelled = false
+    ;(async () => {
+      try {
+        const l = await CapApp.addListener('backButton', ({ canGoBack }) => {
+          // 优先关操作弹窗
+          if (reminderAction) { setReminderAction(null); return }
+          // 子页面回到对应 tab 顶层
+          if (view) {
+            if (view.name === 'task') setTab('todos')
+            else setTab('settings')
+            setView(null)
+            return
+          }
+          // 到了顶层 Tab：交给原生 finish / moveTaskToBack
+          if (!canGoBack) {
+            CapApp.exitApp().catch(() => { /* ignore */ })
+          }
+        })
+        if (cancelled) { l.remove(); return }
+        listener = l
+      } catch {
+        /* Web 端无此事件，忽略 */
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (listener) listener.remove().catch(() => {})
+    }
+  }, [view, reminderAction])
 
   // 提醒操作弹窗回调
   const handleReminderStart = (task: Task) => {

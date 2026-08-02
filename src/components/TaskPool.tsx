@@ -6,16 +6,14 @@ import {
   setTaskRandomEnabled,
   setTaskWeight,
   pickRandomTask,
-  getRandomPool,
   getContinueTask,
   formatSequenceProgress,
 } from '../store'
-import { TASK_STATUS_LABELS } from '../types'
 import { formatDuration } from '../utils'
 import { TaskForm } from './TaskForm'
 import { LearningSession } from './LearningSession'
-import { RandomResultModal } from './RandomResultModal'
 import type { Task } from '../types'
+import { TASK_STATUS_LABELS } from '../types'
 
 interface Props {
   onOpenTask: (task: Task) => void
@@ -24,7 +22,6 @@ interface Props {
 export function TaskPool({ onOpenTask }: Props) {
   const data = useAppData()
   const [showForm, setShowForm] = useState(false)
-  const [randomTask, setRandomTask] = useState<Task | null>(null)
   const [sessionTaskId, setSessionTaskId] = useState<string | null>(null)
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
 
@@ -35,7 +32,7 @@ export function TaskPool({ onOpenTask }: Props) {
 
   const handleRandomStart = () => {
     const picked = pickRandomTask(data.tasks)
-    setRandomTask(picked)
+    if (picked) setSessionTaskId(picked.id)
   }
 
   return (
@@ -209,26 +206,6 @@ export function TaskPool({ onOpenTask }: Props) {
       )}
 
       {showForm && <TaskForm onClose={() => setShowForm(false)} />}
-
-      {randomTask && (
-        <RandomResultModal
-          task={randomTask}
-          randomPoolSize={getRandomPool(data.tasks).length}
-          onClose={() => setRandomTask(null)}
-          onReroll={() => {
-            const picked = pickRandomTask(data.tasks)
-            setRandomTask(picked)
-          }}
-          onStart={() => {
-            setSessionTaskId(randomTask.id)
-            setRandomTask(null)
-          }}
-          onOpenTask={() => {
-            onOpenTask(randomTask)
-            setRandomTask(null)
-          }}
-        />
-      )}
 
       {sessionTask && (
         <LearningSession

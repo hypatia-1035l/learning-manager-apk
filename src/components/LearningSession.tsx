@@ -78,8 +78,8 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
   const remaining = isCountdown ? Math.max(0, countdownSec - elapsed) : 0
 
   useEffect(() => {
-    // 预填：count 型默认本次完成 0；position 型预填当前进度方便微调
-    setDeltaInput('')
+    // 预填：count 型默认本次完成 1（一次学完立刻点保存只需一步）；position 型预填当前进度方便微调
+    setDeltaInput(isCount ? '1' : '')
     setEndProgress(isCount ? '' : startProgress)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task.currentObjectId])
@@ -417,21 +417,24 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
               </div>
             </div>
           )}
-          <div className="field">
-            <label className="muted">备注（可选）</label>
-            <textarea
-              className="textarea"
+          <div className="field" style={{ marginTop: 2 }}>
+            <label className="muted" style={{ fontSize: 12 }}>备注（可选）</label>
+            <input
+              className="input"
               value={noteInput}
               onChange={(e) => setNoteInput(e.target.value)}
-              placeholder="记点什么：学习心得、遇到的问题、下次继续的地方…"
-              rows={3}
+              placeholder="记点什么…"
             />
           </div>
-          <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={handleResume}>
+          <div className="row wrap" style={{ justifyContent: 'flex-end', gap: 6, marginTop: 4 }}>
+            <button className="btn sm" onClick={handleResume}>
               继续学习
             </button>
-            <button className="btn" onClick={handleSaveDurationOnly} title="不更新进度，仅记录本次学习时长">
+            <button
+              className="btn sm"
+              onClick={handleSaveDurationOnly}
+              title="不更新进度，仅记录本次学习时长"
+            >
               仅记时长
             </button>
             <button className="btn primary" onClick={handleSave}>
