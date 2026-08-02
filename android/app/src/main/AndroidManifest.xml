@@ -57,6 +57,19 @@
                 <action android:name="com.learning.manager.STUDY_OPEN" />
             </intent-filter>
         </receiver>
+
+        <!-- 摸鱼提醒动作接收器：Snooze/Ignore 不启动 Activity，后台处理 -->
+        <receiver
+            android:name=".StudyNotificationActionReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.learning.manager.NOTIF_SNOOZE_10" />
+                <action android:name="com.learning.manager.NOTIF_SNOOZE_30" />
+                <action android:name="com.learning.manager.NOTIF_IGNORE" />
+                <action android:name="com.learning.manager.NOTIF_REFIRE" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Permissions -->

@@ -60,6 +60,11 @@ export default function App() {
   // 注册会话结束回调：学习会话结束时设置冷却并重新调度提醒
   useEffect(() => {
     const off = registerSessionEndCallback(() => {
+      // 记录学习会话结束时间，用于「学习后 N 分钟不提醒」跳过逻辑
+      try {
+        const key = 'learning-manager:last-session-end'
+        localStorage.setItem(key, String(Date.now()))
+      } catch { /* ignore */ }
       if (data.reminder?.enabled) {
         endSessionAndReschedule(data.tasks, data.reminder).catch(() => {})
       }

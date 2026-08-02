@@ -127,33 +127,60 @@ function migrateTask(t: Task): Task {
 }
 
 // ---------- 迁移：提醒配置 ----------
-// 时间窗兼容：旧数据仅有 startHour/endHour（小时精度），迁移为分钟精度
+// v1→v2：单窗口 start/end → windows[]；新增 dailyMode/dailyCount/enabledWeekdays/skipAfterSessionMinutes
 function migrateReminder(r: unknown): ReminderConfig {
   const rem = (r ?? {}) as Partial<ReminderConfig> & {
     cooldownMinutes?: number
     startHour?: number
     endHour?: number
+    dailyMode?: unknown
+    dailyCount?: unknown
   }
-  // 分钟精度：优先用新字段，回退到旧 startHour/endHour*60，再回退到默认
-  const startMinute =
-    typeof rem.startMinute === 'number'
-      ? rem.startMinute
-      : typeof rem.startHour === 'number'
-        ? rem.startHour * 60
-        : 9 * 60
-  const endMinute =
-    typeof rem.endMinute === 'number'
-      ? rem.endMinute
-      : typeof rem.endHour === 'number'
-        ? rem.endHour * 60
-        : 22 * 60
+  // 单窗口分钟：优先用 windows[0]，回退 startMinute/endMinute，回退 startHour/endHour*60，再回退默认
+  let startMinute = 9 * 60
+  let endMinute = 22 * 60
+  if (Array.isArray(rem.windows) && rem.windows.length > 0) {
+    startMinute = rem.windows[0].startMinute
+    endMinute = rem.windows[0].endMinute
+  } else if (typeof rem.startMinute === 'number' && typeof rem.endMinute === 'number') {
+    startMinute = rem.startMinute
+    endMinute = rem.endMinute
+  } else {
+    if (typeof rem.startHour === 'number') startMinute = rem.startHour * 60
+    if (typeof rem.endHour === 'number') endMinute = rem.endHour * 60
+  }
+  startMinute = Math.min(1439, Math.max(0, startMinute))
+  endMinute = Math.min(1439, Math.max(0, endMinute))
+
+  const windowsFromLegacy = Array.isArray(rem.windows) && rem.windows.length > 0
+    ? rem.windows.map((w) => ({
+        startMinute: Math.min(1439, Math.max(0, w.startMinute ?? 0)),
+        endMinute: Math.min(1439, Math.max(0, w.endMinute ?? 1439)),
+      })).slice(0, 3)
+    : [{ startMinute, endMinute }]
+
+  // 模式：有 dailyMode 就用，否则看旧 intervalMinutes：0=随机，>0=固定间隔
+  let dailyMode: 'interval' | 'random' | 'dailyCount' = 'random'
+  if (rem.dailyMode === 'interval' || rem.dailyMode === 'random' || rem.dailyMode === 'dailyCount') {
+    dailyMode = rem.dailyMode
+  } else if (typeof rem.intervalMinutes === 'number' && rem.intervalMinutes > 0) {
+    dailyMode = 'interval'
+  }
+  const def: ReminderConfig = { ...DEFAULT_REMINDER }
   return {
     enabled: rem.enabled ?? false,
-    intervalMinutes: rem.intervalMinutes ?? 0,
-    // 迁移：旧 reminder 可能无 cooldownMinutes 字段，默认 30
+    dailyMode,
+    intervalMinutes: rem.intervalMinutes ?? def.intervalMinutes,
+    dailyCount: typeof rem.dailyCount === 'number' ? Math.min(20, Math.max(1, rem.dailyCount)) : def.dailyCount,
     cooldownMinutes: rem.cooldownMinutes ?? 30,
-    startMinute: Math.min(1439, Math.max(0, startMinute)),
-    endMinute: Math.min(1439, Math.max(0, endMinute)),
+    windows: windowsFromLegacy,
+    enabledWeekdays: Array.isArray(rem.enabledWeekdays)
+      ? rem.enabledWeekdays.filter((d): d is number => typeof d === 'number' && d >= 0 && d <= 6)
+      : [],
+    skipAfterSessionMinutes:
+      typeof rem.skipAfterSessionMinutes === 'number'
+        ? Math.min(720, Math.max(0, rem.skipAfterSessionMinutes))
+        : def.skipAfterSessionMinutes,
     enabledTaskIds: rem.enabledTaskIds ?? [],
   }
 }

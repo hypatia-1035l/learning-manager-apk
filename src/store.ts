@@ -727,9 +727,6 @@ export function updateReminder(patch: Partial<ReminderConfig>) {
   }))
 }
 
-// 切换提醒模式
-// （已移除：统一由 intervalMinutes 控制，0=随机，>0=固定间隔）
-
 // ---------- 提醒池筛选 ----------
 // 取参与提醒的任务：
 //   - enabled=true
@@ -749,4 +746,66 @@ export function getReminderPool(
     }
     return true
   })
+}
+
+// ---------- 时间窗工具 ----------
+// 单个窗口：start <= end 正常区间；start > end 跨午夜
+export function isMinuteInWindow(
+  minuteOfDay: number,
+  startMinute: number,
+  endMinute: number,
+): boolean {
+  if (startMinute <= endMinute) return minuteOfDay >= startMinute && minuteOfDay < endMinute
+  return minuteOfDay >= startMinute || minuteOfDay < endMinute
+}
+
+// 多窗口中命中任一即可
+export function isMinuteInAnyWindow(
+  minuteOfDay: number,
+  windows: { startMinute: number; endMinute: number }[],
+): boolean {
+  if (!windows?.length) return false
+  return windows.some((w) => isMinuteInWindow(minuteOfDay, w.startMinute, w.endMinute))
+}
+
+// 星期判断：enabledWeekdays 空=每天
+export function isWeekdayEnabled(dow06: number, enabledWeekdays: number[]): boolean {
+  if (!enabledWeekdays?.length) return true
+  return enabledWeekdays.includes(dow06)
+}
+
+// ---------- 今日提醒次数（跨天自动清零）----------
+const REMINDER_FIRED_KEY = 'learning-manager:reminder-fired'
+export function getReminderFiredToday(): { date: string; count: number } {
+  try {
+    const raw = localStorage.getItem(REMINDER_FIRED_KEY)
+    if (!raw) return { date: todayKey(), count: 0 }
+    const obj = JSON.parse(raw) as { date: string; count: number }
+    if (obj.date !== todayKey()) return { date: todayKey(), count: 0 }
+    return obj
+  } catch {
+    return { date: todayKey(), count: 0 }
+  }
+}
+export function incrementReminderFiredToday(): number {
+  const cur = getReminderFiredToday()
+  const next = { date: todayKey(), count: cur.count + 1 }
+  try { localStorage.setItem(REMINDER_FIRED_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+  return next.count
+}
+function todayKey(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// ---------- 最近学习会话结束时间（用于"学习后跳过"）----------
+const LAST_SESSION_END_KEY = 'learning-manager:last-session-end'
+export function markSessionEndedNow(): void {
+  try { localStorage.setItem(LAST_SESSION_END_KEY, String(Date.now())) } catch { /* ignore */ }
+}
+export function getLastSessionEnd(): number {
+  try {
+    const ts = Number(localStorage.getItem(LAST_SESSION_END_KEY))
+    return isNaN(ts) ? 0 : ts
+  } catch { return 0 }
 }

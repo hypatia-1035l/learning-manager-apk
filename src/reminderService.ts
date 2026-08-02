@@ -8,21 +8,32 @@ import {
   getReminderPool,
   pickSequence,
   formatSequenceProgress,
+  isMinuteInAnyWindow,
+  isWeekdayEnabled,
+  getReminderFiredToday,
+  incrementReminderFiredToday,
+  getLastSessionEnd,
 } from './store'
+import {
+  isNativeNotificationsAvailable,
+  scheduleNative,
+  cancelAllNative,
+  type NotifItem,
+} from './studyNotifications'
 
 // 通知 ID 命名空间：1 起递增，用于窗口内多次提醒
+// 99 用作测试提醒 ID
 export const NOTIF_ID_BASE = 1
+export const NOTIF_ID_TEST = 99
+export const NOTIF_ID_MAX = 120
 
 // ===== 会话状态 + 冷却管理 =====
-// 学习会话活跃时抑制提醒；会话结束后开始冷却
-// sessionActive 持久化到 localStorage，App 重启后可恢复，避免 Service 在跑但前端认为未开始导致提醒误触发
 let sessionActive = false
-let cooldownUntil = 0 // 时间戳：在此时间之前不触发提醒
+let cooldownUntil = 0
 
 const COOLDOWN_KEY = 'learning-manager:cooldown-until'
 const SESSION_ACTIVE_KEY = 'learning-manager:session-active'
 
-// 初始化：从 localStorage 恢复冷却截止时间和会话活跃状态
 try {
   const raw = localStorage.getItem(COOLDOWN_KEY)
   if (raw) {
@@ -31,7 +42,6 @@ try {
       cooldownUntil = ts
     }
   }
-  // 恢复会话活跃状态：上次 App 被杀时若仍在计时，启动时也认为活跃
   const sessRaw = localStorage.getItem(SESSION_ACTIVE_KEY)
   if (sessRaw === '1') {
     sessionActive = true
@@ -40,10 +50,8 @@ try {
   /* ignore */
 }
 
-// 会话结束回调：App 注册后用于会话结束时重新调度提醒
 let onSessionEndCallback: (() => void) | null = null
 
-// 注册会话结束回调（App 启动时调用）
 export function registerSessionEndCallback(cb: () => void): () => void {
   onSessionEndCallback = cb
   return () => {
@@ -51,14 +59,10 @@ export function registerSessionEndCallback(cb: () => void): () => void {
   }
 }
 
-// 查询当前会话活跃状态（App 启动时用于判断是否需要恢复计时界面）
 export function isSessionActive(): boolean {
   return sessionActive
 }
 
-// 标记学习会话活跃状态
-// active=true 时取消所有待触发提醒（计时中不触发）
-// active=false 时设置冷却并触发重新调度
 export async function setSessionActive(active: boolean): Promise<void> {
   const wasActive = sessionActive
   sessionActive = active
@@ -68,15 +72,12 @@ export async function setSessionActive(active: boolean): Promise<void> {
     /* ignore */
   }
   if (active) {
-    // 进入计时：取消所有待触发提醒
     await cancelAllReminders()
   } else if (wasActive) {
-    // 从计时中退出：触发回调让 App 重新调度（回调中会设置冷却 + scheduleReminders）
     if (onSessionEndCallback) onSessionEndCallback()
   }
 }
 
-// 会话结束时设置冷却并重新调度（由 App 回调中调用）
 export async function endSessionAndReschedule(
   tasks: Task[],
   reminder: ReminderConfig,
@@ -85,8 +86,6 @@ export async function endSessionAndReschedule(
   await scheduleReminders(tasks, reminder)
 }
 
-// 设置冷却截止时间（延迟/忽略/会话结束时调用）
-// cooldownMinutes: 冷却分钟数
 export function setCooldown(cooldownMinutes: number): void {
   cooldownUntil = Date.now() + Math.max(cooldownMinutes, 1) * 60 * 1000
   try {
@@ -96,13 +95,11 @@ export function setCooldown(cooldownMinutes: number): void {
   }
 }
 
-// 获取当前冷却截止时间
 export function getCooldownUntil(): number {
   return cooldownUntil
 }
 
 // ---------- 权限 ----------
-// 请求通知权限（Android 13+ 需运行时申请）
 export async function requestNotificationPermission(): Promise<boolean> {
   try {
     const perm = await LocalNotifications.checkPermissions()
@@ -110,15 +107,42 @@ export async function requestNotificationPermission(): Promise<boolean> {
     const req = await LocalNotifications.requestPermissions()
     return req.display === 'granted'
   } catch {
-    // Web 端或无通知权限时静默失败
     return false
   }
 }
 
+// ---------- 通知动作注册（用于通知卡片上的按钮）----------
+// actionId 约定：
+//   'start'   → 开始学习，打开 App 跳转到任务详情
+//   's10'     → 10 分钟后再提醒（不打开 App，由原生 Receiver 处理）
+//   's30'     → 30 分钟后再提醒（不打开 App）
+//   'ignore'  → 忽略 / 今天不再提醒（不打开 App）
+let actionsRegistered = false
+export async function ensureNotificationActionsRegistered(): Promise<void> {
+  if (actionsRegistered) return
+  actionsRegistered = true
+  try {
+    // 注册四种动作；是否可进入前台由 Android 端 PendingIntent 决定
+    // （s10/s30/ignore 使用 getBroadcast() → 进入自定义 Receiver，不会拉起 MainActivity）
+    await LocalNotifications.registerActionTypes({
+      types: [
+        {
+          id: 'REMINDER_WITH_ACTIONS',
+          actions: [
+            { id: 's10', title: '10分钟后', destructive: false, input: false, foreground: false },
+            { id: 's30', title: '30分钟后', destructive: false, input: false, foreground: false },
+            { id: 'ignore', title: '忽略', destructive: true, input: false, foreground: false },
+            { id: 'start', title: '开始学习', destructive: false, input: false, foreground: true },
+          ],
+        },
+      ],
+    })
+  } catch {
+    /* 插件端不支持或 Web 端，静默降级 */
+  }
+}
+
 // ---------- 通知内容构建 ----------
-// 数据来源由「Task + 当前 object」改为「Task + Sequence（学习序列）」
-// 展示语义：学习方向 / 当前序列 / 进度
-// 注：仅替换数据来源，通知展示逻辑不变。
 function buildBody(task: Task, seq: Sequence | null): string {
   const lines = ['该摸一条鱼了：', `学习方向：${task.name}`]
   if (seq) {
@@ -129,11 +153,9 @@ function buildBody(task: Task, seq: Sequence | null): string {
 }
 
 // ---------- 按权重随机选任务 ----------
-// 完全随机，但权重仍参与计算（weight 越大越易被选中）
 function pickWeightedTask(pool: Task[]): Task {
   const weighted = pool.filter((t) => t.weight > 0)
   if (weighted.length === 0) {
-    // 全部权重为 0：等概率随机
     return pool[Math.floor(Math.random() * pool.length)]
   }
   const total = weighted.reduce((s, t) => s + t.weight, 0)
@@ -145,111 +167,222 @@ function pickWeightedTask(pool: Task[]): Task {
   return weighted[weighted.length - 1]
 }
 
-// ---------- 调度提醒 ----------
-// 统一逻辑：
-//   - intervalMinutes > 0：按固定间隔调度，每次按权重随机选任务
-//   - intervalMinutes == 0：在窗口内随机时机提醒，每次按权重随机选任务
-// 冷却时间 cooldownMinutes 用于避免提醒过于频繁（两次提醒最小间隔）
-// 会话活跃时不调度（由 setSessionActive 取消）；冷却期内跳过
+// ---------- 多窗口 + 星期的下一次"窗口开始"计算 ----------
+// 找出 now 之后第一个窗口的起点（考虑今天剩余窗口、跨夜、明天起的窗口）
+function nextWindowStartAfter(reminder: ReminderConfig, from: Date): Date {
+  const windows = reminder.windows.length ? reminder.windows : [{ startMinute: 9 * 60, endMinute: 22 * 60 }]
+  // 枚举今天到未来 7 天的每一天，找到最早命中 weekday 且存在窗口起点 > from
+  for (let dayOffset = 0; dayOffset <= 8; dayOffset++) {
+    const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + dayOffset)
+    const dow = d.getDay()
+    if (!isWeekdayEnabled(dow, reminder.enabledWeekdays)) continue
+    for (const w of windows) {
+      const candidate = new Date(d)
+      candidate.setHours(Math.floor(w.startMinute / 60), w.startMinute % 60, 0, 0)
+      if (candidate.getTime() > from.getTime()) {
+        return candidate
+      }
+    }
+  }
+  // 兜底：1 小时后
+  return new Date(from.getTime() + 60 * 60 * 1000)
+}
+
+// 找出 now 之后第一个窗口的结束时间（用于在当前窗口内安排提醒时的"上界"）
+// 若 now 在某个窗口内，返回该窗口的结束点；否则返回 nextWindowStart 后的窗口结束点
+function nextWindowEndAfter(reminder: ReminderConfig, from: Date): { endAt: Date; inWindowNow: boolean } {
+  const windows = reminder.windows.length ? reminder.windows : [{ startMinute: 9 * 60, endMinute: 22 * 60 }]
+  const fromMinute = from.getHours() * 60 + from.getMinutes()
+  const fromDow = from.getDay()
+  const weekdayOkNow = isWeekdayEnabled(fromDow, reminder.enabledWeekdays)
+  if (weekdayOkNow && isMinuteInAnyWindow(fromMinute, windows)) {
+    // 在窗口内：找到当前命中的窗口，返回其结束点（跨夜时为次日）
+    for (const w of windows) {
+      if (isMinuteInWindow(fromMinute, w.startMinute, w.endMinute)) {
+        const end = new Date(from)
+        const eh = Math.floor(w.endMinute / 60)
+        const em = w.endMinute % 60
+        if (w.startMinute <= w.endMinute) {
+          end.setHours(eh, em, 0, 0)
+        } else {
+          // 跨夜：结束时间在次日
+          end.setDate(end.getDate() + 1)
+          end.setHours(eh, em, 0, 0)
+        }
+        return { endAt: end, inWindowNow: true }
+      }
+    }
+  }
+  // 不在窗口：nextWindowStart 对应的窗口结束
+  const start = nextWindowStartAfter(reminder, from)
+  const startMinuteLocal = start.getHours() * 60 + start.getMinutes()
+  for (const w of windows) {
+    if (w.startMinute === startMinuteLocal) {
+      const end = new Date(start)
+      const eh = Math.floor(w.endMinute / 60)
+      const em = w.endMinute % 60
+      if (w.startMinute <= w.endMinute) {
+        end.setHours(eh, em, 0, 0)
+      } else {
+        end.setDate(end.getDate() + 1)
+        end.setHours(eh, em, 0, 0)
+      }
+      return { endAt: end, inWindowNow: false }
+    }
+  }
+  const end = new Date(start.getTime() + 13 * 60 * 60 * 1000)
+  return { endAt: end, inWindowNow: false }
+}
+
+// 单窗口判定函数（兼容 windows 中 start>end 跨午夜）
+function isMinuteInWindow(
+  minuteOfDay: number,
+  startMinute: number,
+  endMinute: number,
+): boolean {
+  if (startMinute <= endMinute) return minuteOfDay >= startMinute && minuteOfDay < endMinute
+  return minuteOfDay >= startMinute || minuteOfDay < endMinute
+}
+
+// 日期命中提醒（weekday + date 层面）
+function isReminderActiveOn(reminder: ReminderConfig, d: Date): boolean {
+  return isWeekdayEnabled(d.getDay(), reminder.enabledWeekdays)
+}
+
+// ---------- 核心调度 ----------
 export async function scheduleReminders(
   tasks: Task[],
   reminder: ReminderConfig,
 ): Promise<void> {
-  // 会话活跃时不调度（计时中不触发提醒）
   if (sessionActive) return
-
-  // 先取消旧的
   await cancelAllReminders()
+  await ensureNotificationActionsRegistered()
   if (!reminder.enabled) return
-
-  // 提醒池为空不调度
   const pool = getReminderPool(tasks, reminder)
   if (pool.length === 0) return
 
-  const now = new Date()
-  const minuteOfDay = now.getHours() * 60 + now.getMinutes()
-  // 当前已超出窗口（如夜间），则只调度下一次窗口开始时的一次提醒
-  const inWindow = isInWindow(minuteOfDay, reminder.startMinute, reminder.endMinute)
-  if (!inWindow) {
+  let now = new Date()
+
+  // 窗口外：仅排一个"下次窗口开始"提醒
+  const { inWindowNow } = nextWindowEndAfter(reminder, now)
+  if (!inWindowNow) {
     await scheduleNextWindowStart(reminder)
     return
   }
 
-  // 计算窗口结束时间
-  const end = new Date()
-  end.setHours(Math.floor(reminder.endMinute / 60), reminder.endMinute % 60, 0, 0)
-  if (end <= now) end.setDate(end.getDate() + 1)
-
-  // 间隔：>0 用固定间隔；==0 用随机间隔（窗口内 3-5 次）
-  const intervalMs = reminder.intervalMinutes * 60 * 1000
+  const { endAt: windowEnd } = nextWindowEndAfter(reminder, now)
   const cooldownMs = Math.max(reminder.cooldownMinutes, 1) * 60 * 1000
+  let cooldownEnd = Math.max(cooldownUntil, 0)
 
-  // 冷却截止时间：在此时间之前不安排提醒
-  const cooldownEnd = Math.max(cooldownUntil, 0)
-
-  const notifications = []
-  let at = new Date(now.getTime())
-  let i = 0
-
-  if (reminder.intervalMinutes > 0) {
-    // 固定间隔模式：第一次提醒在 now + intervalMs，但如果在冷却期内则推后到冷却结束
-    let firstAt = new Date(now.getTime() + intervalMs)
-    if (cooldownEnd > firstAt.getTime()) {
-      firstAt = new Date(cooldownEnd)
+  // 学习后跳过：如果最近有会话结束，且仍在 skip 窗口内，把 cooldownEnd 推后到 skip 结束
+  if (reminder.skipAfterSessionMinutes > 0) {
+    const lastEnd = getLastSessionEnd()
+    if (lastEnd > 0) {
+      const skipUntil = lastEnd + reminder.skipAfterSessionMinutes * 60 * 1000
+      if (skipUntil > cooldownEnd) cooldownEnd = skipUntil
     }
-    at = firstAt
-    while (at < end && i < 50) {
-      if (isInWindow(at.getHours() * 60 + at.getMinutes(), reminder.startMinute, reminder.endMinute)) {
-        const task = pickWeightedTask(pool)
-        // 选定学习方向后，再从其下选一个具体序列（保留原随机算法，仅替换数据来源）
-        const seq = pickSequence(task)
-        notifications.push({
-          id: NOTIF_ID_BASE + i,
-          title: '今天摸啥鱼',
-          body: buildBody(task, seq),
-          schedule: { at },
-          extra: { taskId: task.id, sequenceId: seq?.id ?? null },
-        })
-        i++
+  }
+
+  // dual channel: LocalNotifications for 跨平台/Web，原生 plugin 保证 snooze/ignore 不进 App
+  const notifications: Array<{
+    id: number
+    title: string
+    body: string
+    schedule: { at?: Date }
+    actionTypeId?: string
+    extra?: Record<string, unknown>
+  }> = []
+  const nativeItems: NotifItem[] = []
+  let at = new Date(Math.max(now.getTime(), cooldownEnd))
+  let id = NOTIF_ID_BASE
+
+  const alreadyFired = getReminderFiredToday().count
+
+  const pushOne = (fireAt: Date) => {
+    if (id >= NOTIF_ID_MAX) return
+    const task = pickWeightedTask(pool)
+    const seq = pickSequence(task)
+    const title = '今天摸啥鱼'
+    const body = buildBody(task, seq)
+    notifications.push({
+      id,
+      title,
+      body,
+      schedule: { at: fireAt },
+      actionTypeId: 'REMINDER_WITH_ACTIONS',
+      extra: {
+        taskId: task.id,
+        sequenceId: seq?.id ?? null,
+        _title: title,
+        _body: body,
+      },
+    })
+    // 原生通道：带 atMs + taskId，用 Broadcast action PendingIntent，不启动 App
+    nativeItems.push({
+      id,
+      title,
+      body,
+      taskId: task.id,
+      atMs: fireAt.getTime(),
+    })
+    id++
+  }
+
+  if (reminder.dailyMode === 'interval' && reminder.intervalMinutes > 0) {
+    const intervalMs = reminder.intervalMinutes * 60 * 1000
+    let cursor = at
+    while (cursor < windowEnd && id < NOTIF_ID_MAX) {
+      const cd = new Date(cursor)
+      const cdMin = cd.getHours() * 60 + cd.getMinutes()
+      if (isReminderActiveOn(reminder, cd) && isMinuteInAnyWindow(cdMin, reminder.windows)) {
+        pushOne(cd)
       }
-      at = new Date(at.getTime() + intervalMs)
+      cursor = new Date(cursor.getTime() + intervalMs)
+    }
+  } else if (reminder.dailyMode === 'dailyCount') {
+    // 每日固定次数：在窗口剩余时间 + 剩余目标次数内，均匀分布后再抖动
+    const target = Math.max(1, Math.min(20, reminder.dailyCount)) - alreadyFired - 0
+    if (target <= 0) {
+      // 今天已到目标：排到明天窗口开始
+      await scheduleNextWindowStart(reminder)
+      return
+    }
+    const remaining = windowEnd.getTime() - at.getTime()
+    if (remaining <= cooldownMs) {
+      await scheduleNextWindowStart(reminder)
+      return
+    }
+    const step = remaining / (target + 1)
+    for (let k = 1; k <= target && id < NOTIF_ID_MAX; k++) {
+      const base = at.getTime() + step * k
+      const jitter = (Math.random() - 0.5) * Math.min(step * 0.4, 15 * 60 * 1000) // ±25% 或 ±15分
+      const fireAt = new Date(Math.max(at.getTime() + cooldownMs * Math.max(0, k - 1), base + jitter))
+      if (fireAt >= windowEnd) continue
+      const cdMin = fireAt.getHours() * 60 + fireAt.getMinutes()
+      if (!isMinuteInAnyWindow(cdMin, reminder.windows)) continue
+      pushOne(fireAt)
     }
   } else {
-    // 随机模式：在窗口内安排若干次提醒
-    // 起始时间：冷却结束后的时间
-    if (cooldownEnd > at.getTime()) {
-      at = new Date(cooldownEnd)
-    }
-    const windowMs = end.getTime() - at.getTime()
-    if (windowMs <= 0) {
+    // random 模式：窗口内按冷却间隔与 cooldown 估算 N 次，随机分布
+    const remaining = windowEnd.getTime() - at.getTime()
+    if (remaining <= cooldownMs) {
       await scheduleNextWindowStart(reminder)
       return
     }
     const targetCount = Math.min(
       5,
-      Math.max(1, Math.floor(windowMs / Math.max(cooldownMs, 30 * 60 * 1000))),
+      Math.max(1, Math.floor(remaining / Math.max(cooldownMs, 30 * 60 * 1000))),
     )
-    for (let k = 0; k < targetCount; k++) {
-      // 在剩余窗口时间内随机取一个时间点
-      const remaining = end.getTime() - at.getTime()
-      if (remaining <= cooldownMs) break
-      const offset = Math.random() * (remaining - cooldownMs)
-      const fireAt = new Date(at.getTime() + offset)
-      if (!isInWindow(fireAt.getHours() * 60 + fireAt.getMinutes(), reminder.startMinute, reminder.endMinute)) {
-        continue
-      }
-      const task = pickWeightedTask(pool)
-      const seq = pickSequence(task)
-      notifications.push({
-        id: NOTIF_ID_BASE + i,
-        title: '今天摸啥鱼',
-        body: buildBody(task, seq),
-        schedule: { at: fireAt },
-        extra: { taskId: task.id, sequenceId: seq?.id ?? null },
-      })
-      i++
-      // 下一次提醒至少在冷却时间之后
-      at = new Date(fireAt.getTime() + cooldownMs)
+    let cursor = at
+    for (let k = 0; k < targetCount && id < NOTIF_ID_MAX; k++) {
+      const left = windowEnd.getTime() - cursor.getTime()
+      if (left <= cooldownMs) break
+      const offset = Math.random() * (left - cooldownMs)
+      const fireAt = new Date(cursor.getTime() + offset)
+      const cdMin = fireAt.getHours() * 60 + fireAt.getMinutes()
+      if (!isMinuteInAnyWindow(cdMin, reminder.windows)) continue
+      pushOne(fireAt)
+      cursor = new Date(fireAt.getTime() + cooldownMs)
     }
   }
 
@@ -257,56 +390,74 @@ export async function scheduleReminders(
     await scheduleNextWindowStart(reminder)
     return
   }
-  try {
-    await LocalNotifications.schedule({ notifications })
-  } catch {
-    /* ignore */
+  // 双通道：
+  //   Web/iOS 走 LocalNotifications；
+  //   Android 走原生 StudyNotifications（action 用 Broadcast，不启动 App）。
+  if (isNativeNotificationsAvailable()) {
+    await scheduleNative(nativeItems)
+    // 同时把 LocalNotifications 清掉，避免双通道都发重复通知
+    try {
+      await LocalNotifications.cancel({
+        notifications: nativeItems.map(n => ({ id: n.id })),
+      })
+    } catch { /* ignore */ }
+  } else {
+    try { await LocalNotifications.schedule({ notifications }) } catch { /* ignore */ }
   }
 }
 
-// 窗口判断：start <= end 时正常区间；start > end 时跨午夜
-// 参数均为"当天分钟数"（0-1439）
-function isInWindow(minuteOfDay: number, start: number, end: number): boolean {
-  if (start <= end) return minuteOfDay >= start && minuteOfDay < end
-  return minuteOfDay >= start || minuteOfDay < end
-}
-
-// 计算下一次窗口开始时间
+// ---------- 窗口边界调度 ----------
 function nextWindowStart(reminder: ReminderConfig): Date {
-  const now = new Date()
-  const next = new Date(now)
-  next.setHours(Math.floor(reminder.startMinute / 60), reminder.startMinute % 60, 0, 0)
-  if (next <= now) {
-    next.setDate(next.getDate() + 1)
-  }
-  return next
+  return nextWindowStartAfter(reminder, new Date())
 }
 
 async function scheduleNextWindowStart(reminder: ReminderConfig) {
+  await ensureNotificationActionsRegistered()
   const at = nextWindowStart(reminder)
+  const item: NotifItem = {
+    id: NOTIF_ID_BASE,
+    title: '今天摸啥鱼',
+    body: '新的一段学习窗口，准备好开始摸鱼了吗？',
+    taskId: undefined,
+    atMs: at.getTime(),
+  }
+  if (isNativeNotificationsAvailable()) {
+    await scheduleNative([item])
+    try { await LocalNotifications.cancel({ notifications: [{ id: NOTIF_ID_BASE }] }) } catch { /* ignore */ }
+  } else {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: NOTIF_ID_BASE,
+            title: item.title,
+            body: item.body,
+            schedule: { at },
+            actionTypeId: 'REMINDER_WITH_ACTIONS',
+            extra: { taskId: null },
+          },
+        ],
+      })
+    } catch { /* ignore */ }
+  }
+}
+
+// ---------- 取消 ----------
+export async function cancelAllReminders() {
   try {
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: NOTIF_ID_BASE,
-          title: '今天摸啥鱼',
-          body: '新的一天，准备好开始摸鱼了吗？',
-          schedule: { at },
-          extra: { taskId: null },
-        },
-      ],
+    await LocalNotifications.cancel({
+      notifications: Array.from({ length: NOTIF_ID_MAX }, (_, i) => ({ id: i + 1 })),
     })
   } catch {
     /* ignore */
   }
+  await cancelAllNative()
 }
 
 // ---------- 下次提醒预览 ----------
-// 计算下次提醒的预计触发时间（用于 UI 预览，不实际调度）
-// 返回 { at: Date, mode: 'fixed' | 'random' | 'windowStart' } 或 null
 export interface NextReminderPreview {
   at: Date
-  mode: 'fixed' | 'random' | 'windowStart'
+  mode: 'fixed' | 'random' | 'windowStart' | 'dailyCount' | 'skipSession'
 }
 export function getNextReminderPreview(
   tasks: Task[],
@@ -317,83 +468,123 @@ export function getNextReminderPreview(
   if (pool.length === 0) return null
 
   const now = new Date()
-  const minuteOfDay = now.getHours() * 60 + now.getMinutes()
-  const inWindow = isInWindow(minuteOfDay, reminder.startMinute, reminder.endMinute)
-
-  if (!inWindow) {
-    return { at: nextWindowStart(reminder), mode: 'windowStart' }
+  const { inWindowNow } = nextWindowEndAfter(reminder, now)
+  if (!inWindowNow) {
+    return { at: nextWindowStartAfter(reminder, now), mode: 'windowStart' }
   }
 
-  const cooldownEnd = Math.max(cooldownUntil, now.getTime())
-  if (reminder.intervalMinutes > 0) {
-    const intervalMs = reminder.intervalMinutes * 60 * 1000
-    let firstAt = now.getTime() + intervalMs
-    if (cooldownEnd > firstAt) firstAt = cooldownEnd
+  let firstAtMs = Math.max(now.getTime(), cooldownUntil)
+  // 学习后跳过
+  if (reminder.skipAfterSessionMinutes > 0) {
+    const lastEnd = getLastSessionEnd()
+    if (lastEnd > 0) {
+      const skipUntil = lastEnd + reminder.skipAfterSessionMinutes * 60 * 1000
+      if (skipUntil > firstAtMs) firstAtMs = skipUntil
+    }
+  }
+
+  const { endAt: windowEnd } = nextWindowEndAfter(reminder, now)
+  if (firstAtMs >= windowEnd.getTime()) {
+    return { at: nextWindowStartAfter(reminder, now), mode: 'windowStart' }
+  }
+
+  if (firstAtMs > cooldownUntil) {
+    return { at: new Date(firstAtMs), mode: 'skipSession' }
+  }
+  if (reminder.dailyMode === 'interval' && reminder.intervalMinutes > 0) {
+    const firstAt = Math.max(firstAtMs, now.getTime() + reminder.intervalMinutes * 60 * 1000)
     return { at: new Date(firstAt), mode: 'fixed' }
   }
-  // 随机模式：返回冷却结束时间作为最早可能时间
-  return { at: new Date(cooldownEnd), mode: 'random' }
+  if (reminder.dailyMode === 'dailyCount') {
+    return { at: new Date(firstAtMs), mode: 'dailyCount' }
+  }
+  return { at: new Date(firstAtMs), mode: 'random' }
 }
 
 // ---------- 立即测试提醒 ----------
-// 5 秒后发送一条测试通知，用于验证权限与通道
 export async function sendTestReminder(): Promise<void> {
-  try {
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: 99,
-          title: '今天摸啥鱼',
-          body: '这是一条测试提醒，证明通知通道工作正常。',
-          schedule: { at: new Date(Date.now() + 5000) },
-          extra: { taskId: null },
-        },
-      ],
-    })
-  } catch {
-    /* ignore */
+  await ensureNotificationActionsRegistered()
+  const atMs = Date.now() + 5000
+  const item: NotifItem = {
+    id: NOTIF_ID_TEST,
+    title: '今天摸啥鱼',
+    body: '这是一条测试提醒，证明通知通道工作正常。（点卡片可进入App；下方按钮可延迟/忽略）',
+    taskId: undefined,
+    atMs,
+  }
+  if (isNativeNotificationsAvailable()) {
+    await scheduleNative([item])
+    try { await LocalNotifications.cancel({ notifications: [{ id: NOTIF_ID_TEST }] }) } catch { /* ignore */ }
+  } else {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: NOTIF_ID_TEST,
+            title: item.title,
+            body: item.body,
+            schedule: { at: new Date(atMs) },
+            actionTypeId: 'REMINDER_WITH_ACTIONS',
+            extra: { taskId: null },
+          },
+        ],
+      })
+    } catch { /* ignore */ }
   }
 }
 
-// ---------- 取消 ----------
-export async function cancelAllReminders() {
-  try {
-    await LocalNotifications.cancel({
-      notifications: Array.from({ length: 100 }, (_, i) => ({ id: i + 1 })),
-    })
-  } catch {
-    /* ignore */
-  }
-}
-
-// ---------- 通知点击监听 ----------
-// 通知点击动作信息
+// ---------- 通知点击 + 动作监听 ----------
 export interface NotificationAction {
   taskId: string | null
-  randomStart?: boolean // 是否触发随机开始
+  randomStart?: boolean
+  snoozeMinutes?: number // s10 / s30 时填
+  ignored?: boolean
 }
 
-// 监听通知点击，返回动作信息（taskId + 额外标识）
 export function onNotificationClick(
   cb: (action: NotificationAction) => void,
 ): () => void {
   let attached = false
+  ensureNotificationActionsRegistered().catch(() => {})
   try {
-    const handle = async (event: {
+    const handleAction = async (event: {
       notification?: { extra?: Record<string, unknown> }
+      actionId?: string
     }) => {
       const extra = event?.notification?.extra ?? {}
+      const actionId = event?.actionId
+      // snooze / ignore 由原生 StudyNotificationActionReceiver 处理，
+      // 这里仅作为兜底（例如 Web 端、原生未接入场景），在 App 内做一次延迟。
+      if (actionId === 's10') {
+        setCooldown(10)
+        cb({ taskId: (extra.taskId as string | null) ?? null, snoozeMinutes: 10 })
+        return
+      }
+      if (actionId === 's30') {
+        setCooldown(30)
+        cb({ taskId: (extra.taskId as string | null) ?? null, snoozeMinutes: 30 })
+        return
+      }
+      if (actionId === 'ignore') {
+        cb({ taskId: (extra.taskId as string | null) ?? null, ignored: true })
+        return
+      }
       cb({
         taskId: (extra.taskId as string | null) ?? null,
       })
     }
-    // Capacitor 的 addListener 返回 Promise<PluginListenerHandle>
+    // 同时监听点击通知本体和点击动作按钮
     LocalNotifications.addListener(
       'localNotificationActionPerformed',
-      handle as Parameters<typeof LocalNotifications.addListener>[1],
-    ).then(() => {
-      attached = true
-    })
+      handleAction as Parameters<typeof LocalNotifications.addListener>[1],
+    ).then(() => { attached = true })
+    LocalNotifications.addListener(
+      'localNotificationReceived',
+      () => {
+        // 仅用于计数：通知发出时 +1（仅当该条是"当日有效调度"时）
+        incrementReminderFiredToday()
+      },
+    ).catch(() => {})
     return () => {
       if (attached) {
         LocalNotifications.removeAllListeners().catch(() => {})

@@ -105,25 +105,45 @@ export interface AppData {
 }
 
 // ===== 提醒功能 =====
-// 提醒配置（独立存储，不影响任务/随机/计时逻辑）
-// 间隔为 0 时按随机时机提醒，>0 时按固定间隔提醒
+// 提醒模式：固定间隔 / 随机时机 / 每日固定次数
+export type ReminderDailyMode = 'interval' | 'random' | 'dailyCount'
+
+// 单个时间窗口（开始=结束的分钟数，0-1439），支持跨夜（start > end）
+export interface TimeWindow {
+  startMinute: number
+  endMinute: number
+}
+
 export interface ReminderConfig {
   enabled: boolean // 总开关
-  intervalMinutes: number // 0=随机提醒；>0=固定间隔提醒（分钟）
+  // ---- 时间模式 ----
+  dailyMode: ReminderDailyMode
+  intervalMinutes: number // 仅 interval 模式有效：>0 表示固定间隔
+  dailyCount: number // 仅 dailyCount 模式有效：每日提醒目标次数
   cooldownMinutes: number // 冷却时间，避免频繁打扰
-  // 提醒时间窗（分钟精度，避免深夜打扰），0-1439
-  startMinute: number // 如 540 = 9:00
-  endMinute: number // 如 1320 = 22:00
-  // 参与提醒的具体任务 ID 白名单（空表示所有启用任务都参与）
-  enabledTaskIds: string[]
+  // ---- 时间窗口（可多个，用于区分工作段/午休等）----
+  windows: TimeWindow[] // 至少 1 个，最多 3 个
+  // ---- 星期白名单 ----
+  enabledWeekdays: number[] // 0=周日 … 6=周六，空=每天
+  // ---- 智能跳过 ----
+  skipAfterSessionMinutes: number // 学习会话结束后 N 分钟内不提醒，0=关闭
+  // ---- 参与任务白名单 ----
+  enabledTaskIds: string[] // 空=所有启用任务都参与
+
+  // 遗留字段（迁移兼容：windows 为空时读取）
+  startMinute?: number
+  endMinute?: number
 }
 
 export const DEFAULT_REMINDER: ReminderConfig = {
   enabled: false,
-  intervalMinutes: 0,
+  dailyMode: 'random',
+  intervalMinutes: 60,
+  dailyCount: 5,
   cooldownMinutes: 30,
-  startMinute: 9 * 60, // 540 = 9:00
-  endMinute: 22 * 60, // 1320 = 22:00
+  windows: [{ startMinute: 9 * 60, endMinute: 22 * 60 }],
+  enabledWeekdays: [],
+  skipAfterSessionMinutes: 60,
   enabledTaskIds: [],
 }
 
