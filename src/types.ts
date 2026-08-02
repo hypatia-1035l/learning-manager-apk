@@ -22,6 +22,13 @@ export interface PositionProgress {
 }
 export type SequenceProgress = CountProgress | PositionProgress
 
+// 进度节点：给数量型进度的某个数字绑定显示名（目录名/篇目名等）
+// 当 current >= node.at 时，该节点为"当前节点"，在进度文本后追加显示
+export interface ProgressNode {
+  at: number // 到达该进度数字时触发（>= at）
+  label: string // 节点名/目录名/篇目名
+}
+
 // 学习对象（存储形态） —— 语义上即「学习序列 Sequence」
 // 一个学习方向下的具体学习内容，负责：目标 / 进度 / 完成判定 / 随机权重
 // 例：阅读方向 → 左传 / 资治通鉴；绘画方向 → 线条训练 / 透视训练
@@ -43,6 +50,9 @@ export interface LearningObject {
   // count 型 -> { type:'count', current, target, unit }
   // position 型 -> { type:'position', text }
   progressModel?: SequenceProgress
+  // 进度节点：给数量型进度绑定的显示名列表（可选）
+  // 有节点时，进度文本后追加当前节点名，如 "350 / 1000 条 · 隐公篇"
+  progressNodes?: ProgressNode[]
 }
 
 // 学习序列 —— LearningObject 的语义别名（不引入第三层 Node）

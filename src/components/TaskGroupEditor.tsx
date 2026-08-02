@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Task } from '../types'
+import type { Task, ProgressNode } from '../types'
 import {
   addLearningObject,
   deleteLearningObject,
@@ -8,9 +8,28 @@ import {
   updateLearningObject,
   setGroupMode,
   completeCurrentObject,
+  formatSequenceProgress,
 } from '../store'
 import { GROUP_MODE_LABELS } from '../types'
 import type { GroupMode } from '../types'
+
+// 进度节点文本 <-> ProgressNode[] 互转
+// 文本格式：每行一个，"数字 名称"（空格/逗号/竖线分隔）
+function parseNodesText(text: string): ProgressNode[] {
+  const lines = text.split('\n')
+  const nodes: ProgressNode[] = []
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const m = trimmed.match(/^(\d+(?:\.\d+)?)\s*[,，\s|、]\s*(.+)$/)
+    if (m) nodes.push({ at: Math.floor(Number(m[1])), label: m[2].trim() })
+  }
+  return nodes.sort((a, b) => a.at - b.at)
+}
+function nodesToText(nodes?: ProgressNode[]): string {
+  if (!nodes || nodes.length === 0) return ''
+  return [...nodes].sort((a, b) => a.at - b.at).map((n) => `${n.at} ${n.label}`).join('\n')
+}
 
 interface Props {
   task: Task
@@ -28,6 +47,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
   const [editUnit, setEditUnit] = useState('')
   const [editTarget, setEditTarget] = useState('')
   const [editCountdown, setEditCountdown] = useState('')
+  const [editNodes, setEditNodes] = useState('')
 
   // 直接读取任务组（可能为 null，添加首项时自动创建）
   const group = task.group
@@ -56,23 +76,26 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
     onTaskMutated()
   }
 
-  const startEdit = (item: { id: string; name: string; progress: string; progressUnit: string; progressTarget: string; countdownSeconds?: number | null }) => {
+  const startEdit = (item: { id: string; name: string; progress: string; progressUnit: string; progressTarget: string; countdownSeconds?: number | null; progressNodes?: ProgressNode[] }) => {
     setEditingId(item.id)
     setEditName(item.name)
     setEditProg(item.progress)
     setEditUnit(item.progressUnit ?? '')
     setEditTarget(item.progressTarget ?? '')
     setEditCountdown(item.countdownSeconds ? String(item.countdownSeconds / 60) : '')
+    setEditNodes(nodesToText(item.progressNodes))
   }
 
   const saveEdit = () => {
     if (!editingId) return
+    const parsedNodes = parseNodesText(editNodes)
     updateLearningObject(task.id, editingId, {
       name: editName.trim() || '未命名',
       progress: editProg,
       progressUnit: editUnit,
       progressTarget: editTarget,
       countdownSeconds: parseCountdown(editCountdown),
+      progressNodes: parsedNodes.length > 0 ? parsedNodes : undefined,
     })
     setEditingId(null)
     onTaskMutated()
@@ -247,6 +270,24 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                         onChange={(e) => setEditCountdown(e.target.value)}
                         placeholder="分钟（空=正向）"
                       />
+                    </div>
+                    <div className="field" style={{ marginTop: 6 }}>
+                      <label className="faint" style={{ fontSize: 12 }}>
+                        进度节点（可选，每行一个，格式：数字 名称）
+                      </label>
+                      <textarea
+                        className="input"
+                        rows={3}
+                        value={editNodes}
+                        onChange={(e) => setEditNodes(e.target.value)}
+                        placeholder={'如：\n0 隐公\n100 桓公\n200 庄公'}
+                        style={{ width: '100%', resize: 'vertical', fontSize: 13 }}
+                      />
+                      <span className="faint" style={{ fontSize: 11 }}>
+                        到达该数字时进度后缀显示对应名称。可批量粘贴，也可逐行编辑。
+                      </span>
+                    </div>
+                    <div className="row" style={{ gap: 6, marginTop: 4 }}>
                       <button className="btn sm primary" onClick={saveEdit}>
                         保存
                       </button>
@@ -272,12 +313,8 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                         }}
                       />
                     )}
-                    <span className="prog" title={item.progress}>
-                      {item.completed
-                        ? '已完成'
-                        : item.progressTarget
-                          ? `${item.progress || '—'}${item.progressUnit ? ' ' + item.progressUnit : ''} / ${item.progressTarget}${item.progressUnit ? ' ' + item.progressUnit : ''}`
-                          : (item.progress || '—')}
+                    <span className="prog" title={formatSequenceProgress(item)}>
+                      {item.completed ? '已完成' : formatSequenceProgress(item)}
                     </span>
                     <div className="ops">
                       <button

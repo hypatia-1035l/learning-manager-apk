@@ -180,14 +180,31 @@ export function getSequenceProgress(obj: LearningObject): SequenceProgress {
   return deriveProgressModel(obj)
 }
 
+// 根据当前进度数字查找匹配的进度节点名（目录名/篇目名）
+// 返回 current >= node.at 的最后一个节点（按 at 升序），没有则返回 null
+export function getCurrentNodeLabel(obj: LearningObject): string | null {
+  if (!obj.progressNodes || obj.progressNodes.length === 0) return null
+  const p = getSequenceProgress(obj)
+  if (p.type !== 'count') return null
+  const sorted = [...obj.progressNodes].sort((a, b) => a.at - b.at)
+  let label: string | null = null
+  for (const node of sorted) {
+    if (p.current >= node.at) label = node.label
+    else break
+  }
+  return label
+}
+
 // 把序列进度格式化为展示文本：
-//   count 型  -> "350 / 1000 条"（无目标时仅显示当前）
+//   count 型  -> "350 / 1000 条"（无目标时仅显示当前）；有节点时追加 "· 节点名"
 //   position 型 -> 原文本
 export function formatSequenceProgress(obj: LearningObject): string {
   const p = getSequenceProgress(obj)
   if (p.type === 'count') {
     const unit = p.unit ? ` ${p.unit}` : ''
-    return p.target > 0 ? `${p.current} / ${p.target}${unit}` : `${p.current}${unit}`
+    const base = p.target > 0 ? `${p.current} / ${p.target}${unit}` : `${p.current}${unit}`
+    const nodeLabel = getCurrentNodeLabel(obj)
+    return nodeLabel ? `${base} · ${nodeLabel}` : base
   }
   return p.text || '尚未记录'
 }

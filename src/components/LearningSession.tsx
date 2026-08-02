@@ -6,6 +6,7 @@ import {
   completeCurrentObject,
   getSequenceProgress,
   formatSequenceProgress,
+  getCurrentNodeLabel,
 } from '../store'
 import { formatTimer } from '../utils'
 import {
@@ -387,7 +388,17 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
               />
               <div className="hint">
                 {prog?.type === 'count'
-                  ? `${prog.current} → ${prog.current + (Number(deltaInput) || 0)} / ${prog.target}${prog.unit ? ' ' + prog.unit : ''}`
+                  ? (() => {
+                      const newCurrent = prog.current + (Number(deltaInput) || 0)
+                      const base = `${prog.current} → ${newCurrent} / ${prog.target}${prog.unit ? ' ' + prog.unit : ''}`
+                      const curLabel = obj ? getCurrentNodeLabel(obj) : null
+                      const newLabel = obj?.progressNodes?.length
+                        ? getCurrentNodeLabel({ ...obj, progressModel: { ...prog, current: newCurrent } })
+                        : null
+                      if (!curLabel && !newLabel) return base
+                      if (curLabel === newLabel) return `${base} · ${curLabel}`
+                      return `${base}（${curLabel ?? '—'} → ${newLabel ?? '—'}）`
+                    })()
                   : '填写本次完成的数量，达到目标后自动完成'}
               </div>
             </div>
