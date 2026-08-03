@@ -52,24 +52,6 @@ export function TaskForm({ onClose }: Props) {
   const [globalCountdown, setGlobalCountdown] = useState('')
   const [globalNodes, setGlobalNodes] = useState('')
 
-  const quickPreset = (mode: 'book' | 'videos' | 'articles' | 'pomodoro') => {
-    if (mode === 'book') {
-      setGlobalTarget('300')
-      setGlobalUnit('页')
-      setGlobalCountdown('25')
-    } else if (mode === 'videos') {
-      setGlobalTarget('50')
-      setGlobalUnit('集')
-      setGlobalCountdown('15')
-    } else if (mode === 'articles') {
-      setGlobalTarget('100')
-      setGlobalUnit('篇')
-      setGlobalCountdown('10')
-    } else if (mode === 'pomodoro') {
-      setGlobalCountdown('25')
-    }
-  }
-
   const submit = () => {
     if (!name.trim()) return
     const names: string[] = []
@@ -138,16 +120,6 @@ export function TaskForm({ onClose }: Props) {
             placeholder="如：历史阅读、英语、Blender"
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
-        </div>
-
-        <div>
-          <div className="row wrap" style={{ gap: 6, marginTop: 4 }}>
-            <span className="faint" style={{ fontSize: 12, alignSelf: 'center' }}>快速模板：</span>
-            <button className="btn sm" onClick={() => quickPreset('book')}>读书 300页/25分</button>
-            <button className="btn sm" onClick={() => quickPreset('videos')}>视频 50集/15分</button>
-            <button className="btn sm" onClick={() => quickPreset('articles')}>文章 100篇/10分</button>
-            <button className="btn sm" onClick={() => quickPreset('pomodoro')}>番茄钟 25分</button>
-          </div>
         </div>
 
         <div className="row wrap" style={{ gap: 8, marginTop: 2 }}>
