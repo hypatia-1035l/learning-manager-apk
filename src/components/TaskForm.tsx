@@ -143,10 +143,10 @@ export function TaskForm({ onClose }: Props) {
         <div>
           <div className="row wrap" style={{ gap: 6, marginTop: 4 }}>
             <span className="faint" style={{ fontSize: 12, alignSelf: 'center' }}>快速模板：</span>
-            <button className="btn sm" onClick={() => quickPreset('book')}>📚 读书 300页/25分</button>
-            <button className="btn sm" onClick={() => quickPreset('videos')}>🎬 视频 50集/15分</button>
-            <button className="btn sm" onClick={() => quickPreset('articles')}>📝 文章 100篇/10分</button>
-            <button className="btn sm" onClick={() => quickPreset('pomodoro')}>🍅 番茄钟 25分</button>
+            <button className="btn sm" onClick={() => quickPreset('book')}>读书 300页/25分</button>
+            <button className="btn sm" onClick={() => quickPreset('videos')}>视频 50集/15分</button>
+            <button className="btn sm" onClick={() => quickPreset('articles')}>文章 100篇/10分</button>
+            <button className="btn sm" onClick={() => quickPreset('pomodoro')}>番茄钟 25分</button>
           </div>
         </div>
 

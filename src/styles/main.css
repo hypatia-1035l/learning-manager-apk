@@ -714,6 +714,11 @@ select {
   gap: 10px;
   margin-top: 18px;
   flex-shrink: 0;
+  /* 确保按钮始终可见，不被表单内容挤出屏幕 */
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-card);
+  padding-top: 8px;
 }
 .form-stack {
   display: flex;
