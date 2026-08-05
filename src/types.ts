@@ -67,7 +67,7 @@ export interface TaskGroup {
 }
 
 // 任务（学习方向） —— 一个长期学习方向（如：阅读 / 绘画 / 建模 / 编程）
-// 职责：是否启用、是否参与随机、随机权重；本身不承担完成目标/进度。
+// 职责：是否启用、随机权重；本身不承担完成目标/进度。
 // 完成判定由其下各 Sequence 自行负责（Sequence.completed）。
 // status 字段保留用于旧逻辑兼容，但完成态不再以它为唯一依据。
 export interface Task {
@@ -76,7 +76,6 @@ export interface Task {
   icon: string // 用户选择的图标（emoji），作为学习方向的图标
   status: TaskStatus // 兼容字段；完成态以序列判定为准
   enabled: boolean // 是否启用（任务池入口开关）
-  randomEnabled: boolean // 是否参与随机选择
   weight: number // 随机权重（加权随机预留；普通随机不使用）
   group: TaskGroup | null // 绑定的内容序列容器（暂保留，避免大范围迁移）
   currentObjectId: string | null // 当前学习序列 ID（指向 group.items）
@@ -119,9 +118,14 @@ export interface AppData {
 export type ReminderDailyMode = 'interval' | 'random' | 'dailyCount'
 
 // 单个时间窗口（开始=结束的分钟数，0-1439），支持跨夜（start > end）
+// 可选字段：仿闹钟形式，每段独立绑定任务白名单与生效星期
+//   - taskIds: 空数组或 undefined → 用 ReminderConfig.enabledTaskIds（全局白名单）
+//   - weekdays: 空数组或 undefined → 用 ReminderConfig.enabledWeekdays（全局星期）
 export interface TimeWindow {
   startMinute: number
   endMinute: number
+  taskIds?: string[]
+  weekdays?: number[] // 0=周日 … 6=周六
 }
 
 export interface ReminderConfig {

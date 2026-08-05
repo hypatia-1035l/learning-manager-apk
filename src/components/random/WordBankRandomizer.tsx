@@ -5,6 +5,9 @@ import {
   deletePreset,
   pickWeighted,
   addRandomRecord,
+  getLastPickedWordId,
+  setLastPickedWordId,
+  clearLastPickedWordIds,
 } from '../../randomStore'
 import type { WordBank, Preset } from '../../randomTypes'
 
@@ -23,6 +26,16 @@ function loadDisplayMode(): DisplayMode {
     /* ignore */
   }
   return 'inline'
+}
+
+// "不连抽"偏好持久化 key
+const NO_REPEAT_KEY = 'learning-manager:wb-no-repeat'
+function loadNoRepeat(): boolean {
+  try {
+    return localStorage.getItem(NO_REPEAT_KEY) === '1'
+  } catch {
+    return false
+  }
 }
 
 interface Props {
@@ -254,11 +267,42 @@ function RandomPanel({
   const [copied, setCopied] = useState(false)
   const allHasItems = banks.every((b) => b.words.length > 0)
 
+  // "不连抽"：排除上一次抽到的词（偏好持久化）
+  const [noRepeat, setNoRepeat] = useState<boolean>(loadNoRepeat())
+  const toggleNoRepeat = () => {
+    const next = !noRepeat
+    setNoRepeat(next)
+    try {
+      localStorage.setItem(NO_REPEAT_KEY, next ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+    if (!next) clearLastPickedWordIds()
+  }
+
   const handleDraw = () => {
     const picks: { bankId: string; bankName: string; text: string }[][] = []
+    // 本次抽取内已排除的词条：排除上一次抽到的 + 本批次已抽到的
+    const batchExcluded = new Map<string, Set<string>>()
+    if (noRepeat) {
+      for (const b of banks) {
+        const last = getLastPickedWordId(b.id)
+        if (last) batchExcluded.set(b.id, new Set([last]))
+      }
+    }
     for (let i = 0; i < drawCount; i++) {
       const row = banks.map((b) => {
-        const pick = pickWeighted(b.words)
+        const excl = noRepeat ? batchExcluded.get(b.id) : undefined
+        const pick = pickWeighted(b.words, excl)
+        if (noRepeat && pick) {
+          let s = batchExcluded.get(b.id)
+          if (!s) {
+            s = new Set()
+            batchExcluded.set(b.id, s)
+          }
+          s.add(pick.id)
+          setLastPickedWordId(b.id, pick.id)
+        }
         return {
           bankId: b.id,
           bankName: b.name,
@@ -381,6 +425,14 @@ function RandomPanel({
           </div>
         </>
       )}
+
+      {/* 不连抽开关 */}
+      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+        <label className="row" style={{ gap: 6, fontSize: 13, cursor: 'pointer' }}>
+          <input type="checkbox" checked={noRepeat} onChange={toggleNoRepeat} />
+          不连抽（排除上一次抽到的词）
+        </label>
+      </div>
 
       {/* 单次抽取数量 */}
       <div className="field">

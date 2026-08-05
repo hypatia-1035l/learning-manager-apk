@@ -317,9 +317,9 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
   return (
     <div className="session-overlay">
       <div className="session-task">{task.icon} {task.name}</div>
-      <div className="session-obj">{obj ? obj.name : '（未设置学习序列）'}</div>
+      <div className="session-obj">{obj ? obj.name : '（未设置序列）'}</div>
       <div className="session-prog">
-        当前进度：{obj ? formatSequenceProgress(obj) : '尚未记录'}
+        进度：{obj ? formatSequenceProgress(obj) : '尚未记录'}
       </div>
 
       {/* 暂停/恢复提示卡：只在 timing/paused 阶段且未被用户关闭时显示 */}
@@ -334,10 +334,10 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
           </span>
           <span className="session-hint-text">
             {phase === 'paused'
-              ? `已暂停，当前学习 ${formatTimer(elapsed)}，点击继续学习`
-              : `已恢复上次未完成计时（${formatTimer(elapsed)}）`}
+              ? `已暂停 ${formatTimer(elapsed)}，点击继续`
+              : `已恢复 ${formatTimer(elapsed)}`}
           </span>
-          <span className="session-hint-close" title="关闭提示">
+          <span className="session-hint-close">
             关闭
           </span>
         </button>
@@ -351,22 +351,22 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
       {phase === 'timing' ? (
         <div className="session-actions">
           <button className="btn" onClick={handleCompleteObject} disabled={!obj}>
-            完成当前内容
+            完成
           </button>
           <button className="btn" onClick={handlePause}>
             暂停
           </button>
           <button className="btn primary" onClick={handleEnd}>
-            结束学习
+            结束
           </button>
         </div>
       ) : phase === 'paused' ? (
         <div className="session-actions">
           <button className="btn primary" onClick={handleResumeFromPause}>
-            继续学习
+            继续
           </button>
           <button className="btn" onClick={handleEnd}>
-            结束学习
+            结束
           </button>
         </div>
       ) : (
@@ -374,7 +374,7 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
           {isCount ? (
             <div className="field">
               <label>
-                本次完成数量
+                本次完成
                 {prog?.type === 'count' && prog.unit ? `（${prog.unit}）` : ''}
               </label>
               <input
@@ -399,12 +399,12 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
                       if (curLabel === newLabel) return `${base} · ${curLabel}`
                       return `${base}（${curLabel ?? '—'} → ${newLabel ?? '—'}）`
                     })()
-                  : '填写本次完成的数量，达到目标后自动完成'}
+                  : '填写本次完成数量，达到目标自动完成'}
               </div>
             </div>
           ) : (
             <div className="field">
-              <label>记录当前位置</label>
+              <label>当前位置</label>
               <input
                 className="input"
                 autoFocus
@@ -413,12 +413,12 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
                 placeholder="如：卷八十九 / 第12集 / 第三卷第五章"
               />
               <div className="hint">
-                原：{startProgress || '（空）'} → 填写后更新为当前进度
+                原：{startProgress || '空'} → 更新为当前
               </div>
             </div>
           )}
           <div className="field" style={{ marginTop: 2 }}>
-            <label className="muted" style={{ fontSize: 12 }}>备注（可选）</label>
+            <label className="muted" style={{ fontSize: 12 }}>备注</label>
             <input
               className="input"
               value={noteInput}
@@ -428,17 +428,16 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
           </div>
           <div className="row wrap" style={{ justifyContent: 'flex-end', gap: 6, marginTop: 4 }}>
             <button className="btn sm" onClick={handleResume}>
-              继续学习
+              继续
             </button>
             <button
               className="btn sm"
               onClick={handleSaveDurationOnly}
-              title="不更新进度，仅记录本次学习时长"
             >
               仅记时长
             </button>
             <button className="btn primary" onClick={handleSave}>
-              保存记录
+              保存
             </button>
           </div>
         </div>

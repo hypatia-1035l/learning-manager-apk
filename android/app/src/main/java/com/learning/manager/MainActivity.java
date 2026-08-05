@@ -1,5 +1,6 @@
 package com.learning.manager;
 
+import android.content.Intent;
 import android.os.Bundle;
 import androidx.activity.OnBackPressedCallback;
 import com.getcapacitor.BridgeActivity;
@@ -26,6 +27,9 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(BackNavigationPlugin.class);
         super.onCreate(savedInstanceState);
 
+        // 捕获通知动作（开始/换一个）：冷启动时从启动 Intent 读取
+        captureNotifAction(getIntent());
+
         // 拦截系统返回键（含物理返回键 + 手势导航边缘侧滑）：
         // 只有在 JS 明确允许时才退到桌面，其余情况交给 JS 的 backButton 监听器决定行为。
         // 注意：onBackPressedDispatcher 优先级高于 Capacitor 内部默认的 finish 逻辑，
@@ -43,5 +47,25 @@ public class MainActivity extends BridgeActivity {
             }
         };
         getOnBackPressedDispatcher().addCallback(this, callback);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        // 热启动时：通知动作（开始/换一个）打开 App，捕获并转发给插件
+        captureNotifAction(intent);
+    }
+
+    /**
+     * 从通知 Intent 中读取 notif_action / taskId，转发给 StudyNotificationPlugin 暂存。
+     * JS 启动/切前台时通过 consumePendingNotifAction 读取并处理。
+     */
+    private void captureNotifAction(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getStringExtra("notif_action");
+        if (action == null || action.isEmpty()) return;
+        String taskId = intent.getStringExtra("taskId");
+        StudyNotificationPlugin.setPendingNotifAction(action, taskId);
     }
 }

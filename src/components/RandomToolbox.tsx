@@ -7,10 +7,10 @@ import { RandomRecords } from './random/RandomRecords'
 type Tool = 'number' | 'wordbank' | 'banks' | 'records'
 
 const TABS: { id: Tool; label: string }[] = [
-  { id: 'number', label: '数字随机' },
-  { id: 'wordbank', label: '词库随机' },
-  { id: 'banks', label: '词库管理' },
-  { id: 'records', label: '随机记录' },
+  { id: 'number', label: '数字' },
+  { id: 'wordbank', label: '词库' },
+  { id: 'banks', label: '管理' },
+  { id: 'records', label: '记录' },
 ]
 
 export function RandomToolbox() {

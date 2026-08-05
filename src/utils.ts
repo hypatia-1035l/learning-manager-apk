@@ -28,7 +28,7 @@ export function formatDate(ts: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-// 日期+时间格式化：07-28 14:32
+// 日期+时间格式化：08-03 16:01
 export function formatDateTime(ts: number): string {
   const d = new Date(ts)
   const pad = (n: number) => String(n).padStart(2, '0')

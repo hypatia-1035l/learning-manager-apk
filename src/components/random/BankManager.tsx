@@ -623,8 +623,8 @@ function BankEditor({ bank, onBack }: { bank: WordBank; onBack: () => void }) {
                 `，重复跳过 ${importPreview.duplicates} 条`}
               {importPreview.entries.length > 0 && (
                 <div style={{ marginTop: 4 }}>
-                  {importPreview.entries.slice(0, 10).map((e, i) => (
-                    <span key={i} style={{ marginRight: 8 }}>
+                  {importPreview.entries.slice(0, 10).map((e) => (
+                    <span key={e.id} style={{ marginRight: 8 }}>
                       {e.text}
                       {e.weight > 1 ? `(${e.weight})` : ''}
                     </span>
@@ -648,7 +648,7 @@ function BankEditor({ bank, onBack }: { bank: WordBank; onBack: () => void }) {
       {/* 词条列表 */}
       <div className="obj-list">
         {bank.words.map((w, idx) => (
-          <WordRow key={idx} word={w} index={idx} bankId={bank.id} />
+          <WordRow key={w.id} word={w} wordId={w.id} displayIndex={idx} bankId={bank.id} />
         ))}
       </div>
     </div>
@@ -658,11 +658,13 @@ function BankEditor({ bank, onBack }: { bank: WordBank; onBack: () => void }) {
 // ===== 词条行 =====
 function WordRow({
   word,
-  index,
+  wordId,
+  displayIndex,
   bankId,
 }: {
   word: WordEntry
-  index: number
+  wordId: string
+  displayIndex: number
   bankId: string
 }) {
   const [editing, setEditing] = useState(false)
@@ -690,7 +692,7 @@ function WordRow({
         <button
           className="btn sm primary"
           onClick={() => {
-            updateWord(bankId, index, {
+            updateWord(bankId, wordId, {
               text: text.trim() || word.text,
               weight,
             })
@@ -715,7 +717,7 @@ function WordRow({
 
   return (
     <div className="obj-item">
-      <span className="idx">{index + 1}</span>
+      <span className="idx">{displayIndex + 1}</span>
       <span style={{ flex: 1 }}>{word.text}</span>
       {word.weight > 1 && (
         <span
@@ -737,7 +739,7 @@ function WordRow({
         <button
           className="icon-btn danger"
           title="删除"
-          onClick={() => confirm(`删除词条「${word.text}」？`) && deleteWord(bankId, index)}
+          onClick={() => confirm(`删除词条「${word.text}」？`) && deleteWord(bankId, wordId)}
         >
           删除
         </button>

@@ -98,7 +98,7 @@ export function TaskForm({ onClose }: Props) {
 
   return (
     <Modal
-      title="新建学习方向"
+      title="新建方向"
       onClose={onClose}
       footer={
         <>
@@ -111,25 +111,35 @@ export function TaskForm({ onClose }: Props) {
     >
       <div className="form-stack" style={{ gap: 10 }}>
         <div className="field" style={{ marginBottom: 4 }}>
-          <label>方向名称</label>
+          <label>名称</label>
           <input
             className="input"
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="如：历史阅读、英语、Blender"
+            placeholder="如：历史、英语、Blender"
             onKeyDown={(e) => e.key === 'Enter' && submit()}
+          />
+        </div>
+
+        <div className="field" style={{ marginBottom: 4 }}>
+          <label>序列名</label>
+          <textarea
+            className="textarea"
+            placeholder={'每行一条，可带：名称 | 目标 | 单位 | 分钟\n竖线后可不填，空则用下方默认'}
+            value={seqInput}
+            onChange={(e) => setSeqInput(e.target.value)}
+            rows={4}
           />
         </div>
 
         <div className="row wrap" style={{ gap: 8, marginTop: 2 }}>
           <div className="field" style={{ flex: '1 1 90px', marginBottom: 0 }}>
-            <label className="faint" style={{ fontSize: 12 }}>默认目标</label>
+            <label className="faint" style={{ fontSize: 12 }}>目标</label>
             <input
               className="input"
               type="number"
               min={0}
-              placeholder="300"
               value={globalTarget}
               onChange={(e) => setGlobalTarget(e.target.value)}
             />
@@ -138,7 +148,6 @@ export function TaskForm({ onClose }: Props) {
             <label className="faint" style={{ fontSize: 12 }}>单位</label>
             <input
               className="input"
-              placeholder="页/集/篇"
               value={globalUnit}
               onChange={(e) => setGlobalUnit(e.target.value)}
             />
@@ -149,16 +158,15 @@ export function TaskForm({ onClose }: Props) {
               className="input"
               type="number"
               min={0}
-              placeholder="25"
               value={globalCountdown}
               onChange={(e) => setGlobalCountdown(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="field" style={{ marginBottom: 4 }}>
+        <div className="field" style={{ marginBottom: 0 }}>
           <label className="faint" style={{ fontSize: 12 }}>
-            进度节点（可选，所有序列共用）· 每行 <code style={{ fontSize: 11 }}>数字 名称</code>
+            进度节点（每行 <code style={{ fontSize: 11 }}>数字 名称</code>）
           </label>
           <textarea
             className="input"
@@ -169,28 +177,6 @@ export function TaskForm({ onClose }: Props) {
             style={{ width: '100%', resize: 'vertical', fontSize: 13, padding: 8 }}
           />
         </div>
-
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label>
-            预置序列名
-            <span className="faint" style={{ fontSize: 12 }}>
-              · 每行一条，可带参数：<code style={{ fontSize: 11 }}>名称 | 目标 | 单位 | 分钟</code>（竖线后可不填，空则用全局模板）
-            </span>
-          </label>
-          <textarea
-            className="textarea"
-            placeholder={
-              '例：\n左传\n资治通鉴 | 294 | 卷 | 45\n史记'
-            }
-            value={seqInput}
-            onChange={(e) => setSeqInput(e.target.value)}
-            rows={4}
-          />
-        </div>
-
-        <p className="faint" style={{ fontSize: 12, marginTop: 2 }}>
-          留空序列名只建方向，之后手动加。有目标+单位→自动是 count 型进度，否则 position 型。
-        </p>
       </div>
     </Modal>
   )

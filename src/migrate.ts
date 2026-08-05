@@ -114,10 +114,6 @@ function migrateTask(t: Task): Task {
     : t.group
   return {
     ...t,
-    randomEnabled:
-      typeof (t as Task & { randomEnabled?: boolean }).randomEnabled === 'boolean'
-        ? (t as Task & { randomEnabled?: boolean }).randomEnabled!
-        : true,
     weight:
       typeof (t as Task & { weight?: number }).weight === 'number'
         ? (t as Task & { weight?: number }).weight!

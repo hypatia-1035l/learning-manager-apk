@@ -16,26 +16,20 @@ interface Props {
 }
 
 // 提醒通知点击后的操作选择弹窗
-// 选项：开始计时 / 换一个 / 延迟 / 忽略
-// 开始计时 → 进入会话，计时结束后开始冷却
-// 延迟 / 忽略 → 立即开始冷却
+// 仅保留：开始计时 / 换一个 / 取消
+// 开始 → 进入会话；取消 / 关闭 → 进入冷却
 export function ReminderActionModal({ task, cooldownMinutes, randomPoolSize, onStart, onReroll, onClose }: Props) {
   const obj = getCurrentObject(task)
   // 可随机任务少于 2 个时，换一个无意义（必然重复或为空）
   const canReroll = randomPoolSize >= 2
 
-  const handleDelay = () => {
-    setCooldown(cooldownMinutes)
-    onClose()
-  }
-
-  const handleIgnore = () => {
+  const handleCancel = () => {
     setCooldown(cooldownMinutes)
     onClose()
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>该摸一条鱼了</h3>
 
@@ -54,27 +48,19 @@ export function ReminderActionModal({ task, cooldownMinutes, randomPoolSize, onS
 
         <div className="reminder-actions">
           <button className="btn primary lg" onClick={() => onStart(task)}>
-            开始计时
+            开始
           </button>
           <button
             className="btn lg"
             onClick={onReroll}
             disabled={!canReroll}
-            title={canReroll ? '换一个随机方向' : '可随机的方向不足 2 个，无法更换'}
           >
             换一个
           </button>
-          <button className="btn lg" onClick={handleDelay}>
-            延迟（{cooldownMinutes}分）
-          </button>
-          <button className="btn lg ghost" onClick={handleIgnore}>
-            忽略
+          <button className="btn lg ghost" onClick={handleCancel}>
+            取消
           </button>
         </div>
-
-        <p className="faint" style={{ fontSize: 12, textAlign: 'center', marginTop: 12 }}>
-          开始计时后进入冷却；延迟/忽略也计算冷却
-        </p>
       </div>
     </div>
   )

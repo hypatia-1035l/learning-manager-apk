@@ -30,7 +30,7 @@ export function RandomResultModal({
         <div className="rr-name">{task.name}</div>
 
         <div className="rr-block">
-          <div className="label">当前学习序列</div>
+          <div className="label">当前序列</div>
           <div className="obj">
             {obj ? obj.name : '（尚未设置学习序列）'}
           </div>

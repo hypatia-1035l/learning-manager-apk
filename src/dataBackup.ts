@@ -5,6 +5,26 @@
 const KEY_PREFIX = 'learning-manager:'
 const EXPORT_VERSION = 1
 
+// 运行时瞬态键：由当前设备运行状态派生，绝不可纳入备份。
+// 若被导出并在其他设备/时间恢复，会导致：
+//  - session-active=true        → 永久压制提醒
+//  - paused-task/paused-elapsed → 复活陈旧的“暂停会话”
+//  - cooldown-until             → 卡住提醒（一直冷却）
+//  - last-scheduled-date         → 当天不再重新调度提醒
+//  - notif-perm-requested        → 跳过通知权限请求
+//  - reminder-fired/last-session-end → 历史触发/结束标记，跨设备无意义
+// 新增任何运行时键时，必须同步加入此集合，否则会被误备份。
+const TRANSIENT_KEYS = new Set<string>([
+  'learning-manager:notif-perm-requested',
+  'learning-manager:last-scheduled-date',
+  'learning-manager:cooldown-until',
+  'learning-manager:session-active',
+  'learning-manager:paused-task',
+  'learning-manager:paused-elapsed',
+  'learning-manager:reminder-fired',
+  'learning-manager:last-session-end',
+])
+
 // 备份文件结构
 export interface BackupFile {
   version: number
@@ -19,7 +39,11 @@ export function exportAllData(): BackupFile {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
-      if (key && key.startsWith(KEY_PREFIX)) {
+      if (
+        key &&
+        key.startsWith(KEY_PREFIX) &&
+        !TRANSIENT_KEYS.has(key) // 排除运行时瞬态键，避免恢复后污染运行态
+      ) {
         const val = localStorage.getItem(key)
         if (val !== null) data[key] = val
       }
@@ -102,10 +126,25 @@ export function validateBackup(backup: BackupFile): ValidationResult {
   }
 }
 
-// 导入备份：覆盖现有 localStorage 数据
-// 注意：会覆盖现有数据，调用方应先确认
+// 导入备份：先清除现有“持久”数据键，再写回备份内容
+// 只清持久键（保留当前设备的瞬态运行态），避免误删正在进行的会话/冷却等状态；
+// 写回时再次跳过瞬态键（防御旧版备份里残留的瞬态键）。
+// 注意：会覆盖现有持久数据，调用方应先确认
 export function importBackup(backup: BackupFile): void {
+  // 1. 清除现有持久键（瞬态键原样保留，不破坏当前设备运行态）
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (
+      key &&
+      key.startsWith(KEY_PREFIX) &&
+      !TRANSIENT_KEYS.has(key)
+    ) {
+      localStorage.removeItem(key)
+    }
+  }
+  // 2. 写回备份数据（跳过任何瞬态键，防御性）
   for (const [key, value] of Object.entries(backup.data)) {
+    if (TRANSIENT_KEYS.has(key)) continue
     try {
       localStorage.setItem(key, value)
     } catch {

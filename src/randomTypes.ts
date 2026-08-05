@@ -11,6 +11,7 @@ export interface NumberRange {
 // ===== 统一词库系统 =====
 // 词条：带权重，默认 1
 export interface WordEntry {
+  id: string // 稳定唯一标识（用于 React key 与增删改定位，避免按位置漂移）
   text: string
   weight: number // 默认 1，越大越易被选中
 }

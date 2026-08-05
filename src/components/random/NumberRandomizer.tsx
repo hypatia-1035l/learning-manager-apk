@@ -8,9 +8,6 @@ import {
   addRandomRecord,
 } from '../../randomStore'
 
-// 单次抽取数量选项
-const COUNT_OPTIONS = [1, 3, 5, 10]
-
 export function NumberRandomizer() {
   const data = useRandomData()
   const [min, setMin] = useState('1')
@@ -91,7 +88,7 @@ export function NumberRandomizer() {
           </div>
 
           <div className="field">
-            <label>小数点位数（0 = 整数，最大 10）</label>
+            <label>小数位（0-10）</label>
             <div className="row">
               <input
                 type="number"
@@ -117,29 +114,18 @@ export function NumberRandomizer() {
           </div>
 
           <div className="field">
-            <label>单次抽取数量</label>
-            <div className="row wrap">
-              {COUNT_OPTIONS.map((n) => (
-                <button
-                  key={n}
-                  className={`btn sm ${drawCount === n ? 'primary' : ''}`}
-                  onClick={() => setDrawCount(n)}
-                >
-                  ×{n}
-                </button>
-              ))}
-              <input
-                type="number"
-                min={1}
-                max={50}
-                className="input"
-                style={{ width: 80 }}
-                value={drawCount}
-                onChange={(e) =>
-                  setDrawCount(Math.max(1, Math.min(50, Math.floor(Number(e.target.value) || 1))))
-                }
-              />
-            </div>
+            <label>抽取数量</label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              className="input"
+              style={{ width: 100 }}
+              value={drawCount}
+              onChange={(e) =>
+                setDrawCount(Math.max(1, Math.min(50, Math.floor(Number(e.target.value) || 1))))
+              }
+            />
           </div>
 
           <div className="rt-result">
@@ -165,7 +151,7 @@ export function NumberRandomizer() {
           </button>
 
           <div className="field">
-            <label>保存为常用范围</label>
+            <label>保存为常用</label>
             <div className="row">
               <input
                 className="input"

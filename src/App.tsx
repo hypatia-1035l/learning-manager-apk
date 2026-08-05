@@ -22,6 +22,7 @@ import {
 import {
   getStudyTimerStatus,
 } from './studyTimer'
+import { consumePendingNotifAction } from './studyNotifications'
 import type { Task } from './types'
 
 // 四个平级工作区（主导航）
@@ -29,7 +30,7 @@ type Tab = 'todos' | 'tools' | 'stats' | 'settings'
 
 // 子页面视图（叠加在当前工作区之上，返回时回到对应工作区）
 type View =
-  | { name: 'task'; taskId: string }
+  | { name: 'task'; taskId: string; autoStartSession?: boolean }
   | { name: 'reminder' }
   | { name: 'backup' }
 
@@ -105,7 +106,7 @@ export default function App() {
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [data.tasks, data.reminder?.enabled])
+  }, [data.reminder?.enabled])
 
   // 启动时检查 StudyTimer Service 状态 + 消费 pending action
   useEffect(() => {
@@ -132,20 +133,80 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.tasks])
 
-  // 监听通知点击：弹出操作选择弹窗（开始/换一个/延迟/忽略）
+  // 消费原生通知动作（开始/换一个）：
+  //   - 冷启动：MainActivity.onCreate 已把 notif_action 写入插件，启动时读取
+  //   - 热启动：onNewIntent 写入，切回前台（visibilitychange）时读取
   useEffect(() => {
-    const off = onNotificationClick((action) => {
-      if (action.taskId) {
-        const matchedTask = data.tasks.find((t) => t.id === action.taskId)
-        if (matchedTask) {
-          setReminderAction(matchedTask)
+    let cancelled = false
+    const drain = () => {
+      ;(async () => {
+        const pending = await consumePendingNotifAction()
+        if (cancelled || !pending) return
+        if (pending.action === 'reroll') {
+          handleNotifAction({ taskId: pending.taskId || null, reroll: true })
+        } else if (pending.action === 'start') {
+          handleNotifAction({ taskId: pending.taskId || null })
         }
+      })().catch(() => { /* ignore */ })
+    }
+    // 启动时尝试一次
+    drain()
+    // 切回前台时再尝试一次（热启动场景）
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') drain()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.tasks])
+
+  // 统一处理通知动作（开始/换一个/取消），供 JS 监听与原生 pending 两条路径复用
+  const handleNotifAction = (action: {
+    taskId: string | null
+    reroll?: boolean
+    cancelled?: boolean
+  }) => {
+    // 取消：不弹窗，停留在待办
+    if (action.cancelled) {
+      setReminderAction(null)
+      setTab('todos')
+      setView(null)
+      return
+    }
+    // 换一个：重新随机抽一个任务
+    if (action.reroll) {
+      const picked = pickRandomTask(data.tasks)
+      if (picked) {
+        setReminderAction(picked)
       } else {
         setTab('todos')
         setView(null)
       }
-    })
+      return
+    }
+    // 开始（或点击通知本体）：直接进入 TaskDetail + 自动打开会话开始计时
+    if (action.taskId) {
+      const matchedTask = data.tasks.find((t) => t.id === action.taskId)
+      if (matchedTask) {
+        setView({ name: 'task', taskId: matchedTask.id, autoStartSession: true })
+      } else {
+        setTab('todos')
+        setView(null)
+      }
+    } else {
+      setTab('todos')
+      setView(null)
+    }
+  }
+
+  // 监听通知点击：弹出操作选择弹窗（开始/换一个/取消）
+  useEffect(() => {
+    const off = onNotificationClick(handleNotifAction)
     return off
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.tasks])
 
   // 同步「是否允许退桌面」标志位给原生层：
@@ -193,8 +254,7 @@ export default function App() {
   // 提醒操作弹窗回调
   const handleReminderStart = (task: Task) => {
     setReminderAction(null)
-    setView({ name: 'task', taskId: task.id })
-    // TaskDetail 中的 LearningSession 会自动启动计时并标记会话活跃
+    setView({ name: 'task', taskId: task.id, autoStartSession: true })
   }
 
   const handleReminderReroll = () => {
@@ -211,6 +271,7 @@ export default function App() {
         <div className="app">
           <TaskDetail
             taskId={view.taskId}
+            autoStartSession={view.autoStartSession ?? false}
             onBack={() => {
               setTab('todos')
               setView(null)
@@ -279,7 +340,7 @@ export default function App() {
           className={`tabbar-item ${tab === 'todos' ? 'active' : ''}`}
           onClick={() => setTab('todos')}
         >
-          <span className="tb-name">待办</span>
+          <span className="tb-name">方向</span>
         </button>
         <button
           className={`tabbar-item ${tab === 'tools' ? 'active' : ''}`}

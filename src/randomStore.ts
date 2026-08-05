@@ -105,6 +105,23 @@ const uid = (): string =>
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`)
 
+// 创建带稳定 id 的词条（所有词条创建统一经此，保证 id 不缺失）
+const mkWord = (text: string, weight = 1): WordEntry => ({
+  id: uid(),
+  text,
+  weight,
+})
+
+// 把任意来源的"词条"规整为带 id 的 WordEntry（兼容旧数据字符串/缺 id 对象）
+function normalizeWord(w: WordEntry | string): WordEntry {
+  if (typeof w === 'string') return mkWord(w, 1)
+  return {
+    id: typeof w.id === 'string' && w.id ? w.id : uid(),
+    text: w.text,
+    weight: typeof w.weight === 'number' && w.weight > 0 ? w.weight : 1,
+  }
+}
+
 // ---------- 旧数据迁移 ----------
 interface LegacyData {
   ranges?: NumberRange[]
@@ -140,10 +157,7 @@ function migrateLegacy(raw: LegacyData): RandomData {
         enabled: b.enabled ?? true,
         tags: Array.isArray(b.tags) ? b.tags : [],
         createdAt: b.createdAt ?? Date.now(),
-        words: (b.words ?? []).map((w: WordEntry | string) => ({
-          text: typeof w === 'string' ? w : (w as WordEntry).text,
-          weight: typeof w === 'object' && 'weight' in w ? (w as WordEntry).weight : 1,
-        })),
+        words: (b.words ?? []).map((w: WordEntry | string) => normalizeWord(w)),
       })),
     )
   }
@@ -158,7 +172,7 @@ function migrateLegacy(raw: LegacyData): RandomData {
         category: '',
         enabled: true,
         tags: [],
-        words: tl.items.map((text) => ({ text, weight: 1 })),
+        words: tl.items.map((text) => mkWord(text, 1)),
         createdAt: tl.createdAt,
       })
     }
@@ -176,7 +190,7 @@ function migrateLegacy(raw: LegacyData): RandomData {
           category: tpl.name,
           enabled: true,
           tags: [],
-          words: b.items.map((text) => ({ text, weight: 1 })),
+          words: b.items.map((text) => mkWord(text, 1)),
           createdAt: tpl.createdAt,
         })
       }
@@ -196,10 +210,7 @@ function migrateLegacy(raw: LegacyData): RandomData {
           category: tpl.name,
           enabled: true,
           tags: [],
-          words: layer.options.map((text, idx) => ({
-            text,
-            weight: layer.weights?.[idx] ?? 1,
-          })),
+          words: layer.options.map((text, idx) => mkWord(text, layer.weights?.[idx] ?? 1)),
           createdAt: tpl.createdAt,
         })
       }
@@ -263,7 +274,7 @@ function seedDefaults(data: RandomData): void {
     category: s.category,
     enabled: true,
     tags: s.tags,
-    words: s.words.map((w) => ({ text: w.text, weight: w.weight ?? 1 })),
+    words: s.words.map((w) => mkWord(w.text, w.weight ?? 1)),
     createdAt: Date.now(),
   }))
   data.banks = [...data.banks, ...newBanks]
@@ -332,19 +343,44 @@ export function pickOne<T>(arr: T[]): T | null {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-export function pickWeighted(entries: WordEntry[]): WordEntry | null {
+// 上次抽到的词条 id（按词库），用于"不连抽"；会话级内存态，不落盘
+const lastPickedWordIds = new Map<string, string>()
+
+export function getLastPickedWordId(bankId: string): string | null {
+  return lastPickedWordIds.get(bankId) ?? null
+}
+
+export function setLastPickedWordId(bankId: string, wordId: string): void {
+  lastPickedWordIds.set(bankId, wordId)
+}
+
+export function clearLastPickedWordIds(): void {
+  lastPickedWordIds.clear()
+}
+
+// 加权随机；exclude 为要排除的词条 id 集合（用于"不连抽"）
+export function pickWeighted(
+  entries: WordEntry[],
+  exclude?: Set<string> | null,
+): WordEntry | null {
   if (!entries.length) return null
-  const weighted = entries.filter((e) => e.weight > 0)
-  if (weighted.length === 0) {
+  let pool = entries.filter(
+    (e) => e.weight > 0 && !(exclude && exclude.has(e.id)),
+  )
+  if (pool.length === 0) {
+    // 排除后池子空了（如仅 1 个词条），回退到不排除，保证总能抽到
+    pool = entries.filter((e) => e.weight > 0)
+  }
+  if (pool.length === 0) {
     return entries[Math.floor(Math.random() * entries.length)]
   }
-  const total = weighted.reduce((s, e) => s + e.weight, 0)
+  const total = pool.reduce((s, e) => s + e.weight, 0)
   let r = Math.random() * total
-  for (const e of weighted) {
+  for (const e of pool) {
     r -= e.weight
     if (r <= 0) return e
   }
-  return weighted[weighted.length - 1]
+  return pool[pool.length - 1]
 }
 
 // ---------- 数字范围 CRUD ----------
@@ -418,7 +454,7 @@ export function addWord(bankId: string, text: string, weight = 1) {
     ...p,
     banks: p.banks.map((b) =>
       b.id === bankId
-        ? { ...b, words: [...b.words, { text: text.trim(), weight }] }
+        ? { ...b, words: [...b.words, mkWord(text.trim(), weight)] }
         : b,
     ),
   }))
@@ -426,7 +462,7 @@ export function addWord(bankId: string, text: string, weight = 1) {
 
 export function updateWord(
   bankId: string,
-  index: number,
+  wordId: string,
   patch: Partial<WordEntry>,
 ) {
   setState((p) => ({
@@ -435,8 +471,8 @@ export function updateWord(
       b.id === bankId
         ? {
             ...b,
-            words: b.words.map((w, i) =>
-              i === index ? { ...w, ...patch } : w,
+            words: b.words.map((w) =>
+              w.id === wordId ? { ...w, ...patch } : w,
             ),
           }
         : b,
@@ -444,12 +480,12 @@ export function updateWord(
   }))
 }
 
-export function deleteWord(bankId: string, index: number) {
+export function deleteWord(bankId: string, wordId: string) {
   setState((p) => ({
     ...p,
     banks: p.banks.map((b) =>
       b.id === bankId
-        ? { ...b, words: b.words.filter((_, i) => i !== index) }
+        ? { ...b, words: b.words.filter((w) => w.id !== wordId) }
         : b,
     ),
   }))
@@ -494,7 +530,7 @@ export function parseImportText(
             continue
           }
           seen.add(part)
-          entries.push({ text: part, weight: 1 })
+          entries.push(mkWord(part, 1))
         }
         continue
       }
@@ -506,7 +542,7 @@ export function parseImportText(
       continue
     }
     seen.add(textPart)
-    entries.push({ text: textPart, weight })
+    entries.push(mkWord(textPart, weight))
   }
 
   return { entries, duplicates }
@@ -709,6 +745,7 @@ export function importBank(data: ExportedBank): WordBank {
   const words: WordEntry[] = Array.isArray(data.words)
     ? data.words
         .map((w) => ({
+          id: typeof (w as WordEntry)?.id === 'string' && (w as WordEntry).id ? (w as WordEntry).id : uid(),
           text: String(w?.text ?? '').trim(),
           weight: typeof w?.weight === 'number' && w.weight > 0 ? w.weight : 1,
         }))
@@ -774,6 +811,7 @@ export function importAll(data: ExportedAll): ImportAllResult {
       const words: WordEntry[] = Array.isArray(bk.words)
         ? bk.words
             .map((w) => ({
+              id: typeof (w as WordEntry)?.id === 'string' && (w as WordEntry).id ? (w as WordEntry).id : uid(),
               text: String(w?.text ?? '').trim(),
               weight:
                 typeof w?.weight === 'number' && w.weight > 0 ? w.weight : 1,

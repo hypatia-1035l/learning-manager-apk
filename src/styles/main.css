@@ -603,6 +603,8 @@ select {
   color: var(--ink-faint);
   font-size: 12px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 .record-item .obj {
   font-weight: 600;
@@ -1179,6 +1181,8 @@ select {
   gap: 10px;
   font-size: 12px;
   flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 .s-record-prog {
   flex: 1;

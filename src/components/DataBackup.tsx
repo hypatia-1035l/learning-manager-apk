@@ -119,8 +119,11 @@ export function DataBackup({ onBack }: Props) {
         <ul className="muted" style={{ fontSize: 13, marginBottom: 14, paddingLeft: 20 }}>
           <li>学习数据（任务、学习序列、学习记录、提醒设置）</li>
           <li>随机工具箱（数字范围、词库、预设、随机记录）</li>
-          <li>运行状态（通知标记、调度日期、暂停的学习会话等）</li>
+          <li>数据结构版本与界面偏好标记</li>
         </ul>
+        <p className="faint" style={{ fontSize: 12, marginBottom: 14 }}>
+          注：备份仅含用户数据，不包含运行时状态（如暂停的学习会话、提醒冷却/调度标记），导入后这些状态会按新环境重新生成。
+        </p>
         <button className="btn primary" onClick={handleExport}>
           导出全部数据
         </button>

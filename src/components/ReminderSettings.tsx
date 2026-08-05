@@ -11,7 +11,12 @@ import {
   cancelAllReminders,
   getNextReminderPreview,
   sendTestReminder,
+  isExactAlarmDegraded,
 } from '../reminderService'
+import {
+  canScheduleExactAlarmsNative,
+  openExactAlarmSettingsNative,
+} from '../studyNotifications'
 import type {
   ReminderConfig,
   ReminderDailyMode,
@@ -87,12 +92,21 @@ export function ReminderSettings({ onBack }: Props) {
   const [testing, setTesting] = useState(false)
   const [permGranted, setPermGranted] = useState<boolean | null>(null)
   const [msg, setMsg] = useState<string>('')
+  // 精确闹钟权限降级提示（原生通道未获授权时提醒会漂移）
+  const [exactDegraded, setExactDegraded] = useState<boolean>(isExactAlarmDegraded())
 
   // 刷新计数/倒计时用的 tick
   const [tick, setTick] = useState(0)
   useEffect(() => {
     const t = setInterval(() => setTick((x) => x + 1), 1000)
     return () => clearInterval(t)
+  }, [])
+
+  // 探测精确闹钟权限状态（仅 Android 原生通道有意义；Web/iOS 恒为 false）
+  useEffect(() => {
+    canScheduleExactAlarmsNative()
+      .then((ok) => setExactDegraded(!ok))
+      .catch(() => {})
   }, [])
 
   // 模式
@@ -103,30 +117,63 @@ export function ReminderSettings({ onBack }: Props) {
   const [dailyCount, setDailyCount] = useState(String(reminder.dailyCount))
   const [skipMinutes, setSkipMinutes] = useState(String(reminder.skipAfterSessionMinutes))
 
-  // 时间窗：支持多个
+  // 时间窗：支持多个，每段可绑独立任务白名单与星期
   const [windows, setWindows] = useState<TimeWindow[]>(() => {
     if (reminder.windows && reminder.windows.length) {
       return reminder.windows.map((w) => ({
         startMinute: typeof w.startMinute === 'number' ? w.startMinute : 9 * 60,
         endMinute:   typeof w.endMinute   === 'number' ? w.endMinute   : 22 * 60,
+        taskIds: w.taskIds ?? [],
+        weekdays: w.weekdays ?? [],
       }))
     }
     return [{
       startMinute: typeof reminder.startMinute === 'number' ? reminder.startMinute : 9 * 60,
       endMinute:   typeof reminder.endMinute   === 'number' ? reminder.endMinute   : 22 * 60,
+      taskIds: [],
+      weekdays: [],
     }]
   })
   const addWindow = () => {
     setWindows((ws) => {
       if (ws.length >= 4) return ws
       const last = ws[ws.length - 1]
-      return [...ws, { startMinute: last?.endMinute ?? 9 * 60, endMinute: 22 * 60 }]
+      return [...ws, {
+        startMinute: last?.endMinute ?? 9 * 60,
+        endMinute: 22 * 60,
+        taskIds: [],
+        weekdays: [],
+      }]
     })
   }
   const removeWindow = (idx: number) =>
     setWindows((ws) => (ws.length <= 1 ? ws : ws.filter((_, i) => i !== idx)))
   const updateWindow = (idx: number, k: 'startMinute' | 'endMinute', v: number) =>
     setWindows((ws) => ws.map((w, i) => (i === idx ? { ...w, [k]: v } : w)))
+  // 窗口独立任务勾选
+  const toggleWindowTask = (idx: number, taskId: string, checked: boolean) =>
+    setWindows((ws) => ws.map((w, i) => {
+      if (i !== idx) return w
+      const s = new Set(w.taskIds ?? [])
+      if (checked) s.add(taskId)
+      else s.delete(taskId)
+      return { ...w, taskIds: Array.from(s) }
+    }))
+  // 窗口独立星期切换：空数组=用全局
+  const toggleWindowWday = (idx: number, v: number) =>
+    setWindows((ws) => ws.map((w, i) => {
+      if (i !== idx) return w
+      const s = new Set(w.weekdays ?? [])
+      if (s.has(v)) s.delete(v)
+      else s.add(v)
+      return { ...w, weekdays: Array.from(s).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)) }
+    }))
+  // 清空窗口独立设置（回到使用全局）
+  const clearWindowOverrides = (idx: number) =>
+    setWindows((ws) => ws.map((w, i) => (i === idx ? { ...w, taskIds: [], weekdays: [] } : w)))
+
+  // 每段窗口的"独立设置"展开状态
+  const [wExpanded, setWExpanded] = useState<Record<number, boolean>>({})
 
   // 星期白名单
   const [wdays, setWdays] = useState<number[]>(
@@ -159,6 +206,9 @@ export function ReminderSettings({ onBack }: Props) {
       windows: windows.map((w) => ({
         startMinute: clampInt(w.startMinute, 0, 1439),
         endMinute: clampInt(w.endMinute, 0, 1439),
+        // 空数组表示"用全局白名单/星期"
+        taskIds: w.taskIds && w.taskIds.length ? w.taskIds : undefined,
+        weekdays: w.weekdays && w.weekdays.length ? w.weekdays : undefined,
       })),
       // 兼容旧字段，用第一窗填充
       startMinute: clampInt(windows[0].startMinute, 0, 1439),
@@ -266,6 +316,34 @@ export function ReminderSettings({ onBack }: Props) {
             未授予通知权限。请到系统设置 → 应用 → 今天摸啥鱼 → 通知，开启通知权限。
           </p>
         )}
+        {exactDegraded && (
+          <p
+            className="muted"
+            style={{
+              color: 'var(--orange, #c47f00)',
+              fontSize: 13,
+              background: 'var(--bg-soft)',
+              padding: '8px 10px',
+              borderRadius: 8,
+              marginTop: 8,
+            }}
+          >
+            未授予「精确闹钟」权限，提醒可能漂移/不准时。
+            <button
+              className="btn sm"
+              style={{ marginLeft: 8 }}
+              onClick={async () => {
+                await openExactAlarmSettingsNative()
+                // 回到设置后重新探测
+                canScheduleExactAlarmsNative()
+                  .then((ok) => setExactDegraded(!ok))
+                  .catch(() => {})
+              }}
+            >
+              去设置开启
+            </button>
+          </p>
+        )}
         {reminder.enabled && (
           <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>{previewText}</p>
         )}
@@ -349,45 +427,122 @@ export function ReminderSettings({ onBack }: Props) {
           </div>
         </div>
 
-        <div className="section-title" style={{ marginTop: 10 }}>提醒时间段（最多 4 段）</div>
+        <div className="section-title" style={{ marginTop: 10 }}>提醒时间段（最多 4 段，每段可独立绑任务/星期）</div>
         {windows.map((w, i) => {
           const cross = w.startMinute > w.endMinute
           const empty = w.startMinute === w.endMinute
+          const wTaskIds = w.taskIds ?? []
+          const wWdays = w.weekdays ?? []
+          const hasOverride = wTaskIds.length > 0 || wWdays.length > 0
+          const [expanded, setExpanded] = [wExpanded[i], (v: boolean) => setWExpanded((m) => ({ ...m, [i]: v }))]
           return (
-            <div key={i} className="row wrap" style={{ gap: 12, marginBottom: 10, alignItems: 'flex-end' }}>
-              <div className="field" style={{ flex: '1 1 120px', marginBottom: 0 }}>
-                <label>第 {i + 1} 段 · 开始</label>
-                <input
-                  type="time" className="input"
-                  value={minuteToTime(w.startMinute)}
-                  onChange={(e) => updateWindow(i, 'startMinute', timeToMinute(e.target.value))}
+            <div key={i} className="window-block" style={{ marginBottom: 12, padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
+              <div className="row wrap" style={{ gap: 12, alignItems: 'flex-end' }}>
+                <div className="field" style={{ flex: '1 1 120px', marginBottom: 0 }}>
+                  <label>第 {i + 1} 段 · 开始</label>
+                  <input
+                    type="time" className="input"
+                    value={minuteToTime(w.startMinute)}
+                    onChange={(e) => updateWindow(i, 'startMinute', timeToMinute(e.target.value))}
+                    disabled={!reminder.enabled}
+                  />
+                </div>
+                <div className="field" style={{ flex: '1 1 120px', marginBottom: 0 }}>
+                  <label>
+                    结束
+                    {cross && <span className="faint" style={{ fontSize: 12 }}> · 跨夜</span>}
+                  </label>
+                  <input
+                    type="time" className="input"
+                    value={minuteToTime(w.endMinute)}
+                    onChange={(e) => updateWindow(i, 'endMinute', timeToMinute(e.target.value))}
+                    disabled={!reminder.enabled}
+                  />
+                </div>
+                <button
+                  className="btn"
+                  onClick={() => removeWindow(i)}
+                  disabled={!reminder.enabled || windows.length <= 1}
+                  style={{ alignSelf: 'center' }}
+                >
+                  删除
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => setExpanded(!expanded)}
                   disabled={!reminder.enabled}
-                />
+                  style={{ alignSelf: 'center' }}
+                >
+                  {expanded ? '收起' : '独立设置'}
+                </button>
               </div>
-              <div className="field" style={{ flex: '1 1 120px', marginBottom: 0 }}>
-                <label>
-                  结束
-                  {cross && <span className="faint" style={{ fontSize: 12 }}> · 跨夜</span>}
-                </label>
-                <input
-                  type="time" className="input"
-                  value={minuteToTime(w.endMinute)}
-                  onChange={(e) => updateWindow(i, 'endMinute', timeToMinute(e.target.value))}
-                  disabled={!reminder.enabled}
-                />
-              </div>
-              <button
-                className="btn"
-                onClick={() => removeWindow(i)}
-                disabled={!reminder.enabled || windows.length <= 1}
-                style={{ alignSelf: 'center' }}
-              >
-                删除
-              </button>
               {empty && (
-                <p className="muted" style={{ color: 'var(--amber)', fontSize: 12, margin: '4px 0 0', flex: '1 1 100%' }}>
+                <p className="muted" style={{ color: 'var(--amber)', fontSize: 12, margin: '4px 0 0' }}>
                   该段开始=结束，不会触发。请调整结束时间。
                 </p>
+              )}
+              {expanded && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
+                  <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>
+                    仿闹钟：本段独立绑任务/星期；不勾选则用下方全局白名单
+                    {hasOverride && (
+                      <button
+                        className="btn sm ghost"
+                        style={{ marginLeft: 8 }}
+                        onClick={() => clearWindowOverrides(i)}
+                        disabled={!reminder.enabled}
+                      >
+                        清空（用全局）
+                      </button>
+                    )}
+                  </div>
+                  <div className="row wrap" style={{ gap: 6, marginBottom: 8 }}>
+                    {WEEKDAY_LABELS.map((wd) => {
+                      const on = wWdays.includes(wd.value)
+                      return (
+                        <button
+                          key={wd.value}
+                          className={on ? 'btn primary sm' : 'btn sm'}
+                          onClick={() => toggleWindowWday(i, wd.value)}
+                          disabled={!reminder.enabled}
+                          style={{ minWidth: 40 }}
+                        >
+                          {wd.label}
+                        </button>
+                      )
+                    })}
+                    <span className="faint" style={{ fontSize: 11, alignSelf: 'center' }}>
+                      {wWdays.length === 0 ? '用全局星期' : `仅 ${wWdays.length} 天`}
+                    </span>
+                  </div>
+                  <div className="obj-list" style={{ maxHeight: 200, overflowY: 'auto' }}>
+                    {data.tasks.length === 0 ? (
+                      <p className="faint" style={{ fontSize: 12 }}>尚无任务</p>
+                    ) : data.tasks.map((task) => {
+                      const checked = wTaskIds.includes(task.id)
+                      return (
+                        <label
+                          key={task.id}
+                          className="obj-item"
+                          style={{ cursor: 'pointer', fontSize: 13, padding: '4px 6px' }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!reminder.enabled || !task.enabled}
+                            onChange={(e) => toggleWindowTask(i, task.id, e.target.checked)}
+                            style={{ marginRight: 6 }}
+                          />
+                          <span className="tc-icon">{task.icon}</span>
+                          <span>{task.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <span className="faint" style={{ fontSize: 11 }}>
+                    {wTaskIds.length === 0 ? '用全局任务池' : `仅 ${wTaskIds.length} 个任务`}
+                  </span>
+                </div>
               )}
             </div>
           )

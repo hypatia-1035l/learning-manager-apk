@@ -6,7 +6,9 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.Settings;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import com.getcapacitor.JSArray;
@@ -21,20 +23,42 @@ import org.json.JSONObject;
 /**
  * 原生发布通知插件。
  * 与 @capacitor/local-notifications 并存，用来保证：
- *   - 通知动作按钮（10分钟后/30分钟后/忽略）使用 BroadcastReceiver，<b>不启动 App</b>
+ *   - "取消" 动作使用 BroadcastReceiver，<b>不启动 App</b>
+ *   - "开始" / "换一个" 动作打开 MainActivity，通过 pending action 转发给 JS
  *   - 通知发布到专用 channel "learning_reminders"
  *
- * 注意：@capacitor/local-notifications 仍用于 schedule 的 API 层（定时、ID 管理、跨平台），
- * 但 Android 端实际通知的 action PendingIntent 在 Capacitor 源码中是 Activity Intent，
- * 会打开 App。因此我们额外暴露 "fireNow" / "scheduleExact" 两个方法，用于 Snooze 场景下
- * 在后台不启动 App 也能弹出通知。
+ * 方法：
+ *   - ensureChannel / fireNow / schedule / cancelAll
+ *   - consumePendingNotifAction  读取并清除由通知动作（开始/换一个）写入的 pending action
  */
 @CapacitorPlugin(name = "StudyNotifications")
 public class StudyNotificationPlugin extends Plugin {
 
+    // 暂存的通知动作（开始/换一个 + taskId），由 MainActivity 从 Intent extra 写入，
+    // JS 启动/切前台时调用 consumePendingNotifAction 读取并清除
+    private static volatile String sPendingAction = null;
+    private static volatile String sPendingTaskId = null;
+
     @Override
     public void load() {
         ensureChannel(getContext());
+    }
+
+    /** MainActivity 在 onCreate / onNewIntent 中调用：写入 pending action */
+    public static void setPendingNotifAction(String action, String taskId) {
+        sPendingAction = action;
+        sPendingTaskId = taskId;
+    }
+
+    @PluginMethod
+    public void consumePendingNotifAction(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("action", sPendingAction == null ? "" : sPendingAction);
+        r.put("taskId", sPendingTaskId == null ? "" : sPendingTaskId);
+        // 读取后清除
+        sPendingAction = null;
+        sPendingTaskId = null;
+        call.resolve(r);
     }
 
     @PluginMethod
@@ -98,6 +122,41 @@ public class StudyNotificationPlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * 查询应用是否被授权使用精确闹钟（Android 12+ / S 及以上）。
+     * 低于 S 版本无此权限概念，一律返回 true。
+     */
+    @PluginMethod
+    public void canScheduleExactAlarms(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("granted", canScheduleExactAlarms(getContext()));
+        call.resolve(r);
+    }
+
+    /**
+     * 跳转到系统"精确闹钟"授权设置页（Android 12+）。
+     * 低于 S 版本或不支持时静默忽略。
+     */
+    @PluginMethod
+    public void openExactAlarmSettings(PluginCall call) {
+        Context ctx = getContext();
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Intent i = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                i.setData(Uri.fromParts("package", ctx.getPackageName(), null));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+            }
+        } catch (Throwable ignored) {}
+        call.resolve();
+    }
+
+    private static boolean canScheduleExactAlarms(Context ctx) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true;
+        AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        return am != null && am.canScheduleExactAlarms();
+    }
+
     // ---------------------- internal ----------------------
 
     private void scheduleExact(Context ctx, int id, String title, String body, String taskId, long atMs) {
@@ -118,8 +177,15 @@ public class StudyNotificationPlugin extends Plugin {
         );
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (am != null) {
-            try { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi); }
-            catch (Throwable t) {
+            try {
+                if (canScheduleExactAlarms(ctx)) {
+                    // 已获精确闹钟权限：准时触发
+                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi);
+                } else {
+                    // 未获精确闹钟权限：降级为宽松定时（可能漂移，但不会崩溃/静默失败）
+                    am.set(AlarmManager.RTC_WAKEUP, atMs, pi);
+                }
+            } catch (Throwable t) {
                 try { am.set(AlarmManager.RTC_WAKEUP, atMs, pi); } catch (Throwable ignored) {}
             }
         }
@@ -128,8 +194,10 @@ public class StudyNotificationPlugin extends Plugin {
     static void fireImpl(Context ctx, int id, String title, String body, String taskId) {
         ensureChannel(ctx);
 
+        // 点击通知本体时打开 MainActivity，带 action=start
         Intent openApp = new Intent(ctx, MainActivity.class);
         openApp.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        openApp.putExtra("notif_action", "start");
         if (taskId != null) openApp.putExtra("taskId", taskId);
         PendingIntent contentPi = PendingIntent.getActivity(
                 ctx,
@@ -140,15 +208,17 @@ public class StudyNotificationPlugin extends Plugin {
                         : PendingIntent.FLAG_UPDATE_CURRENT)
         );
 
-        NotificationCompat.Action a10 =
-                StudyNotificationActionReceiver.buildAction(ctx, id, title, body,
-                        "com.learning.manager.NOTIF_SNOOZE_10", "10分钟后", 30000 + id);
-        NotificationCompat.Action a30 =
-                StudyNotificationActionReceiver.buildAction(ctx, id, title, body,
-                        "com.learning.manager.NOTIF_SNOOZE_30", "30分钟后", 40000 + id);
-        NotificationCompat.Action aIgnore =
-                StudyNotificationActionReceiver.buildAction(ctx, id, title, body,
-                        "com.learning.manager.NOTIF_IGNORE", "忽略", 50000 + id);
+        // 开始 / 换一个：Activity intent（打开 App）
+        NotificationCompat.Action aStart =
+                StudyNotificationActionReceiver.buildActivityAction(ctx, id, taskId,
+                        "start", "开始", 30000 + id);
+        NotificationCompat.Action aReroll =
+                StudyNotificationActionReceiver.buildActivityAction(ctx, id, taskId,
+                        "reroll", "换一个", 40000 + id);
+        // 取消：广播，不打开 App
+        NotificationCompat.Action aCancel =
+                StudyNotificationActionReceiver.buildBroadcastAction(ctx, id, title, body, taskId,
+                        "com.learning.manager.NOTIF_CANCEL", "取消", 50000 + id);
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, StudyNotificationActionReceiver.CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
@@ -159,9 +229,9 @@ public class StudyNotificationPlugin extends Plugin {
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setAutoCancel(true)
                 .setContentIntent(contentPi)
-                .addAction(a10)
-                .addAction(a30)
-                .addAction(aIgnore);
+                .addAction(aStart)
+                .addAction(aReroll)
+                .addAction(aCancel);
         try { NotificationManagerCompat.from(ctx).notify(id, b.build()); }
         catch (Throwable ignored) {}
     }

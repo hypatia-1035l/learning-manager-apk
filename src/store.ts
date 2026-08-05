@@ -23,6 +23,9 @@ import {
 
 const STORAGE_KEY = 'learning-manager:data:v1'
 
+// 学习记录滚动上限：超出后截断最旧记录，避免 localStorage 长期无限增长
+const MAX_STUDY_RECORDS = 2000
+
 // ---------- 基础工具 ----------
 const uid = (): string =>
   (typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -145,7 +148,6 @@ export function createTask(input: {
     icon: input.icon,
     status: 'not_started',
     enabled: true,
-    randomEnabled: true,
     weight: 1,
     group,
     currentObjectId: items[0]?.id ?? null,
@@ -176,11 +178,6 @@ export function deleteTask(id: string) {
 
 export function setTaskEnabled(id: string, enabled: boolean) {
   updateTask(id, { enabled })
-}
-
-// 是否参与随机选择
-export function setTaskRandomEnabled(id: string, randomEnabled: boolean) {
-  updateTask(id, { randomEnabled })
 }
 
 // 随机权重（加权随机预留）
@@ -621,7 +618,12 @@ export function finishStudySession(args: {
         updatedAt: Date.now(),
       }
     })
-    return { ...prev, tasks, records: [record, ...prev.records] }
+    const nextRecords = [record, ...prev.records]
+    // 滚动上限：超出截断最旧记录，避免 localStorage 无限增长
+    if (nextRecords.length > MAX_STUDY_RECORDS) {
+      nextRecords.length = MAX_STUDY_RECORDS
+    }
+    return { ...prev, tasks, records: nextRecords }
   })
 }
 
@@ -635,6 +637,26 @@ export function updateStudyRecordNote(recordId: string, note: string | undefined
         r.id === recordId ? { ...r, note: finalNote } : r,
       ),
     }
+  })
+}
+
+// 删除单条学习记录（并重算关联方向的累计时长，保持 totalStudyTime 一致）
+export function deleteStudyRecord(recordId: string) {
+  setState((prev) => {
+    const target = prev.records.find((r) => r.id === recordId)
+    if (!target) return prev
+    const records = prev.records.filter((r) => r.id !== recordId)
+    const tasks = prev.tasks.map((t) =>
+      t.id === target.taskId
+        ? {
+            ...t,
+            totalStudyTime: records
+              .filter((r) => r.taskId === t.id)
+              .reduce((s, r) => s + (r.duration || 0), 0),
+          }
+        : t,
+    )
+    return { ...prev, tasks, records }
   })
 }
 
@@ -707,6 +729,49 @@ export function getRecentRecords(
     .slice(0, limit)
 }
 
+// ---------- 统计：最近 N 天每日时长（含 0 天），从旧到新 ----------
+export function getDailyDurations(
+  records: StudyRecord[],
+  days = 30,
+): Array<{ date: number; duration: number }> {
+  const today = startOfToday()
+  const dayMs = 24 * 60 * 60 * 1000
+  const out: Array<{ date: number; duration: number }> = []
+  for (let i = days - 1; i >= 0; i--) {
+    const dayStart = today - i * dayMs
+    const dayEnd = dayStart + dayMs
+    const dur = records
+      .filter((r) => r.date >= dayStart && r.date < dayEnd)
+      .reduce((s, r) => s + (r.duration || 0), 0)
+    out.push({ date: dayStart, duration: dur })
+  }
+  return out
+}
+
+// ---------- 统计：连续学习天数（截至今天；今天无记录则从昨天起算） ----------
+export function getStreakDays(records: StudyRecord[]): number {
+  if (records.length === 0) return 0
+  const dayMs = 24 * 60 * 60 * 1000
+  const today = startOfToday()
+  const daySet = new Set<number>()
+  for (const r of records) {
+    const d = new Date(r.date)
+    d.setHours(0, 0, 0, 0)
+    daySet.add(d.getTime())
+  }
+  let streak = 0
+  let cursor = today
+  if (!daySet.has(cursor)) {
+    cursor -= dayMs
+    if (!daySet.has(cursor)) return 0
+  }
+  while (daySet.has(cursor)) {
+    streak++
+    cursor -= dayMs
+  }
+  return streak
+}
+
 // ---------- 任务选择系统 ----------
 
 // 判断任务是否存在可学习内容（有未完成且启用的学习对象）
@@ -720,7 +785,6 @@ export function getRandomPool(tasks: Task[]): Task[] {
   return tasks.filter(
     (t) =>
       t.enabled &&
-      t.randomEnabled &&
       t.status !== 'completed' &&
       t.status !== 'paused' &&
       t.weight > 0 &&
@@ -794,6 +858,42 @@ export function getReminderPool(
     }
     return true
   })
+}
+
+// 指定时间窗的提醒池：若窗口绑了独立 taskIds，则用窗口白名单；
+// 否则回退到全局白名单。每段窗口可"绑死"具体任务（仿闹钟）。
+export function getReminderPoolForWindow(
+  tasks: Task[],
+  reminder: ReminderConfig | undefined,
+  window: { taskIds?: string[] } | undefined,
+): Task[] {
+  if (!reminder) return []
+  const localIds = window?.taskIds
+  const useWindowWhitelist = localIds && localIds.length > 0
+  return tasks.filter((t) => {
+    if (!t.enabled) return false
+    if (useWindowWhitelist) {
+      return localIds!.includes(t.id)
+    }
+    if (
+      reminder.enabledTaskIds.length &&
+      !reminder.enabledTaskIds.includes(t.id)
+    ) {
+      return false
+    }
+    return true
+  })
+}
+
+// 窗口在某天是否生效：若窗口绑了独立 weekdays，则用窗口星期；否则用全局星期
+export function isWindowActiveOnWeekday(
+  window: { weekdays?: number[] } | undefined,
+  dow06: number,
+  globalWeekdays: number[],
+): boolean {
+  const wd = window?.weekdays
+  if (wd && wd.length > 0) return wd.includes(dow06)
+  return isWeekdayEnabled(dow06, globalWeekdays)
 }
 
 // ---------- 时间窗工具 ----------

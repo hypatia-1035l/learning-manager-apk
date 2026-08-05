@@ -111,7 +111,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
       {/* 模式选择 */}
       <div className="row" style={{ marginBottom: 14 }}>
         <label className="muted" style={{ fontSize: 13 }}>
-          接续模式：
+          接续：
         </label>
         <select
           className="select"
@@ -128,13 +128,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
             {GROUP_MODE_LABELS.weighted_random}
           </option>
         </select>
-        <span className="faint" style={{ fontSize: 12 }}>
-          {mode === 'sequential'
-            ? '完成当前序列后按列表顺序接续下一序列'
-            : mode === 'random'
-              ? '完成当前序列后从未完成序列中随机选一项'
-              : '完成当前序列后按权重从未完成序列中加权随机'}
-        </span>
       </div>
 
       {/* 添加 */}
@@ -145,7 +138,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
             style={{ flex: 1, minWidth: 120 }}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="添加学习序列，如：左传 / 资治通鉴 / 线条训练 / Blender 第12课"
+            placeholder="序列名"
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           />
           <button className="btn primary" onClick={handleAdd} disabled={!newName.trim()}>
@@ -158,51 +151,31 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
             style={{ flex: '1 1 140px', minWidth: 120 }}
             value={newUnit}
             onChange={(e) => setNewUnit(e.target.value)}
-            placeholder="进度单位，如：条/卷/集"
+            placeholder="单位，如：条/卷/集"
           />
           <input
             className="input"
             style={{ flex: '1 1 140px', minWidth: 120 }}
             value={newTarget}
             onChange={(e) => setNewTarget(e.target.value)}
-            placeholder="目标进度，如：1000"
+            placeholder="目标，如：1000"
           />
-        </div>
-        <div className="row wrap" style={{ gap: 8, marginTop: 6 }}>
-          <span className="faint" style={{ fontSize: 12, alignSelf: 'center' }}>持续时间：</span>
-          {[5, 15, 25, 45].map((m) => (
-            <button
-              key={m}
-              className={`btn sm ${newCountdown === String(m) ? 'primary' : ''}`}
-              onClick={() => setNewCountdown(newCountdown === String(m) ? '' : String(m))}
-            >
-              {m}分
-            </button>
-          ))}
           <input
             className="input"
             type="number"
             min={0}
-            style={{ width: 80 }}
+            style={{ width: 100 }}
             value={newCountdown}
             onChange={(e) => setNewCountdown(e.target.value)}
-            placeholder="自定义分钟"
+            placeholder="倒计时(分)"
           />
-          {newCountdown && (
-            <button className="btn sm ghost" onClick={() => setNewCountdown('')}>
-              清除
-            </button>
-          )}
         </div>
-        <span className="faint" style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
-          填写数字目标→数量型序列；留空→位置型序列（自由文本）。设持续时间→倒计时模式，到时自动结束。
-        </span>
       </div>
 
       {/* 列表 */}
       {items.length === 0 ? (
         <p className="faint" style={{ fontSize: 13, padding: '8px 0' }}>
-          尚未添加学习序列。添加后即可开始学习并自动接续。
+          尚无序列。
         </p>
       ) : (
         <div className="obj-list">
@@ -231,7 +204,7 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                         style={{ flex: 1, minWidth: 120 }}
                         value={editProg}
                         onChange={(e) => setEditProg(e.target.value)}
-                        placeholder="当前进度（数量型填数字，位置型填文本）"
+                        placeholder="当前进度"
                       />
                     </div>
                     <div className="row wrap" style={{ gap: 6 }}>
@@ -240,18 +213,18 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                         style={{ flex: '1 1 140px', minWidth: 120 }}
                         value={editUnit}
                         onChange={(e) => setEditUnit(e.target.value)}
-                        placeholder="进度单位，如：条/卷/集"
+                        placeholder="单位，如：条/卷/集"
                       />
                       <input
                         className="input"
                         style={{ flex: '1 1 140px', minWidth: 120 }}
                         value={editTarget}
                         onChange={(e) => setEditTarget(e.target.value)}
-                        placeholder="目标进度，如：1000"
+                        placeholder="目标，如：1000"
                       />
                     </div>
                     <div className="row wrap" style={{ gap: 6 }}>
-                      <span className="faint" style={{ fontSize: 12 }}>持续时间：</span>
+                      <span className="faint" style={{ fontSize: 12 }}>时长：</span>
                       {[5, 15, 25, 45].map((m) => (
                         <button
                           key={m}
@@ -268,24 +241,21 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                         style={{ width: 80 }}
                         value={editCountdown}
                         onChange={(e) => setEditCountdown(e.target.value)}
-                        placeholder="分钟（空=正向）"
+                        placeholder="分钟"
                       />
                     </div>
                     <div className="field" style={{ marginTop: 6 }}>
                       <label className="faint" style={{ fontSize: 12 }}>
-                        进度节点（可选，每行一个，格式：数字 名称）
+                        进度节点（每行 <code style={{ fontSize: 11 }}>数字 名称</code>）
                       </label>
                       <textarea
                         className="input"
                         rows={3}
                         value={editNodes}
                         onChange={(e) => setEditNodes(e.target.value)}
-                        placeholder={'如：\n0 隐公\n100 桓公\n200 庄公'}
+                        placeholder={'0 隐公\n100 桓公\n200 庄公'}
                         style={{ width: '100%', resize: 'vertical', fontSize: 13 }}
                       />
-                      <span className="faint" style={{ fontSize: 11 }}>
-                        到达该数字时进度后缀显示对应名称。可批量粘贴，也可逐行编辑。
-                      </span>
                     </div>
                     <div className="row" style={{ gap: 6, marginTop: 4 }}>
                       <button className="btn sm primary" onClick={saveEdit}>
@@ -305,7 +275,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                         type="number"
                         min={1}
                         value={item.weight}
-                        title="随机权重（越大越易被选中）"
                         onChange={(e) => {
                           const w = Math.max(1, Math.floor(Number(e.target.value) || 1))
                           updateLearningObject(task.id, item.id, { weight: w })
@@ -313,13 +282,12 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                         }}
                       />
                     )}
-                    <span className="prog" title={formatSequenceProgress(item)}>
+                    <span className="prog">
                       {item.completed ? '已完成' : formatSequenceProgress(item)}
                     </span>
                     <div className="ops">
                       <button
                         className="icon-btn"
-                        title="设为当前序列"
                         disabled={isCurrent}
                         onClick={() => {
                           setCurrentObject(task.id, item.id)
@@ -330,7 +298,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                       </button>
                       <button
                         className="icon-btn"
-                        title="上移"
                         onClick={() => {
                           moveLearningObject(task.id, item.id, 'up')
                           onTaskMutated()
@@ -340,7 +307,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                       </button>
                       <button
                         className="icon-btn"
-                        title="下移"
                         onClick={() => {
                           moveLearningObject(task.id, item.id, 'down')
                           onTaskMutated()
@@ -350,7 +316,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                       </button>
                       <button
                         className="icon-btn"
-                        title="编辑"
                         onClick={() => startEdit(item)}
                       >
                         编辑
@@ -358,7 +323,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                       {!item.completed && (
                       <label
                         className="icon-btn"
-                        title={item.enabled ? '参与接续/随机' : '暂停（不参与随机）'}
                         style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 2 }}
                       >
                         <input
@@ -376,7 +340,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                     {!item.completed && (
                       <button
                         className="icon-btn"
-                        title="标记完成并接续下一序列"
                         onClick={() => {
                           setCurrentObject(task.id, item.id)
                           completeCurrentObject(task.id)
@@ -388,9 +351,8 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                     )}
                       <button
                         className="icon-btn danger"
-                        title="删除"
                         onClick={() => {
-                          if (confirm(`删除序列「${item.name}」？`)) {
+                          if (confirm(`删除「${item.name}」？`)) {
                             deleteLearningObject(task.id, item.id)
                             onTaskMutated()
                           }
@@ -407,16 +369,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
         </div>
       )}
 
-      {items.length > 1 && (
-        <div className="flow-hint">
-          <span className="arrow">→</span>
-          {mode === 'sequential'
-            ? '顺序接续：完成当前序列后切换到下一未完成序列'
-            : mode === 'random'
-              ? '随机接续：完成当前序列后从未完成序列中等概率随机选一项'
-              : '加权随机：完成当前序列后按权重从未完成序列中加权随机选一项'}
-        </div>
-      )}
     </div>
   )
 }
