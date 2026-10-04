@@ -61,9 +61,11 @@ export function AppIcon({ packageName, appName, size = 32, className }: Props) {
       ref={ref}
       className={`app-icon${className ? ` ${className}` : ''}`}
       style={{ width: size, height: size }}
+      // 纯装饰：所有调用点都紧邻应用名文本，图标再报一次名字会重复播报
+      aria-hidden="true"
     >
       {url ? (
-        <img src={url} alt={appName} width={size} height={size} />
+        <img src={url} alt="" width={size} height={size} />
       ) : (
         <span
           className="app-icon-fb"

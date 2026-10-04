@@ -152,7 +152,12 @@ function persist() {
 }
 
 function setState(updater: (prev: AppData) => AppData) {
-  state = updater(state)
+  const next = updater(state)
+  // 更新函数可能原样返回 prev（去重写入、无变化的重排等）。这时既不该落盘、
+  // 也不该通知订阅者——否则每次无效操作都要把整个 AppData 全量 JSON.stringify
+  // 一遍（学习记录上限 2000 条），并触发全体组件重渲染。
+  if (next === state) return
+  state = next
   persist()
   listeners.forEach((l) => l())
 }

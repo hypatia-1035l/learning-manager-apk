@@ -223,6 +223,25 @@ const day2 = getAppData().plans.find((p) => p.date === today)
 assert(!day2.items.some((it) => it.pinned === true && it.taskId === 't1'), '取消固定后 pending 固定项被移除')
 `,
   },
+  {
+    name: '7-modal-focus-trap',
+    seed: {},
+    imports: `import { resolveTabTarget } from './components/Modal'`,
+    body: `
+const a = { focus() {} }
+const b = { focus() {} }
+const c = { focus() {} }
+const root = { focus() {}, contains: (el) => el === a || el === b || el === c }
+const items = [a, b, c]
+assert(resolveTabTarget(items, a, true, root) === c, 'Shift+Tab 在首元素 → 绕到末元素')
+assert(resolveTabTarget(items, c, false, root) === a, 'Tab 在末元素 → 绕回首元素')
+assert(resolveTabTarget(items, b, false, root) === null, 'Tab 在中间 → 交给浏览器默认行为')
+assert(resolveTabTarget(items, b, true, root) === null, 'Shift+Tab 在中间 → 交给浏览器默认行为')
+assert(resolveTabTarget(items, null, false, root) === a, '焦点在弹窗外 → 拉回首元素')
+assert(resolveTabTarget([], null, false, root) === root, '没有可聚焦元素 → 聚焦对话框容器')
+assert(resolveTabTarget([], a, true, root) === root, '没有可聚焦元素（Shift 方向）→ 聚焦对话框容器')
+`,
+  },
 ]
 
 const alias = {

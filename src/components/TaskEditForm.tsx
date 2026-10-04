@@ -70,6 +70,7 @@ export function TaskEditForm({ task, onClose }: Props) {
           <button
             type="button"
             className="app-chip-x"
+            aria-label={`从名单移除 ${appLabelOf(pool, pkg)}`}
             onClick={() =>
               kind === 'allow'
                 ? setAllowed(allowed.filter((p) => p !== pkg))
