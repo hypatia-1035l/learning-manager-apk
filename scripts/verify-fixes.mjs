@@ -242,6 +242,58 @@ assert(resolveTabTarget([], null, false, root) === root, '没有可聚焦元素 
 assert(resolveTabTarget([], a, true, root) === root, '没有可聚焦元素（Shift 方向）→ 聚焦对话框容器')
 `,
   },
+  {
+    name: '8-dst-day-buckets',
+    seed: {},
+    // 用美国东部时区跑：2026-03-08 02:00 起夏令时，当天只有 23 小时
+    env: { TZ: 'America/New_York' },
+    imports: `import { getDailyDurations, getStreakDays } from './store'`,
+    body: `
+// 把「现在」钉死在 2026-03-09（夏令时切换的次日），让分桶结果可复现
+const RealDate = Date
+const FIXED = new RealDate('2026-03-09T12:00:00')
+class FakeDate extends RealDate {
+  constructor(...args) {
+    if (args.length === 0) super(FIXED.getTime())
+    else super(...args)
+  }
+  static now() { return FIXED.getTime() }
+}
+globalThis.Date = FakeDate
+
+const at = (iso) => new RealDate(iso).getTime()
+const rec = (id, date, duration) => ({
+  id, taskId: 't', taskName: 'T', objectId: '', objectName: '',
+  date, duration, startProgress: '', endProgress: '',
+})
+// 本地 2026-03-08 00:30 EST（UTC-5）= 05:30Z；当天 02:00 进入夏令时
+const r308 = rec('a', at('2026-03-08T05:30:00Z'), 100)
+// 本地 2026-03-09 00:30 EDT（UTC-4）= 04:30Z
+const r309 = rec('b', at('2026-03-09T04:30:00Z'), 200)
+
+// 自检：旧实现「减固定 86400000」在该时区确实会产生非 0 点的桶边界。
+// 若哪天有人改回旧写法，下面这条会先失败，说明本用例是有效的判别器。
+const probe = new RealDate(FIXED.getTime())
+probe.setHours(0, 0, 0, 0)
+const oldStyleBoundary = probe.getTime() - 5 * 24 * 60 * 60 * 1000
+assert(
+  new RealDate(oldStyleBoundary).getHours() !== 0,
+  '自检：旧算法在跨夏令时窗口内确实错位（证明本用例能抓到该 bug）',
+)
+
+const days = getDailyDurations([r308, r309], 5)
+for (const d of days) {
+  const x = new RealDate(d.date)
+  assert(
+    x.getHours() === 0 && x.getMinutes() === 0,
+    '桶起点是本地 0 点（' + x.toString().slice(0, 24) + '）',
+  )
+}
+assert(days[days.length - 2].duration === 100, '3-08 00:30 的记录落在 3-08 桶（减固定毫秒的旧实现会落到 3-09）')
+assert(days[days.length - 1].duration === 200, '3-09 00:30 的记录落在 3-09 桶')
+assert(getStreakDays([r308, r309]) === 2, '跨夏令时的连续两天仍算 2 天（旧实现会算成 1 天）')
+`,
+  },
 ]
 
 const alias = {
@@ -279,7 +331,7 @@ for (const s of scenarios) {
 
   console.log(`--- ${s.name} ---`)
   const r = spawnSync(process.execPath, [outFile], {
-    env: { ...process.env, LM_SEED: JSON.stringify(s.seed) },
+    env: { ...process.env, ...(s.env || {}), LM_SEED: JSON.stringify(s.seed) },
     stdio: 'inherit',
   })
   if (r.status !== 0) failed++

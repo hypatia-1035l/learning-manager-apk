@@ -23,8 +23,11 @@ import {
 // 99 用作测试提醒 ID
 export const NOTIF_ID_BASE = 1
 export const NOTIF_ID_TEST = 99
-export const NOTIF_ID_MAX = 120
-// 回归提醒专用 ID：独立于计划项 1–120，避免互相取消干扰
+// 计划项 id 预算：1 .. NOTIF_ID_MAX-1，超出会被静默丢弃。
+// 需要覆盖「排程天数 × (每日方向数 + 固定任务数)」：7 × (12 + 若干固定)。
+// 原先 120 在固定任务较多时不够用，放宽到 240，仍与 1000 / 2001 / 3001 保持距离。
+export const NOTIF_ID_MAX = 240
+// 回归提醒专用 ID：独立于计划项 1–239，避免互相取消干扰
 export const NOTIF_ID_REENGAGE = 1000
 // 「下一项」常驻通知 ID：固定在通知栏显示接下来最近的一条计划，独立于计划项与回归提醒
 export const NOTIF_ID_NEXT = 2001
@@ -268,6 +271,10 @@ export async function scheduleReminders(): Promise<void> {
   await cancelAllReminders()
   await ensureNotificationActionsRegistered()
   await ensureChannelsNative()
+  // 回归提醒：无论开关都同步一次——开启时续命，关闭时撤销。
+  // 必须放在下面的早返回之前，否则「关掉提醒」会留下一条已排好的回归提醒，
+  // 几天后照样弹「该回来摸鱼了」。
+  await scheduleReengageNudge()
   if (!shouldNotify) {
     await cancelNextTaskNotification()
     return
@@ -352,8 +359,7 @@ export async function scheduleReminders(): Promise<void> {
       const day = plans.find((p) => p.date === ds)
       if (day) for (const it of day.items) pushItem(day, it)
     }
-    // 回归提醒：与计划排程同步续命（每次调度都刷新 lastActive 并把提醒往后推 N 天）
-    await scheduleReengageNudge()
+    // 回归提醒已在上方统一处理
   }
 
   if (notifications.length === 0) {

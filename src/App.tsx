@@ -11,7 +11,6 @@ import { useAppData, pickRandomTask, carryOverManualPlanItems, dateKey, ensurePl
 import { setCanExitAppNative } from './backNavigation'
 import {
   scheduleReminders,
-  scheduleReengageNudge,
   onNotificationClick,
   registerSessionEndCallback,
   endSessionAndReschedule,
@@ -52,15 +51,20 @@ export default function App() {
     : null
   const studyTimerCheckedRef = useRef(false)
 
-  // 首次启动：直接请求通知权限（Android 13+ 需运行时申请）
+  // 首次启动：直接请求通知权限（Android 13+ 需运行时申请）。
+  // 只有真的拿到授权才记「已询问」：否则用户误点一次「不允许」，
+  // 这一栏就永久沉默——之后既不再询问，也没有任何补救入口。
+  // 被拒时下次启动会再试一次；系统第二次拒绝后不再弹窗，调用本身是空操作。
   useEffect(() => {
     try {
-      const requested = localStorage.getItem(PERM_REQUESTED_KEY)
-      if (!requested) {
-        requestNotificationPermission().finally(() => {
-          localStorage.setItem(PERM_REQUESTED_KEY, '1')
+      if (localStorage.getItem(PERM_REQUESTED_KEY)) return
+      requestNotificationPermission()
+        .then((granted) => {
+          if (granted) localStorage.setItem(PERM_REQUESTED_KEY, '1')
         })
-      }
+        .catch(() => {
+          /* ignore */
+        })
     } catch {
       /* ignore */
     }
@@ -93,9 +97,9 @@ export default function App() {
         localStorage.setItem(key, String(Date.now()))
       } catch { /* ignore */ }
       if (data.reminder?.enabled) {
+        // 会话结束 = 最近活跃：进冷却 + 重排剩余计划 + 回归提醒续命，
+        // 这三件事 endSessionAndReschedule 内部都会做
         endSessionAndReschedule().catch(() => {})
-        // 会话结束 = 最近活跃，回归提醒续命
-        scheduleReengageNudge().catch(() => {})
       }
     })
     return off
@@ -113,9 +117,8 @@ export default function App() {
       } catch {
         /* ignore */
       }
+      // 计划排程 + 回归提醒续命/撤销，统一由 scheduleReminders 内部处理
       scheduleReminders().catch(() => {})
-      // 回归提醒：每次打开/切回前台都续命（不受每日守卫限制，日常打开永不触发）
-      scheduleReengageNudge().catch(() => {})
     }
 
     // 启动时检查

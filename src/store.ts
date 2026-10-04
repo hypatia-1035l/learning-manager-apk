@@ -870,8 +870,17 @@ export function getRecordsByTask(records: StudyRecord[], taskId: string) {
 
 // 获取今天 0 点时间戳（本地时区）
 function startOfToday(): number {
+  return startOfDayOffset(0)
+}
+
+// 获取「N 天前」的本地 0 点时间戳。
+// 用 setDate 做日期运算、而不是减 86400000：夏令时切换那天只有 23/25 小时，
+// 固定毫秒步进会让边界整体偏移一小时，0 点附近的记录会落进相邻那天。
+// daysAgo 允许为负（取未来某天 0 点），用于算当天桶的开区间上界。
+function startOfDayOffset(daysAgo: number): number {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - daysAgo)
   return d.getTime()
 }
 
@@ -937,12 +946,11 @@ export function getDailyDurations(
   records: StudyRecord[],
   days = 30,
 ): Array<{ date: number; duration: number }> {
-  const today = startOfToday()
-  const dayMs = 24 * 60 * 60 * 1000
   const out: Array<{ date: number; duration: number }> = []
   for (let i = days - 1; i >= 0; i--) {
-    const dayStart = today - i * dayMs
-    const dayEnd = dayStart + dayMs
+    // 桶边界取「本地 0 点」，跨夏令时切换也保持对齐
+    const dayStart = startOfDayOffset(i)
+    const dayEnd = startOfDayOffset(i - 1)
     const dur = records
       .filter((r) => r.date >= dayStart && r.date < dayEnd)
       .reduce((s, r) => s + (r.duration || 0), 0)
@@ -954,23 +962,22 @@ export function getDailyDurations(
 // ---------- 统计：连续学习天数（截至今天；今天无记录则从昨天起算） ----------
 export function getStreakDays(records: StudyRecord[]): number {
   if (records.length === 0) return 0
-  const dayMs = 24 * 60 * 60 * 1000
-  const today = startOfToday()
   const daySet = new Set<number>()
   for (const r of records) {
     const d = new Date(r.date)
     d.setHours(0, 0, 0, 0)
     daySet.add(d.getTime())
   }
+  // 同样按本地日期回退，避免夏令时那天把连续记录误判成断档
   let streak = 0
-  let cursor = today
-  if (!daySet.has(cursor)) {
-    cursor -= dayMs
-    if (!daySet.has(cursor)) return 0
+  let offset = 0
+  if (!daySet.has(startOfDayOffset(0))) {
+    if (!daySet.has(startOfDayOffset(1))) return 0
+    offset = 1
   }
-  while (daySet.has(cursor)) {
+  while (daySet.has(startOfDayOffset(offset))) {
     streak++
-    cursor -= dayMs
+    offset++
   }
   return streak
 }
