@@ -336,12 +336,6 @@ export function setTaskEnabled(id: string, enabled: boolean) {
   updateTask(id, { enabled })
 }
 
-// 随机权重（加权随机预留）
-export function setTaskWeight(id: string, weight: number) {
-  const w = Math.max(0, Math.floor(weight || 0))
-  updateTask(id, { weight: w })
-}
-
 // 手动调整方向顺序：上移 / 下移，并重排权重（自上而下权重递减，顺序即权重）
 export function reorderTask(id: string, dir: 'up' | 'down') {
   setState((prev) => {

@@ -137,7 +137,7 @@ export function TaskDetail({ taskId, onBack, autoStartSession = false }: Props) 
       </div>
 
       {tab === 'group' ? (
-        <TaskGroupEditor task={task} onTaskMutated={() => {}} />
+        <TaskGroupEditor task={task} />
       ) : (
         <StudyRecords taskId={task.id} totalTime={task.totalStudyTime} />
       )}
@@ -157,11 +157,7 @@ export function TaskDetail({ taskId, onBack, autoStartSession = false }: Props) 
       )}
 
       {sessionOpen && (
-        <LearningSession
-          task={task}
-          onClose={() => setSessionOpen(false)}
-          onTaskMutated={() => {}}
-        />
+        <LearningSession task={task} onClose={() => setSessionOpen(false)} />
       )}
 
       {editing && <TaskEditForm task={task} onClose={() => setEditing(false)} />}

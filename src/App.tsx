@@ -42,9 +42,14 @@ export default function App() {
   const [todosTab, setTodosTab] = useState<'plan' | 'tasks'>('plan')
   // 子页面视图：null 时显示工作区主导航 + 当前 tab 内容
   const [view, setView] = useState<View | null>(null)
-  // 通知动作「开始/换一个」直接进入的全屏计时会话
-  const [sessionTask, setSessionTask] = useState<Task | null>(null)
+  // 通知动作「开始/换一个」直接进入的全屏计时会话。
+  // 只存 id、每次渲染从 store 取最新任务：若直接存 Task 快照，会话里
+  // 「完成当前序列」后本组件拿到的仍是旧对象，界面与常驻通知都会停在旧序列上。
+  const [sessionTaskId, setSessionTaskId] = useState<string | null>(null)
   const data = useAppData()
+  const sessionTask = sessionTaskId
+    ? data.tasks.find((t) => t.id === sessionTaskId) ?? null
+    : null
   const studyTimerCheckedRef = useRef(false)
 
   // 首次启动：直接请求通知权限（Android 13+ 需运行时申请）
@@ -226,7 +231,7 @@ export default function App() {
       target = pickRandomTask(data.tasks)
     }
     if (target) {
-      setSessionTask(target)
+      setSessionTaskId(target.id)
     } else {
       setTab('todos')
       setView(null)
@@ -244,9 +249,9 @@ export default function App() {
   //   - 子页面或有计时会话 → false，原生层不得 moveTaskToBack
   //   - 顶层 Tab            → true，原生层可把 App 退到桌面
   useEffect(() => {
-    const canExitApp = !view && !sessionTask
+    const canExitApp = !view && !sessionTaskId
     setCanExitAppNative(canExitApp).catch(() => { /* ignore */ })
-  }, [view, sessionTask])
+  }, [view, sessionTaskId])
 
   // 监听系统返回键/边缘滑动返回（Android 手势导航）：
   //   有子页面（任务详情/提醒设置/备份）或弹窗时先回上一层，不直接退出应用
@@ -265,7 +270,7 @@ export default function App() {
           }
           // 计时会话中：返回交给页面内的按钮，系统返回不响应
           // （原生侧此时同样禁用了 moveTaskToBack，返回键不会退桌面）
-          if (sessionTask) return
+          if (sessionTaskId) return
           // 到了顶层 Tab：交给原生 finish / moveTaskToBack
           if (!canGoBack) {
             CapApp.exitApp().catch(() => { /* ignore */ })
@@ -281,7 +286,7 @@ export default function App() {
       cancelled = true
       if (listener) listener.remove().catch(() => {})
     }
-  }, [view, sessionTask])
+  }, [view, sessionTaskId])
 
   // ===== 子页面（全屏，叠加在工作区之上）=====
   if (view) {
@@ -325,7 +330,7 @@ export default function App() {
               setView({ name: 'task', taskId: task.id, autoStartSession: autoStart })
             }
             onStartSession={(task: Task) => {
-              setSessionTask(task)
+              setSessionTaskId(task.id)
             }}
           />
         )}
@@ -372,11 +377,7 @@ export default function App() {
       </nav>
 
       {sessionTask && (
-        <LearningSession
-          task={sessionTask}
-          onClose={() => setSessionTask(null)}
-          onTaskMutated={() => {}}
-        />
+        <LearningSession task={sessionTask} onClose={() => setSessionTaskId(null)} />
       )}
     </div>
   )

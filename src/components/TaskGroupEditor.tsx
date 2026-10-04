@@ -19,10 +19,9 @@ import { ConfirmModal } from './ConfirmModal'
 
 interface Props {
   task: Task
-  onTaskMutated: () => void
 }
 
-export function TaskGroupEditor({ task, onTaskMutated }: Props) {
+export function TaskGroupEditor({ task }: Props) {
   const [newName, setNewName] = useState('')
   const [newUnit, setNewUnit] = useState('')
   const [newTarget, setNewTarget] = useState('')
@@ -61,7 +60,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
     setNewUnit('')
     setNewTarget('')
     setNewCountdown('')
-    onTaskMutated()
     nameRef.current?.focus()
   }
 
@@ -85,7 +83,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
     }
     setBatchInput('')
     setBatchMsg(`已添加 ${lines.length} 条序列`)
-    onTaskMutated()
     nameRef.current?.focus()
   }
 
@@ -110,7 +107,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
       progressNodes: editNodesArr.length > 0 ? editNodesArr : undefined,
     })
     setEditingId(null)
-    onTaskMutated()
   }
 
   return (
@@ -131,7 +127,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
           value={mode}
           onChange={(e) => {
             setGroupMode(task.id, e.target.value as GroupMode)
-            onTaskMutated()
           }}
         >
           <option value="sequential">{GROUP_MODE_LABELS.sequential}</option>
@@ -358,7 +353,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                           disabled={isCurrent}
                           onClick={() => {
                             setCurrentObject(task.id, item.id)
-                            onTaskMutated()
                           }}
                         >
                           设为当前
@@ -388,7 +382,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                             className="icon-btn"
                             onClick={() => {
                               moveLearningObject(task.id, item.id, 'up')
-                              onTaskMutated()
                             }}
                           >
                             上移
@@ -397,7 +390,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                             className="icon-btn"
                             onClick={() => {
                               moveLearningObject(task.id, item.id, 'down')
-                              onTaskMutated()
                             }}
                           >
                             下移
@@ -412,7 +404,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                                 checked={item.enabled}
                                 onChange={(e) => {
                                   updateLearningObject(task.id, item.id, { enabled: e.target.checked })
-                                  onTaskMutated()
                                 }}
                                 style={{ margin: 0 }}
                               />
@@ -425,7 +416,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
                               onClick={() => {
                                 setCurrentObject(task.id, item.id)
                                 completeCurrentObject(task.id)
-                                onTaskMutated()
                                 setMoreOpenId(null)
                               }}
                             >
@@ -456,7 +446,6 @@ export function TaskGroupEditor({ task, onTaskMutated }: Props) {
           confirmText="删除"
           onConfirm={() => {
             deleteLearningObject(task.id, deletingItemId)
-            onTaskMutated()
           }}
           onCancel={() => setDeletingItemId(null)}
         />

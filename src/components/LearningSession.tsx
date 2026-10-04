@@ -63,11 +63,9 @@ function nodeLabelOf(o: LearningObject | undefined | null): string | undefined {
 interface Props {
   task: Task
   onClose: () => void
-  // 当学习对象因「完成」而切换时，通知父组件刷新 task 引用
-  onTaskMutated: () => void
 }
 
-export function LearningSession({ task, onClose, onTaskMutated }: Props) {
+export function LearningSession({ task, onClose }: Props) {
   // 累积时长（秒）：跨「计时→结束→继续」多次切换保留
   const accumulatedRef = useRef(0)
   // 当前计时阶段开始的时刻
@@ -321,14 +319,12 @@ export function LearningSession({ task, onClose, onTaskMutated }: Props) {
     } finally {
       // 无论保存结果如何，保存完成后必退出计时页
       clearPausedState()
-      onTaskMutated()
       onClose()
     }
   }
 
   const doCompleteObject = () => {
     completeCurrentObject(task.id)
-    onTaskMutated()
     // 完成后任务对象切换，同步新对象名到常驻通知
     const newObj = getCurrentObject(task)
     updateStudyTimer(task.name, newObj?.name ?? '', accumulatedRef.current, nodeLabelOf(newObj))
