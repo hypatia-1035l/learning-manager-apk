@@ -7,6 +7,7 @@ import {
   importBackup,
 } from '../dataBackup'
 import type { BackupFile } from '../dataBackup'
+import { useSwipeBack } from '../useSwipeBack'
 
 interface Props {
   onBack: () => void
@@ -14,16 +15,16 @@ interface Props {
 
 // localStorage key → 友好名称
 const KEY_LABELS: Record<string, string> = {
-  'learning-manager:data:v1': '学习数据（任务/学习序列/学习记录/提醒设置）',
+  'learning-manager:data:v1': '应用数据（任务/序列/记录/提醒设置）',
   'learning-manager:random-toolbox:v1': '随机工具箱（数字范围/词库/预设/随机记录）',
   'learning-manager:random-seeded:v1': '内置词库填充标记',
   'learning-manager:schema-version': '数据结构版本',
   'learning-manager:notif-perm-requested': '通知权限请求标记',
   'learning-manager:last-scheduled-date': '上次提醒调度日期',
   'learning-manager:cooldown-until': '提醒冷却时间',
-  'learning-manager:session-active': '学习会话活跃标记',
+  'learning-manager:session-active': '会话活跃标记',
   'learning-manager:wb-display-mode': '词库显示模式',
-  'learning-manager:paused-task': '暂停的学习会话',
+  'learning-manager:paused-task': '暂停的计时会话',
   'learning-manager:paused-elapsed': '暂停会话的已用时长',
 }
 
@@ -38,13 +39,17 @@ export function DataBackup({ onBack }: Props) {
   const [validating, setValidating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleExport = () => {
+  // 右滑返回设置页
+  useSwipeBack(onBack)
+
+  const handleExport = async () => {
+    setMsg('')
+    setError('')
     try {
-      downloadBackup()
-      setMsg('已导出，请到下载目录查找 .json 文件')
-      setError('')
+      const where = await downloadBackup()
+      setMsg(where)
     } catch {
-      setError('导出失败')
+      setError('导出失败，请重试')
     }
   }
 
@@ -69,7 +74,17 @@ export function DataBackup({ onBack }: Props) {
       const text = await readFileAsText(file)
       const backup = parseBackup(text)
       if (!backup) {
-        setError('文件格式不正确，无法识别为备份文件')
+        // 若是词库导入文件，直接指出正确入口，避免用户在两个入口间来回试
+        let hint = '文件格式不正确，无法识别为备份文件'
+        try {
+          const obj = JSON.parse(text)
+          if (obj && Array.isArray(obj.banks)) {
+            hint = '这是「词库」文件，不能用备份导入。请到「工具 → 词库 → 导入」里选择它。'
+          }
+        } catch {
+          /* ignore */
+        }
+        setError(hint)
         setValidating(false)
         return
       }
@@ -117,12 +132,12 @@ export function DataBackup({ onBack }: Props) {
           将以下数据打包为 JSON 文件下载：
         </p>
         <ul className="muted" style={{ fontSize: 13, marginBottom: 14, paddingLeft: 20 }}>
-          <li>学习数据（任务、学习序列、学习记录、提醒设置）</li>
+          <li>应用数据（任务、序列、记录、提醒设置）</li>
           <li>随机工具箱（数字范围、词库、预设、随机记录）</li>
           <li>数据结构版本与界面偏好标记</li>
         </ul>
         <p className="faint" style={{ fontSize: 12, marginBottom: 14 }}>
-          注：备份仅含用户数据，不包含运行时状态（如暂停的学习会话、提醒冷却/调度标记），导入后这些状态会按新环境重新生成。
+          注：备份仅含用户数据，不包含运行时状态（如暂停的计时会话、提醒冷却/调度标记），导入后这些状态会按新环境重新生成。
         </p>
         <button className="btn primary" onClick={handleExport}>
           导出全部数据

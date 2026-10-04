@@ -28,14 +28,20 @@ function loadDisplayMode(): DisplayMode {
   return 'inline'
 }
 
-// "不连抽"偏好持久化 key
-const NO_REPEAT_KEY = 'learning-manager:wb-no-repeat'
-function loadNoRepeat(): boolean {
+// 排除模式持久化 key：off=不排除；norepeat=不连抽（排除上一次抽到的词）；noreturn=不放回（抽出即排除）
+const EXCLUDE_MODE_KEY = 'learning-manager:wb-exclude-mode'
+type ExcludeMode = 'off' | 'norepeat' | 'noreturn'
+
+function loadExcludeMode(): ExcludeMode {
   try {
-    return localStorage.getItem(NO_REPEAT_KEY) === '1'
+    const v = localStorage.getItem(EXCLUDE_MODE_KEY)
+    if (v === 'off' || v === 'norepeat' || v === 'noreturn') return v
+    // 旧偏好迁移：不连抽开关
+    if (localStorage.getItem('learning-manager:wb-no-repeat') === '1') return 'norepeat'
   } catch {
-    return false
+    /* ignore */
   }
+  return 'off'
 }
 
 interface Props {
@@ -90,18 +96,17 @@ export function WordBankRandomizer({ selectedIds, onSelectChange }: Props) {
         {selectedBanks.length === 0 ? (
           <div>
             <div className="section-title">随机抽取</div>
-            <p className="faint" style={{ fontSize: 13 }}>
-              先从下方选择词库参与随机。选 1 个为单抽，选多个为组合随机。
-            </p>
             {/* 保存预设入口 */}
-            <div className="row" style={{ gap: 6, marginTop: 12 }}>
-              <input
-                className="input"
-                style={{ flex: 1 }}
-                placeholder="选中词库后，输入预设名保存"
-                value={presetName}
-                onChange={(e) => setPresetName(e.target.value)}
-              />
+            <div className="row wrap" style={{ gap: 8, marginTop: 12, alignItems: 'flex-end' }}>
+              <div className="field" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
+                <label>预设名</label>
+                <input
+                  className="input"
+                  style={{ flex: 1 }}
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                />
+              </div>
               <button
                 className="btn"
                 onClick={handleSavePreset}
@@ -267,41 +272,69 @@ function RandomPanel({
   const [copied, setCopied] = useState(false)
   const allHasItems = banks.every((b) => b.words.length > 0)
 
-  // "不连抽"：排除上一次抽到的词（偏好持久化）
-  const [noRepeat, setNoRepeat] = useState<boolean>(loadNoRepeat())
-  const toggleNoRepeat = () => {
-    const next = !noRepeat
-    setNoRepeat(next)
+  // 排除模式：off=不排除；norepeat=不连抽；noreturn=不放回（抽出即排除，抽完需重置）
+  const [mode, setMode] = useState<ExcludeMode>(loadExcludeMode)
+  // 不放回模式的会话级排除集合（按词库，内存态不落盘）
+  const [excluded, setExcluded] = useState<Map<string, Set<string>>>(new Map())
+
+  const setModeAndClear = (m: ExcludeMode) => {
+    setMode(m)
+    clearLastPickedWordIds()
+    setExcluded(new Map())
     try {
-      localStorage.setItem(NO_REPEAT_KEY, next ? '1' : '0')
+      localStorage.setItem(EXCLUDE_MODE_KEY, m)
     } catch {
       /* ignore */
     }
-    if (!next) clearLastPickedWordIds()
   }
+
+  const resetExcluded = () => setExcluded(new Map())
+
+  // 不放回：已抽 / 总数
+  const totalWords = banks.reduce((s, b) => s + b.words.length, 0)
+  const drawnWords = banks.reduce((s, b) => s + (excluded.get(b.id)?.size ?? 0), 0)
+  const exhausted = mode === 'noreturn' && totalWords > 0 && drawnWords >= totalWords
 
   const handleDraw = () => {
     const picks: { bankId: string; bankName: string; text: string }[][] = []
-    // 本次抽取内已排除的词条：排除上一次抽到的 + 本批次已抽到的
+    // 不连抽：排除上一次抽到的 + 本批次已抽到的
     const batchExcluded = new Map<string, Set<string>>()
-    if (noRepeat) {
+    if (mode === 'norepeat') {
       for (const b of banks) {
         const last = getLastPickedWordId(b.id)
         if (last) batchExcluded.set(b.id, new Set([last]))
       }
     }
+    // 不放回：本批新增的排除（结束一次写入）
+    const newExcluded = new Map(excluded)
     for (let i = 0; i < drawCount; i++) {
       const row = banks.map((b) => {
-        const excl = noRepeat ? batchExcluded.get(b.id) : undefined
-        const pick = pickWeighted(b.words, excl)
-        if (noRepeat && pick) {
-          let s = batchExcluded.get(b.id)
-          if (!s) {
-            s = new Set()
-            batchExcluded.set(b.id, s)
+        let pick: { id: string; text: string } | null = null
+        if (mode === 'noreturn') {
+          const excl = newExcluded.get(b.id)
+          const remaining = b.words.filter((w) => !excl?.has(w.id))
+          if (remaining.length > 0) pick = pickWeighted(b.words, excl)
+        } else {
+          const excl = mode === 'norepeat' ? batchExcluded.get(b.id) : undefined
+          pick = pickWeighted(b.words, excl)
+        }
+        if (pick) {
+          if (mode === 'norepeat') {
+            let s = batchExcluded.get(b.id)
+            if (!s) {
+              s = new Set()
+              batchExcluded.set(b.id, s)
+            }
+            s.add(pick.id)
+            setLastPickedWordId(b.id, pick.id)
+          } else if (mode === 'noreturn') {
+            let s = newExcluded.get(b.id)
+            if (!s) {
+              s = new Set()
+              newExcluded.set(b.id, s)
+            }
+            s.add(pick.id)
           }
-          s.add(pick.id)
-          setLastPickedWordId(b.id, pick.id)
         }
         return {
           bankId: b.id,
@@ -311,6 +344,7 @@ function RandomPanel({
       })
       picks.push(row)
     }
+    if (mode === 'noreturn') setExcluded(newExcluded)
     setResults(picks)
     // 写入随机记录：按当前显示模式决定输出格式
     const bankNames = banks.map((b) => b.name).join(separator)
@@ -426,12 +460,47 @@ function RandomPanel({
         </>
       )}
 
-      {/* 不连抽开关 */}
-      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-        <label className="row" style={{ gap: 6, fontSize: 13, cursor: 'pointer' }}>
-          <input type="checkbox" checked={noRepeat} onChange={toggleNoRepeat} />
-          不连抽（排除上一次抽到的词）
-        </label>
+      {/* 排除模式 */}
+      <div className="row wrap" style={{ gap: 6, alignItems: 'center' }}>
+        <span className="muted" style={{ fontSize: 13 }}>排除：</span>
+        {(
+          [
+            ['off', '无'],
+            ['norepeat', '不连抽'],
+            ['noreturn', '不放回'],
+          ] as Array<[ExcludeMode, string]>
+        ).map(([m, label]) => (
+          <button
+            key={m}
+            type="button"
+            className={`btn sm ${mode === m ? 'primary' : ''}`}
+            title={
+              m === 'norepeat'
+                ? '排除上一次抽到的词'
+                : m === 'noreturn'
+                  ? '抽出即排除，抽完需重置'
+                  : undefined
+            }
+            onClick={() => setModeAndClear(m)}
+          >
+            {label}
+          </button>
+        ))}
+        {mode === 'noreturn' && (
+          <>
+            <span className="faint" style={{ fontSize: 12 }}>
+              已抽 {drawnWords}/{totalWords}
+            </span>
+            <button
+              type="button"
+              className="btn sm"
+              onClick={resetExcluded}
+              disabled={drawnWords === 0}
+            >
+              重置
+            </button>
+          </>
+        )}
       </div>
 
       {/* 单次抽取数量 */}
@@ -506,20 +575,23 @@ function RandomPanel({
       <button
         className="btn primary lg"
         onClick={handleDraw}
-        disabled={!allHasItems}
+        disabled={!allHasItems || exhausted}
+        title={exhausted ? '词库已抽完，点「重置」后再抽' : undefined}
       >
         {isSingle ? '随机抽取' : '组合随机'} ×{drawCount}
       </button>
 
       {/* 保存预设入口 */}
-      <div className="row" style={{ gap: 6 }}>
-        <input
-          className="input"
-          style={{ flex: 1 }}
-          placeholder="输入预设名保存当前组合，如：插画灵感"
-          value={presetName}
-          onChange={(e) => onPresetNameChange(e.target.value)}
-        />
+      <div className="row wrap" style={{ gap: 8, alignItems: 'flex-end' }}>
+        <div className="field" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
+          <label>预设名</label>
+          <input
+            className="input"
+            style={{ flex: 1 }}
+            value={presetName}
+            onChange={(e) => onPresetNameChange(e.target.value)}
+          />
+        </div>
         <button
           className="btn"
           onClick={onSavePreset}

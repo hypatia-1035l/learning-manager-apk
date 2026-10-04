@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import type { Task } from '../types'
 import {
   getCurrentObject,
@@ -28,14 +29,13 @@ export function ReminderActionModal({ task, cooldownMinutes, randomPoolSize, onS
     onClose()
   }
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={handleCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>该摸一条鱼了</h3>
 
         <div className="reminder-action-card">
           <div className="rac-head">
-            <span className="rac-icon">{task.icon}</span>
             <div>
               <div className="rac-name">{task.name}</div>
               {obj && <div className="rac-seq">{obj.name}</div>}
@@ -62,6 +62,7 @@ export function ReminderActionModal({ task, cooldownMinutes, randomPoolSize, onS
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

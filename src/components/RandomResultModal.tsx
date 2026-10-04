@@ -26,13 +26,12 @@ export function RandomResultModal({
   return (
     <Modal title="随机结果" onClose={onClose}>
       <div className="random-result">
-        <div className="rr-icon">{task.icon}</div>
         <div className="rr-name">{task.name}</div>
 
         <div className="rr-block">
           <div className="label">当前序列</div>
           <div className="obj">
-            {obj ? obj.name : '（尚未设置学习序列）'}
+            {obj ? obj.name : '（未设置序列）'}
           </div>
         </div>
 
@@ -61,13 +60,13 @@ export function RandomResultModal({
             <button
               className="btn primary"
               onClick={onStart}
-              title="进入正向计时学习"
+              title="进入计时"
             >
-              开始学习
+              开始
             </button>
           ) : (
             <button className="btn primary" onClick={onOpenTask}>
-              去添加学习序列
+              去添加序列
             </button>
           )}
         </div>

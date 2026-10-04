@@ -6,13 +6,14 @@ import {
 } from '../../randomStore'
 import type { WordBank } from '../../randomTypes'
 
-type Filter = 'all' | 'number' | 'wordbank'
+type Filter = 'all' | 'number' | 'wordbank' | 'color'
 type DateFilter = 'all' | 'today' | 'week'
 
 const FILTER_LABELS: Record<Filter, string> = {
   all: '全部',
   number: '数字',
   wordbank: '词库',
+  color: '颜色',
 }
 
 const DATE_FILTER_LABELS: Record<DateFilter, string> = {
@@ -87,6 +88,7 @@ export function RandomRecords() {
     return {
       number: data.records.filter((r) => r.type === 'number').length,
       wordbank: data.records.filter((r) => r.type === 'wordbank').length,
+      color: data.records.filter((r) => r.type === 'color').length,
     }
   }, [data.records])
 
@@ -144,6 +146,12 @@ export function RandomRecords() {
           数字 · {counts.number}
         </button>
         <button
+          className={`btn sm ${filter === 'color' ? 'primary' : ''}`}
+          onClick={() => setFilter('color')}
+        >
+          颜色 · {counts.color}
+        </button>
+        <button
           className={`btn sm ${filter === 'wordbank' ? 'primary' : ''}`}
           onClick={() => setFilter('wordbank')}
         >
@@ -197,35 +205,52 @@ export function RandomRecords() {
               >
                 <div className="rec-head">
                   <span className={`rec-type rec-${r.type}`}>
-                    {r.type === 'number' ? '数字' : '词库'}
+                    {r.type === 'number' ? '数字' : r.type === 'color' ? '颜色' : '词库'}
                   </span>
                   <span className="rec-summary">{r.summary}</span>
                   <span className="rec-time">{formatTime(r.createdAt)}</span>
                 </div>
-                <div
-                  className="rec-result"
-                  style={{ whiteSpace: 'pre-wrap' }}
-                >
-                  {r.result}
-                </div>
+                {r.type === 'color' ? (
+                  <div className="rec-result rec-colors">
+                    {r.result
+                      .split('\n')
+                      .map((hex) => hex.trim())
+                      .filter((hex) => /^#[0-9a-fA-F]{6}$/.test(hex))
+                      .map((hex, i) => (
+                        <span key={i} className="rec-color-chip">
+                          <span className="color-block sm" style={{ background: hex }} />
+                          <span className="color-hex">{hex}</span>
+                        </span>
+                      ))}
+                  </div>
+                ) : (
+                  <div
+                    className="rec-result"
+                    style={{ whiteSpace: 'pre-wrap' }}
+                  >
+                    {r.result}
+                  </div>
+                )}
                 {/* 存为预设：仅当 summary 能反查到至少 1 个现有词库时展示 */}
                 {canSaveAsPreset && (
                   <div className="rec-preset-action">
                     {editingId === r.id ? (
                       <div className="row" style={{ gap: 6 }}>
-                        <input
-                          className="input"
-                          style={{ flex: 1 }}
-                          placeholder={`存为预设（含 ${matchedIds.length} 个词库）`}
-                          value={presetNameInput}
-                          onChange={(e) => setPresetNameInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter')
-                              confirmSavePreset(r.id, matchedIds)
-                            if (e.key === 'Escape') cancelEditPreset()
-                          }}
-                          autoFocus
-                        />
+                        <div className="field" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
+                          <label>预设名</label>
+                          <input
+                            className="input"
+                            style={{ flex: 1 }}
+                            value={presetNameInput}
+                            onChange={(e) => setPresetNameInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter')
+                                confirmSavePreset(r.id, matchedIds)
+                              if (e.key === 'Escape') cancelEditPreset()
+                            }}
+                            autoFocus
+                          />
+                        </div>
                         <button
                           className="btn sm primary"
                           onClick={() => confirmSavePreset(r.id, matchedIds)}

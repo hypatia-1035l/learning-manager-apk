@@ -1,0 +1,1420 @@
+{
+  "ranges": [],
+  "banks": [
+    {
+      "name": "产品类型",
+      "category": "商业设计",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "包装瓶",
+          "weight": 1
+        },
+        {
+          "text": "罐装饮品",
+          "weight": 1
+        },
+        {
+          "text": "礼盒",
+          "weight": 1
+        },
+        {
+          "text": "纸袋",
+          "weight": 1
+        },
+        {
+          "text": "贴纸",
+          "weight": 1
+        },
+        {
+          "text": "卡片",
+          "weight": 1
+        },
+        {
+          "text": "海报",
+          "weight": 1
+        },
+        {
+          "text": "宣传册",
+          "weight": 1
+        },
+        {
+          "text": "周边产品",
+          "weight": 1
+        },
+        {
+          "text": "限定商品",
+          "weight": 1
+        },
+        {
+          "text": "展示物料",
+          "weight": 1
+        },
+        {
+          "text": "店铺视觉",
+          "weight": 1
+        },
+        {
+          "text": "数字界面",
+          "weight": 1
+        },
+        {
+          "text": "帆布袋",
+          "weight": 1
+        },
+        {
+          "text": "服饰",
+          "weight": 1
+        },
+        {
+          "text": "文具套装",
+          "weight": 1
+        },
+        {
+          "text": "手机壳",
+          "weight": 1
+        },
+        {
+          "text": "盲盒",
+          "weight": 1
+        },
+        {
+          "text": "胸针",
+          "weight": 1
+        },
+        {
+          "text": "挂件",
+          "weight": 1
+        },
+        {
+          "text": "挂耳咖啡",
+          "weight": 1
+        },
+        {
+          "text": "香薰",
+          "weight": 1
+        },
+        {
+          "text": "蜡烛",
+          "weight": 1
+        },
+        {
+          "text": "手账",
+          "weight": 1
+        },
+        {
+          "text": "胶带",
+          "weight": 1
+        },
+        {
+          "text": "亚克力立牌",
+          "weight": 1
+        },
+        {
+          "text": "积木",
+          "weight": 1
+        },
+        {
+          "text": "拼图",
+          "weight": 1
+        },
+        {
+          "text": "冰箱贴",
+          "weight": 1
+        },
+        {
+          "text": "钥匙扣",
+          "weight": 1
+        },
+        {
+          "text": "发圈",
+          "weight": 1
+        },
+        {
+          "text": "帆布包",
+          "weight": 1
+        },
+        {
+          "text": "零钱包",
+          "weight": 1
+        },
+        {
+          "text": "杯垫",
+          "weight": 1
+        },
+        {
+          "text": "便签",
+          "weight": 1
+        },
+        {
+          "text": "文件夹",
+          "weight": 1
+        },
+        {
+          "text": "门帘",
+          "weight": 1
+        },
+        {
+          "text": "地毯",
+          "weight": 1
+        },
+        {
+          "text": "抱枕套",
+          "weight": 1
+        },
+        {
+          "text": "充电宝",
+          "weight": 1
+        },
+        {
+          "text": "食品",
+          "weight": 1
+        },
+        {
+          "text": "饮料",
+          "weight": 1
+        },
+        {
+          "text": "香水",
+          "weight": 1
+        },
+        {
+          "text": "护肤品",
+          "weight": 1
+        },
+        {
+          "text": "化妆品",
+          "weight": 1
+        },
+        {
+          "text": "服装",
+          "weight": 1
+        },
+        {
+          "text": "鞋履",
+          "weight": 1
+        },
+        {
+          "text": "首饰",
+          "weight": 1
+        },
+        {
+          "text": "家具",
+          "weight": 1
+        },
+        {
+          "text": "家居用品",
+          "weight": 1
+        },
+        {
+          "text": "文具",
+          "weight": 1
+        },
+        {
+          "text": "书籍",
+          "weight": 1
+        },
+        {
+          "text": "玩具",
+          "weight": 1
+        },
+        {
+          "text": "游戏周边",
+          "weight": 1
+        },
+        {
+          "text": "数码产品",
+          "weight": 1
+        },
+        {
+          "text": "智能设备",
+          "weight": 1
+        },
+        {
+          "text": "文创产品",
+          "weight": 1
+        },
+        {
+          "text": "艺术衍生品",
+          "weight": 1
+        },
+        {
+          "text": "纪念品",
+          "weight": 1
+        },
+        {
+          "text": "礼品",
+          "weight": 1
+        },
+        {
+          "text": "旅游商品",
+          "weight": 1
+        },
+        {
+          "text": "Box(盒子)",
+          "weight": 1
+        },
+        {
+          "text": "QR Code(二维码)",
+          "weight": 1
+        },
+        {
+          "text": "Perfume(香水)",
+          "weight": 1
+        },
+        {
+          "text": "Serum(精华液)",
+          "weight": 1
+        },
+        {
+          "text": "Shampoo(洗发水)",
+          "weight": 1
+        },
+        {
+          "text": "Olive Oil(橄榄油)",
+          "weight": 1
+        },
+        {
+          "text": "Mineral Water(矿泉水)",
+          "weight": 1
+        },
+        {
+          "text": "Sauce(酱料)",
+          "weight": 1
+        },
+        {
+          "text": "Honey(蜂蜜)",
+          "weight": 1
+        },
+        {
+          "text": "Gift Box(礼品盒)",
+          "weight": 1
+        },
+        {
+          "text": "Blind Box(盲盒)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "商业设计_品牌定位",
+      "category": "商业设计",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "高端",
+          "weight": 1
+        },
+        {
+          "text": "平价",
+          "weight": 1
+        },
+        {
+          "text": "年轻化",
+          "weight": 1
+        },
+        {
+          "text": "专业",
+          "weight": 1
+        },
+        {
+          "text": "环保",
+          "weight": 1
+        },
+        {
+          "text": "潮流",
+          "weight": 1
+        },
+        {
+          "text": "传统",
+          "weight": 1
+        },
+        {
+          "text": "科技",
+          "weight": 1
+        },
+        {
+          "text": "奢华",
+          "weight": 1
+        },
+        {
+          "text": "亲民",
+          "weight": 1
+        },
+        {
+          "text": "收藏级",
+          "weight": 1
+        },
+        {
+          "text": "限定款",
+          "weight": 1
+        },
+        {
+          "text": "大众化",
+          "weight": 1
+        },
+        {
+          "text": "小众",
+          "weight": 1
+        },
+        {
+          "text": "国货",
+          "weight": 1
+        },
+        {
+          "text": "极致性价比",
+          "weight": 1
+        },
+        {
+          "text": "轻奢",
+          "weight": 1
+        },
+        {
+          "text": "小众精品",
+          "weight": 1
+        },
+        {
+          "text": "网红",
+          "weight": 1
+        },
+        {
+          "text": "在地",
+          "weight": 1
+        },
+        {
+          "text": "匠心",
+          "weight": 1
+        },
+        {
+          "text": "慢生活",
+          "weight": 1
+        },
+        {
+          "text": "治愈系",
+          "weight": 1
+        },
+        {
+          "text": "知识分子",
+          "weight": 1
+        },
+        {
+          "text": "极客",
+          "weight": 1
+        },
+        {
+          "text": "二次元",
+          "weight": 1
+        },
+        {
+          "text": "银发",
+          "weight": 1
+        },
+        {
+          "text": "母婴",
+          "weight": 1
+        },
+        {
+          "text": "男性向",
+          "weight": 1
+        },
+        {
+          "text": "女性向",
+          "weight": 1
+        },
+        {
+          "text": "中性",
+          "weight": 1
+        },
+        {
+          "text": "长红",
+          "weight": 1
+        },
+        {
+          "text": "大众",
+          "weight": 1
+        },
+        {
+          "text": "儿童向",
+          "weight": 1
+        },
+        {
+          "text": "家庭向",
+          "weight": 1
+        },
+        {
+          "text": "大众文化",
+          "weight": 1
+        },
+        {
+          "text": "小众文化",
+          "weight": 1
+        },
+        {
+          "text": "艺术化",
+          "weight": 1
+        },
+        {
+          "text": "科技感",
+          "weight": 1
+        },
+        {
+          "text": "传统文化",
+          "weight": 1
+        },
+        {
+          "text": "地方文化",
+          "weight": 1
+        },
+        {
+          "text": "复古",
+          "weight": 1
+        },
+        {
+          "text": "生活方式",
+          "weight": 1
+        },
+        {
+          "text": "功能主义",
+          "weight": 1
+        },
+        {
+          "text": "情感消费",
+          "weight": 1
+        },
+        {
+          "text": "收藏",
+          "weight": 1
+        },
+        {
+          "text": "限量",
+          "weight": 1
+        },
+        {
+          "text": "联名",
+          "weight": 1
+        },
+        {
+          "text": "Luxury(奢华)",
+          "weight": 1
+        },
+        {
+          "text": "Premium(高端)",
+          "weight": 1
+        },
+        {
+          "text": "Corporate(企业)",
+          "weight": 1
+        },
+        {
+          "text": "Personal Branding(个人品牌)",
+          "weight": 1
+        },
+        {
+          "text": "Professional(专业)",
+          "weight": 1
+        },
+        {
+          "text": "Bold(醒目)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "商业设计_品牌类型",
+      "category": "商业设计",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "饮料",
+          "weight": 1
+        },
+        {
+          "text": "食品",
+          "weight": 1
+        },
+        {
+          "text": "茶饮",
+          "weight": 1
+        },
+        {
+          "text": "咖啡",
+          "weight": 1
+        },
+        {
+          "text": "美妆",
+          "weight": 1
+        },
+        {
+          "text": "服饰",
+          "weight": 1
+        },
+        {
+          "text": "潮玩",
+          "weight": 1
+        },
+        {
+          "text": "文具",
+          "weight": 1
+        },
+        {
+          "text": "游戏周边",
+          "weight": 1
+        },
+        {
+          "text": "文创",
+          "weight": 1
+        },
+        {
+          "text": "家居",
+          "weight": 1
+        },
+        {
+          "text": "数码产品",
+          "weight": 1
+        },
+        {
+          "text": "珠宝",
+          "weight": 1
+        },
+        {
+          "text": "香氛",
+          "weight": 1
+        },
+        {
+          "text": "文创书店",
+          "weight": 1
+        },
+        {
+          "text": "买手店",
+          "weight": 1
+        },
+        {
+          "text": "家居百货",
+          "weight": 1
+        },
+        {
+          "text": "零食",
+          "weight": 1
+        },
+        {
+          "text": "酒水",
+          "weight": 1
+        },
+        {
+          "text": "冰淇淋",
+          "weight": 1
+        },
+        {
+          "text": "烘焙",
+          "weight": 1
+        },
+        {
+          "text": "宠物用品",
+          "weight": 1
+        },
+        {
+          "text": "户外",
+          "weight": 1
+        },
+        {
+          "text": "玩具",
+          "weight": 1
+        },
+        {
+          "text": "动漫",
+          "weight": 1
+        },
+        {
+          "text": "博物馆文创",
+          "weight": 1
+        },
+        {
+          "text": "景区文创",
+          "weight": 1
+        },
+        {
+          "text": "文具杂货",
+          "weight": 1
+        },
+        {
+          "text": "奢侈品牌",
+          "weight": 1
+        },
+        {
+          "text": "大众消费",
+          "weight": 1
+        },
+        {
+          "text": "快消品牌",
+          "weight": 1
+        },
+        {
+          "text": "生活方式品牌",
+          "weight": 1
+        },
+        {
+          "text": "文化品牌",
+          "weight": 1
+        },
+        {
+          "text": "艺术品牌",
+          "weight": 1
+        },
+        {
+          "text": "设计品牌",
+          "weight": 1
+        },
+        {
+          "text": "科技品牌",
+          "weight": 1
+        },
+        {
+          "text": "互联网品牌",
+          "weight": 1
+        },
+        {
+          "text": "餐饮品牌",
+          "weight": 1
+        },
+        {
+          "text": "酒店品牌",
+          "weight": 1
+        },
+        {
+          "text": "美妆品牌",
+          "weight": 1
+        },
+        {
+          "text": "服装品牌",
+          "weight": 1
+        },
+        {
+          "text": "家居品牌",
+          "weight": 1
+        },
+        {
+          "text": "文具品牌",
+          "weight": 1
+        },
+        {
+          "text": "食品品牌",
+          "weight": 1
+        },
+        {
+          "text": "饮料品牌",
+          "weight": 1
+        },
+        {
+          "text": "游戏品牌",
+          "weight": 1
+        },
+        {
+          "text": "娱乐品牌",
+          "weight": 1
+        },
+        {
+          "text": "博物馆品牌",
+          "weight": 1
+        },
+        {
+          "text": "出版社",
+          "weight": 1
+        },
+        {
+          "text": "独立品牌",
+          "weight": 1
+        },
+        {
+          "text": "社区品牌",
+          "weight": 1
+        },
+        {
+          "text": "城市品牌",
+          "weight": 1
+        },
+        {
+          "text": "Bakery(烘焙)",
+          "weight": 1
+        },
+        {
+          "text": "Cafe(咖啡馆)",
+          "weight": 1
+        },
+        {
+          "text": "Coffee Shop(咖啡店)",
+          "weight": 1
+        },
+        {
+          "text": "Restaurant(餐厅)",
+          "weight": 1
+        },
+        {
+          "text": "Fashion(时尚)",
+          "weight": 1
+        },
+        {
+          "text": "Skincare(护肤)",
+          "weight": 1
+        },
+        {
+          "text": "Cosmetics(化妆品)",
+          "weight": 1
+        },
+        {
+          "text": "Perfume(香水)",
+          "weight": 1
+        },
+        {
+          "text": "Jewelry(首饰)",
+          "weight": 1
+        },
+        {
+          "text": "Tea(茶叶)",
+          "weight": 1
+        },
+        {
+          "text": "Chocolate(巧克力)",
+          "weight": 1
+        },
+        {
+          "text": "Candle(蜡烛)",
+          "weight": 1
+        },
+        {
+          "text": "Soap(香皂)",
+          "weight": 1
+        },
+        {
+          "text": "Snack(零食)",
+          "weight": 1
+        },
+        {
+          "text": "Dessert(甜点)",
+          "weight": 1
+        },
+        {
+          "text": "Podcast(播客)",
+          "weight": 1
+        },
+        {
+          "text": "Hotel(酒店)",
+          "weight": 1
+        },
+        {
+          "text": "Gym(健身房)",
+          "weight": 1
+        },
+        {
+          "text": "Tech(科技)",
+          "weight": 1
+        },
+        {
+          "text": "Photographer(摄影师)",
+          "weight": 1
+        },
+        {
+          "text": "Lawyer(律师)",
+          "weight": 1
+        },
+        {
+          "text": "Medical(医疗)",
+          "weight": 1
+        },
+        {
+          "text": "Architect(建筑师)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "商业限制条件",
+      "category": "商业设计",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "保留品牌识别元素",
+          "weight": 1
+        },
+        {
+          "text": "面向年轻用户",
+          "weight": 1
+        },
+        {
+          "text": "适合社交传播",
+          "weight": 1
+        },
+        {
+          "text": "控制制作成本",
+          "weight": 1
+        },
+        {
+          "text": "适合量产",
+          "weight": 1
+        },
+        {
+          "text": "做成收藏款",
+          "weight": 1
+        },
+        {
+          "text": "做成限定款",
+          "weight": 1
+        },
+        {
+          "text": "突出环保理念",
+          "weight": 1
+        },
+        {
+          "text": "适合夏季销售",
+          "weight": 1
+        },
+        {
+          "text": "适合线下展示",
+          "weight": 1
+        },
+        {
+          "text": "需适配多种尺寸",
+          "weight": 1
+        },
+        {
+          "text": "强调功能性",
+          "weight": 1
+        },
+        {
+          "text": "必须含中文",
+          "weight": 1
+        },
+        {
+          "text": "适合作为礼物",
+          "weight": 1
+        },
+        {
+          "text": "节日限定周期短",
+          "weight": 1
+        },
+        {
+          "text": "需通过食品安全",
+          "weight": 1
+        },
+        {
+          "text": "适配电商详情页",
+          "weight": 1
+        },
+        {
+          "text": "适合短视频传播",
+          "weight": 1
+        },
+        {
+          "text": "强调可持续",
+          "weight": 1
+        },
+        {
+          "text": "控制重量便于邮寄",
+          "weight": 1
+        },
+        {
+          "text": "适合伴手礼",
+          "weight": 1
+        },
+        {
+          "text": "强调手作感",
+          "weight": 1
+        },
+        {
+          "text": "适合展会展出",
+          "weight": 1
+        },
+        {
+          "text": "需有开箱仪式感",
+          "weight": 1
+        },
+        {
+          "text": "适配多语言市场",
+          "weight": 1
+        },
+        {
+          "text": "强调文化叙事",
+          "weight": 1
+        },
+        {
+          "text": "适合盲盒机制",
+          "weight": 1
+        },
+        {
+          "text": "限定预算",
+          "weight": 1
+        },
+        {
+          "text": "限定尺寸",
+          "weight": 1
+        },
+        {
+          "text": "限定颜色",
+          "weight": 1
+        },
+        {
+          "text": "限定材料",
+          "weight": 1
+        },
+        {
+          "text": "限定工艺",
+          "weight": 1
+        },
+        {
+          "text": "环保材料",
+          "weight": 1
+        },
+        {
+          "text": "低成本",
+          "weight": 1
+        },
+        {
+          "text": "高端质感",
+          "weight": 1
+        },
+        {
+          "text": "量产",
+          "weight": 1
+        },
+        {
+          "text": "小批量",
+          "weight": 1
+        },
+        {
+          "text": "限量",
+          "weight": 1
+        },
+        {
+          "text": "便携",
+          "weight": 1
+        },
+        {
+          "text": "可折叠",
+          "weight": 1
+        },
+        {
+          "text": "可重复使用",
+          "weight": 1
+        },
+        {
+          "text": "儿童安全",
+          "weight": 1
+        },
+        {
+          "text": "户外使用",
+          "weight": 1
+        },
+        {
+          "text": "运输方便",
+          "weight": 1
+        },
+        {
+          "text": "适合电商",
+          "weight": 1
+        },
+        {
+          "text": "Brand Guidelines(品牌规范)",
+          "weight": 1
+        },
+        {
+          "text": "Tone of Voice(品牌语调)",
+          "weight": 1
+        },
+        {
+          "text": "Brand Book(品牌手册)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "商业设计_联名方向",
+      "category": "商业设计",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "历史文化",
+          "weight": 1
+        },
+        {
+          "text": "博物馆",
+          "weight": 1
+        },
+        {
+          "text": "非遗",
+          "weight": 1
+        },
+        {
+          "text": "传统节日",
+          "weight": 1
+        },
+        {
+          "text": "神话传说",
+          "weight": 1
+        },
+        {
+          "text": "动画",
+          "weight": 1
+        },
+        {
+          "text": "游戏",
+          "weight": 1
+        },
+        {
+          "text": "影视",
+          "weight": 1
+        },
+        {
+          "text": "音乐",
+          "weight": 1
+        },
+        {
+          "text": "角色IP",
+          "weight": 1
+        },
+        {
+          "text": "咖啡",
+          "weight": 1
+        },
+        {
+          "text": "茶饮",
+          "weight": 1
+        },
+        {
+          "text": "潮玩",
+          "weight": 1
+        },
+        {
+          "text": "运动",
+          "weight": 1
+        },
+        {
+          "text": "宠物",
+          "weight": 1
+        },
+        {
+          "text": "美术馆",
+          "weight": 1
+        },
+        {
+          "text": "动物园",
+          "weight": 1
+        },
+        {
+          "text": "植物园",
+          "weight": 1
+        },
+        {
+          "text": "图书馆",
+          "weight": 1
+        },
+        {
+          "text": "航天",
+          "weight": 1
+        },
+        {
+          "text": "高校",
+          "weight": 1
+        },
+        {
+          "text": "老字号",
+          "weight": 1
+        },
+        {
+          "text": "地方文旅",
+          "weight": 1
+        },
+        {
+          "text": "独立插画师",
+          "weight": 1
+        },
+        {
+          "text": "音乐节",
+          "weight": 1
+        },
+        {
+          "text": "电竞",
+          "weight": 1
+        },
+        {
+          "text": "汉服圈",
+          "weight": 1
+        },
+        {
+          "text": "潮玩展",
+          "weight": 1
+        },
+        {
+          "text": "公益组织",
+          "weight": 1
+        },
+        {
+          "text": "汽车",
+          "weight": 1
+        },
+        {
+          "text": "餐饮连锁",
+          "weight": 1
+        },
+        {
+          "text": "漫画IP",
+          "weight": 1
+        },
+        {
+          "text": "Celebrity(名人)",
+          "weight": 1
+        },
+        {
+          "text": "Influencer(达人)",
+          "weight": 1
+        },
+        {
+          "text": "Artist(艺术家)",
+          "weight": 1
+        },
+        {
+          "text": "Museum(博物馆)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "营销场景",
+      "category": "商业设计",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "新品发布",
+          "weight": 1
+        },
+        {
+          "text": "节日活动",
+          "weight": 1
+        },
+        {
+          "text": "联名企划",
+          "weight": 1
+        },
+        {
+          "text": "夏季限定",
+          "weight": 1
+        },
+        {
+          "text": "冬季限定",
+          "weight": 1
+        },
+        {
+          "text": "纪念活动",
+          "weight": 1
+        },
+        {
+          "text": "快闪活动",
+          "weight": 1
+        },
+        {
+          "text": "展览活动",
+          "weight": 1
+        },
+        {
+          "text": "社交媒体宣传",
+          "weight": 1
+        },
+        {
+          "text": "线下推广",
+          "weight": 1
+        },
+        {
+          "text": "收藏发行",
+          "weight": 1
+        },
+        {
+          "text": "周年庆",
+          "weight": 1
+        },
+        {
+          "text": "公益联名",
+          "weight": 1
+        },
+        {
+          "text": "直播带货",
+          "weight": 1
+        },
+        {
+          "text": "门店陈列",
+          "weight": 1
+        },
+        {
+          "text": "情人节",
+          "weight": 1
+        },
+        {
+          "text": "春节",
+          "weight": 1
+        },
+        {
+          "text": "双十一",
+          "weight": 1
+        },
+        {
+          "text": "618",
+          "weight": 1
+        },
+        {
+          "text": "毕业季",
+          "weight": 1
+        },
+        {
+          "text": "开学季",
+          "weight": 1
+        },
+        {
+          "text": "市集",
+          "weight": 1
+        },
+        {
+          "text": "漫展",
+          "weight": 1
+        },
+        {
+          "text": "艺术节",
+          "weight": 1
+        },
+        {
+          "text": "会员日",
+          "weight": 1
+        },
+        {
+          "text": "私域社群",
+          "weight": 1
+        },
+        {
+          "text": "小红书种草",
+          "weight": 1
+        },
+        {
+          "text": "抖音挑战",
+          "weight": 1
+        },
+        {
+          "text": "线下快闪",
+          "weight": 1
+        },
+        {
+          "text": "主题展览",
+          "weight": 1
+        },
+        {
+          "text": "品牌周",
+          "weight": 1
+        },
+        {
+          "text": "跨界市集",
+          "weight": 1
+        },
+        {
+          "text": "武林大会",
+          "weight": 1
+        },
+        {
+          "text": "节日营销",
+          "weight": 1
+        },
+        {
+          "text": "品牌升级",
+          "weight": 1
+        },
+        {
+          "text": "联名活动",
+          "weight": 1
+        },
+        {
+          "text": "快闪店",
+          "weight": 1
+        },
+        {
+          "text": "线下活动",
+          "weight": 1
+        },
+        {
+          "text": "展览",
+          "weight": 1
+        },
+        {
+          "text": "主题展",
+          "weight": 1
+        },
+        {
+          "text": "艺术展",
+          "weight": 1
+        },
+        {
+          "text": "发布会",
+          "weight": 1
+        },
+        {
+          "text": "音乐节",
+          "weight": 1
+        },
+        {
+          "text": "电影宣传",
+          "weight": 1
+        },
+        {
+          "text": "游戏宣传",
+          "weight": 1
+        },
+        {
+          "text": "电商促销",
+          "weight": 1
+        },
+        {
+          "text": "社交媒体传播",
+          "weight": 1
+        },
+        {
+          "text": "城市宣传",
+          "weight": 1
+        },
+        {
+          "text": "旅游推广",
+          "weight": 1
+        },
+        {
+          "text": "文化推广",
+          "weight": 1
+        },
+        {
+          "text": "Experiential(体验式)",
+          "weight": 1
+        },
+        {
+          "text": "Email(邮件)",
+          "weight": 1
+        },
+        {
+          "text": "Valentine's Day(情人节)",
+          "weight": 1
+        },
+        {
+          "text": "Holiday(节日)",
+          "weight": 1
+        },
+        {
+          "text": "University(大学)",
+          "weight": 1
+        }
+      ]
+    }
+  ],
+  "presets": []
+}

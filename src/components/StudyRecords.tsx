@@ -84,7 +84,6 @@ export function StudyRecords({ taskId, totalTime }: Props) {
                       rows={2}
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
-                      placeholder="备注（想法、疑问、心得…）"
                     />
                     <div className="record-note-ops">
                       <button

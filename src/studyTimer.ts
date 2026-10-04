@@ -20,16 +20,32 @@ export interface StudyTimerStatus {
   elapsedSeconds: number
 }
 
+// 越界提醒配置（P3）：随 start 一并传给原生前台服务，用于后台轮询检测跑偏
+export interface StudyTimerGuard {
+  enabled: boolean
+  graceMinutes: number
+  allowedApps: string[]
+  blockedApps: string[]
+}
+
 export interface StudyTimerPlugin {
   start(o: {
     taskName: string
     objectName: string
     elapsedSeconds: number
+    // 当前进度节点名（序列配了 progressNodes 且为数量型时才有值；空则通知不显示节点）
+    nodeLabel?: string
+    // P3 越界提醒配置（扁平传参，与原生 StudyTimerPlugin.start 读取一致）
+    guardEnabled?: boolean
+    guardGraceMinutes?: number
+    allowedApps?: string[]
+    blockedApps?: string[]
   }): Promise<void>
   update(o: {
     taskName: string
     objectName: string
     elapsedSeconds: number
+    nodeLabel?: string
   }): Promise<void>
   stop(): Promise<void>
   consumePendingAction(): Promise<StudyTimerPendingAction | null>
@@ -49,9 +65,21 @@ export async function startStudyTimer(
   taskName: string,
   objectName: string,
   elapsedSeconds: number = 0,
+  guard?: StudyTimerGuard,
+  nodeLabel?: string,
 ): Promise<void> {
   try {
-    await StudyTimer.start({ taskName, objectName, elapsedSeconds })
+    // 展开为扁平参数以匹配原生 StudyTimerPlugin.start 的读取
+    await StudyTimer.start({
+      taskName,
+      objectName,
+      elapsedSeconds,
+      nodeLabel,
+      guardEnabled: guard?.enabled ?? false,
+      guardGraceMinutes: guard?.graceMinutes ?? 5,
+      allowedApps: guard?.allowedApps ?? [],
+      blockedApps: guard?.blockedApps ?? [],
+    })
   } catch {
     /* Web 端不支持，静默 */
   }
@@ -61,9 +89,10 @@ export async function updateStudyTimer(
   taskName: string,
   objectName: string,
   elapsedSeconds: number,
+  nodeLabel?: string,
 ): Promise<void> {
   try {
-    await StudyTimer.update({ taskName, objectName, elapsedSeconds })
+    await StudyTimer.update({ taskName, objectName, elapsedSeconds, nodeLabel })
   } catch {
     /* ignore */
   }

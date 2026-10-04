@@ -65,7 +65,9 @@ select {
 /* 移动端：收敛桌面端 padding，避免两侧浪费 */
 @media (max-width: 720px) {
   .app {
-    padding: 16px 14px calc(72px + env(safe-area-inset-bottom));
+    max-width: none;
+    width: 100%;
+    padding: 14px 8px calc(72px + env(safe-area-inset-bottom));
   }
   /* 增大可点击区域，满足移动端 ≥44px 触控目标 */
   .btn {
@@ -224,6 +226,160 @@ select {
   color: var(--ink-faint);
 }
 
+
+/* ===== 待办页固定头：标签切换 + 操作工具栏 ===== */
+.pool-fixed-header {
+  flex: 0 0 auto;
+  padding-top: 4px;
+}
+.pool-fixed-header > .tabs {
+  margin-bottom: 8px;
+}
+.pool-fixed-header > .pool-toolbar {
+  margin-bottom: 12px;
+}
+
+/* ===== 今日计划（次日计划便签） ===== */
+.plan-section {
+  margin-top: 8px;
+}
+.plan-empty {
+  margin-top: 10px;
+  padding: 24px 16px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+.plan-section .pool-toolbar {
+  margin: 4px 0 8px;
+}
+.plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.plan-list.tomorrow {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+.plan-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.plan-front {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 15px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--line);
+  touch-action: pan-y;
+}
+.plan-front.anim {
+  transition: transform 0.18s ease;
+}
+.plan-front.overdue {
+  border-bottom-color: var(--amber, #c47f00);
+  background: color-mix(in srgb, var(--amber, #c47f00) 7%, var(--bg-card));
+}
+.plan-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+}
+.swipe-btn {
+  width: 50px;
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.swipe-btn.reroll { background: #3b82f6; }
+.swipe-btn.skip { background: #c47f00; }
+.swipe-btn.done { background: #2e9e5b; }
+.plan-item .plan-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 14px;
+  min-width: 48px;
+  letter-spacing: 0.5px;
+}
+.plan-item .plan-main {
+  flex: 1;
+  min-width: 0;
+}
+.plan-item .plan-name {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  line-height: 1.75;
+  letter-spacing: 0.5px;
+}
+.plan-item .plan-chip {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-faint);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.plan-item .plan-seq {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-top: 5px;
+  line-height: 1.7;
+  letter-spacing: 0.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-empty {
+  padding: 18px 4px;
+  font-size: 13px;
+}
+.plan-item .plan-status {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.plan-item.done .plan-main,
+.plan-item.skipped .plan-main {
+  opacity: 0.55;
+}
+.plan-item.done .plan-name {
+  text-decoration: line-through;
+}
+/* 方向卡上的提醒星期 chip */
+.wd-chip {
+  font-size: 11px;
+  color: var(--ink-faint);
+  background: var(--bg-soft, #faf8f4);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+/* 提醒开启时的按钮强调 */
+.btn.reminder-on {
+  border-color: var(--accent, #8b6f47);
+  color: var(--accent, #8b6f47);
+  font-weight: 600;
+}
+
 .task-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -234,13 +390,14 @@ select {
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: 10px 12px;
   box-shadow: var(--shadow);
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.12s ease;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
   position: relative;
 }
 .task-card:hover {
@@ -250,15 +407,68 @@ select {
 .task-card.disabled {
   opacity: 0.55;
 }
+/* 方向卡：左开关 / 中内容(方向·序列) / 右排序 */
+.tc-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.tc-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent, #8b6f47);
+}
+.tc-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tc-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tc-seq {
+  font-size: 12px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tc-reorder {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.reorder-btn {
+  width: 28px;
+  height: 22px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink-soft);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.reorder-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 
 .tc-head {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.tc-icon {
-  font-size: 24px;
-  line-height: 1;
 }
 .tc-name {
   font-size: 16px;
@@ -395,6 +605,81 @@ select {
   font-family: inherit;
 }
 
+/* 数字输入框统一紧凑：固定窄宽、居中、不撑满整行（权重框除外） */
+input[type="number"].input:not(.weight-input) {
+  width: 76px;
+  max-width: 96px;
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+/* 含单行输入框的字段：标签与框同行，不换行（多行 textarea 仍标签在上） */
+/* 三列等宽小字段（默认参数行）：独立结构，不与 .field 的横排规则纠缠 */
+.grid-3,
+.grid-2 {
+  display: grid;
+  gap: 8px;
+}
+.grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.mini-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.mini-field > label {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.mini-field > input.input {
+  width: 100%;
+  min-width: 0;
+}
+/* 覆盖全局数字输入框的 76px 窄宽规则：网格内要撑满单元格 */
+.mini-field > input[type="number"].input {
+  width: 100%;
+  max-width: 100%;
+  flex: 0 1 auto;
+  text-align: left;
+}
+
+/* ===== 进度节点批量编辑器 ===== */
+/* 输入改为每行「数字 名称」的 textarea，旧的结构化行样式 .pn-row 已随改版移除 */
+.pn-preview {
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: var(--bg-soft, #faf8f4);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+/* 计时结束页：节点快捷跳转 */
+.node-quick {
+  margin-top: 8px;
+}
+
+.field:has(> input) {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.field:has(> input) > label {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+.field:has(> input) > .input {
+  flex: 1 1 auto;
+  width: auto;
+}
+
 .section {
   background: var(--bg-card);
   border: 1px solid var(--line);
@@ -416,6 +701,21 @@ select {
   font-size: 12px;
   color: var(--ink-faint);
   font-weight: 400;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.help-list b {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 /* ===== 任务详情 ===== */
@@ -440,9 +740,7 @@ select {
   gap: 14px;
   margin-bottom: 16px;
 }
-.detail-head .icon {
-  font-size: 38px;
-}
+/* 详情页图标（已移除） */
 .detail-head h2 {
   margin: 0;
   font-size: 22px;
@@ -524,14 +822,14 @@ select {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--bg-elev);
+  padding: 12px 4px;
+  border-radius: 8px;
 }
-.obj-item.current {
-  border-color: var(--accent-soft);
-  background: var(--accent-bg);
+.obj-item + .obj-item {
+  border-top: 1px solid var(--line);
+}
+.obj-item.current .name {
+  color: var(--accent);
 }
 .obj-item.done {
   opacity: 0.6;
@@ -565,6 +863,19 @@ select {
 .obj-item .ops {
   display: flex;
   gap: 2px;
+  flex-shrink: 0;
+}
+/* 序列行「更多」展开的次行操作 */
+.ops-sub {
+  margin-top: 8px;
+  gap: 6px !important;
+  flex-wrap: wrap;
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}
+.icon-btn.primary {
+  color: var(--accent);
+  font-weight: 600;
 }
 .icon-btn {
   border: none;
@@ -685,7 +996,8 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  /* 高于 .tabbar(50) 与 .session-overlay(60) */
+  z-index: 70;
   padding: 20px;
 }
 .modal {
@@ -709,6 +1021,7 @@ select {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .modal-actions {
   display: flex;
@@ -728,31 +1041,7 @@ select {
   gap: 14px;
 }
 
-/* emoji 选择 */
-.emoji-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 4px;
-  max-height: 180px;
-  overflow-y: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 8px;
-}
-.emoji-cell {
-  border: none;
-  background: none;
-  font-size: 20px;
-  padding: 6px;
-  border-radius: 6px;
-  line-height: 1;
-}
-.emoji-cell:hover {
-  background: var(--line-soft);
-}
-.emoji-cell.active {
-  background: var(--accent-bg);
-}
+/* emoji 选择（已移除） */
 
 /* ===== 任务模板选择（新建方向时从模板创建） ===== */
 .template-grid {
@@ -775,10 +1064,6 @@ select {
 .template-cell:hover {
   border-color: var(--accent-soft);
   background: var(--accent-bg);
-}
-.template-cell .tc-icon {
-  font-size: 20px;
-  line-height: 1;
 }
 .template-cell .tc-name {
   font-size: 13px;
@@ -848,10 +1133,6 @@ select {
   align-items: center;
   gap: 12px;
 }
-.rac-icon {
-  font-size: 32px;
-  line-height: 1;
-}
 .rac-name {
   font-size: 18px;
   font-weight: 700;
@@ -906,6 +1187,26 @@ select {
   color: #b8a98f;
   font-size: 14px;
   margin-bottom: 28px;
+}
+.session-pin {
+  margin: 0 0 22px;
+  background: transparent;
+  border: 1px solid #6b5640;
+  color: #c79a6a;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 13px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.session-pin:hover {
+  border-color: #c79a6a;
+}
+.session-pin.on {
+  background: #6b5640;
+  color: #fff3e0;
+  border-color: #6b5640;
 }
 .session-timer-label {
   font-size: 13px;
@@ -1131,11 +1432,7 @@ select {
   align-items: center;
   gap: 10px;
 }
-.bt-icon {
-  font-size: 20px;
-  line-height: 1;
-  flex-shrink: 0;
-}
+/* 统计按方向图标（已移除） */
 .bt-name {
   font-weight: 600;
   font-size: 14px;
@@ -1252,6 +1549,41 @@ select {
 }
 
 /* tabs */
+/* 弹窗表单小节标题 + 分段选择控件 */
+.form-group-title {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 2px;
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 4px;
+  margin-top: 2px;
+}
+.seg-row {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-soft, #faf8f4);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px;
+}
+.seg-item {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 6px 0;
+  font-size: 13px;
+  border-radius: 6px;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.seg-item.active {
+  background: var(--bg-card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
 .tabs {
   display: flex;
   gap: 4px;
@@ -1275,16 +1607,15 @@ select {
 
 @media (max-width: 560px) {
   .app {
-    padding: 20px 14px 60px;
+    max-width: none;
+    width: 100%;
+    padding: 14px 8px 60px;
   }
   .stat-row {
     grid-template-columns: 1fr;
   }
   .session-timer {
     font-size: 48px;
-  }
-  .emoji-grid {
-    grid-template-columns: repeat(6, 1fr);
   }
 }
 
@@ -1319,10 +1650,7 @@ select {
 .continue-card:hover {
   transform: translateY(-2px);
 }
-.cc-icon {
-  font-size: 40px;
-  line-height: 1;
-}
+/* 继续卡片图标（已移除） */
 .cc-body {
   flex: 1;
   min-width: 0;
@@ -1413,11 +1741,6 @@ select {
   text-align: center;
   padding: 8px 0 4px;
 }
-.rr-icon {
-  font-size: 52px;
-  line-height: 1;
-  margin-bottom: 8px;
-}
 .rr-name {
   font-size: 22px;
   font-weight: 700;
@@ -1489,10 +1812,7 @@ select {
   background: var(--accent-bg);
   box-shadow: 0 0 0 1px var(--accent);
 }
-.tc2-icon {
-  font-size: 26px;
-  line-height: 1;
-}
+/* 工具卡图标（已移除） */
 .tc2-name {
   font-size: 14px;
   font-weight: 700;
@@ -1572,6 +1892,75 @@ select {
   align-self: flex-start;
   font-size: 12px;
   color: var(--ink-soft);
+}
+
+/* ===== 颜色随机 ===== */
+.cr-channels {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cr-channel-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  width: 64px;
+  flex-shrink: 0;
+}
+.color-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  justify-content: center;
+  width: 100%;
+}
+.color-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.color-block {
+  width: 64px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+.color-block.sm {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  box-shadow: none;
+}
+.color-hex {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+.color-copied {
+  font-size: 10px;
+  color: var(--accent);
+}
+.color-mini {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.rec-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.rec-color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 /* ===== 随机记录列表 ===== */
@@ -1703,12 +2092,37 @@ select {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+/* 关键修复：.obj-list 是 flex-column 容器，子项默认 flex-shrink:1。
+   一旦列表配了 max-height（.bm-bank-list 480px / .wb-bank-list 280px），
+   而子项总高远超容器，每行就会被压缩到 min-height(48px)；
+   但行内内容（名称+分类+标签+操作按钮，实测约 138px）不会跟着缩，
+   于是每行内容向外溢出约 79px，压到后面 1.4 行上 ——
+   表现为「列表叠在一起、编辑/删除按钮错位点不到」。
+   列表项一律不参与收缩，溢出交给容器滚动。 */
+.bm-bank-list > .obj-item,
+.wb-bank-list > .obj-item {
+  flex-shrink: 0;
+}
 /* 词库名默认单行省略 */
 .bm-bank-name {
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* 词库项副信息：分类 · 词条数 */
+.bm-bank-meta {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 词库标签行 */
+.bm-bank-tags {
+  margin-top: 3px;
+  line-height: 1.8;
 }
 .bm-tag {
   display: inline-block;
@@ -1722,6 +2136,16 @@ select {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+}
+/* 危险操作按钮（删除类）：此前 .danger 类未定义，图标/文字按钮都无警示色 */
+.btn.danger,
+.icon-btn.danger {
+  color: var(--red);
+  border-color: rgba(200, 60, 60, 0.35);
+}
+.btn.danger:active,
+.icon-btn.danger:active {
+  background: rgba(200, 60, 60, 0.08);
 }
 /* 手机端（vivo S30 等 ~393px 宽屏）：操作按钮下沉第二行 */
 @media (max-width: 560px) {
@@ -1873,40 +2297,6 @@ textarea {
   padding: 6px 8px;
 }
 
-/* 手机端：序列条目换行布局，避免内容溢出和权重框遮挡名称 */
-@media (max-width: 560px) {
-  .obj-item {
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 8px;
-    padding: 10px 10px;
-  }
-  /* 第一行：序号 + 名称（占满剩余空间，省略号）+ 权重输入框 */
-  .obj-item .idx {
-    flex: 0 0 auto;
-  }
-  .obj-item .name {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .obj-item .weight-input {
-    flex: 0 0 48px;
-  }
-  /* 第二行：进度（占满） */
-  .obj-item .prog {
-    order: 2;
-    flex: 1 1 100%;
-    max-width: none;
-  }
-  /* 第三行：操作按钮组（占满，左对齐，可换行） */
-  .obj-item .ops {
-    order: 3;
-    flex: 1 1 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-}
 
 /* 随机工具箱工具卡触控 */
 .tool-card {
@@ -1954,7 +2344,7 @@ textarea {
   top: 0;
   z-index: 10;
   background: var(--bg);
-  padding: 10px 16px 6px;
+  padding: 10px 10px 6px;
   border-bottom: 1px solid var(--line);
 }
 .shell-header .app-title {
@@ -1964,8 +2354,22 @@ textarea {
 }
 .shell-main {
   flex: 1;
-  /* 留出底栏高度 + safe-area，避免内容被遮挡 */
-  padding: 4px 0 calc(56px + env(safe-area-inset-bottom));
+  min-height: 0;
+  position: relative;
+}
+/* 内部标签 Swiper：占满主区，每个页面可独立纵向滚动 */
+.inner-tab-swiper {
+  height: 100%;
+  width: 100%;
+}
+.inner-tab-swiper .swiper-slide {
+  height: 100%;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.inner-tab-swiper .pool-scroll {
+  height: 100%;
+  padding: 4px 0 calc(8px + env(safe-area-inset-bottom));
 }
 .tabbar {
   position: fixed;
@@ -2031,9 +2435,7 @@ textarea {
   align-items: center;
   gap: 12px;
 }
-.settings-item .si-icon {
-  font-size: 22px;
-}
+/* 设置项图标（已移除） */
 .settings-item .si-name {
   font-size: 15px;
   font-weight: 600;
@@ -2050,7 +2452,18 @@ textarea {
 
 /* ===== 待办工作区紧凑布局 ===== */
 .pool-compact {
-  padding: 0 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+.pool-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 12px;
 }
 /* 当前状态卡片 */
 .now-card {
@@ -2075,9 +2488,7 @@ textarea {
   align-items: center;
   gap: 8px;
 }
-.now-icon {
-  font-size: 22px;
-}
+/* 当前状态图标（已移除） */
 .now-name {
   font-size: 16px;
   font-weight: 700;
@@ -2230,5 +2641,230 @@ textarea {
   color: var(--muted);
   margin: 0;
 }
+/* ===== 应用名单：图标 / 选择器 / 池管理 ===== */
 
+/* 应用图标（懒加载，失败时用首字母色块兜底） */
+.app-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.app-icon img {
+  display: block;
+  border-radius: 7px;
+}
+.app-icon-fb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 7px;
+}
+
+/* 方向编辑：已选 chips */
+.app-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.app-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 170px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.app-chip.static {
+  cursor: default;
+}
+.app-chip.add {
+  border-style: dashed;
+  color: var(--ink-faint);
+  background: transparent;
+}
+.app-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-chip-x {
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.app-chip-x:hover {
+  color: var(--red);
+}
+
+/* 应用选择器：已安装应用列表 */
+.app-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin-top: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.app-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.app-pick-row:hover {
+  background: var(--accent-bg);
+}
+.app-pick-row.on {
+  background: var(--accent-bg);
+}
+.app-pick-row.off {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+.app-pick-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.app-pick-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-pick-pkg {
+  font-size: 11px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-pick-mark {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+/* 设置页：应用池列表 */
+.app-pool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.app-pool-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+.app-pool-row.unused {
+  opacity: 0.72;
+}
+.app-pool-main {
+  flex: 1;
+  min-width: 0;
+}
+.app-pool-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-pool-pkg {
+  font-size: 11px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-pool-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 11px;
+}
+.tag-allow {
+  color: var(--green);
+}
+.tag-block {
+  color: var(--red);
+}
+.app-pool-del {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.app-pool-del:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* 计时页：允许名单的应用图标行（在深色 session-overlay 内） */
+.session-apps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 14px;
+  max-width: 330px;
+  margin: -12px 0 22px;
+}
+.session-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  padding: 2px;
+  cursor: pointer;
+}
+.session-app:active {
+  opacity: 0.65;
+}
+.session-app-name {
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #b8a98f;
+}
 

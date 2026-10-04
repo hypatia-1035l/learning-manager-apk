@@ -1,0 +1,2250 @@
+{
+  "ranges": [],
+  "banks": [
+    {
+      "name": "世界观设定",
+      "category": "角色与二次元",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "现代都市",
+          "weight": 1
+        },
+        {
+          "text": "古代王朝",
+          "weight": 1
+        },
+        {
+          "text": "西幻",
+          "weight": 1
+        },
+        {
+          "text": "东方幻想",
+          "weight": 1
+        },
+        {
+          "text": "赛博朋克",
+          "weight": 1
+        },
+        {
+          "text": "蒸汽朋克",
+          "weight": 1
+        },
+        {
+          "text": "末日废土",
+          "weight": 1
+        },
+        {
+          "text": "星际文明",
+          "weight": 1
+        },
+        {
+          "text": "海洋文明",
+          "weight": 1
+        },
+        {
+          "text": "浮空城市",
+          "weight": 1
+        },
+        {
+          "text": "地下都市",
+          "weight": 1
+        },
+        {
+          "text": "魔法学院",
+          "weight": 1
+        },
+        {
+          "text": "神话世界",
+          "weight": 1
+        },
+        {
+          "text": "机械文明",
+          "weight": 1
+        },
+        {
+          "text": "蒸汽文明",
+          "weight": 1
+        },
+        {
+          "text": "冰雪世界",
+          "weight": 1
+        },
+        {
+          "text": "沙漠文明",
+          "weight": 1
+        },
+        {
+          "text": "丛林部落",
+          "weight": 1
+        },
+        {
+          "text": "架空大陆",
+          "weight": 1
+        },
+        {
+          "text": "镜像世界",
+          "weight": 1
+        },
+        {
+          "text": "时间循环",
+          "weight": 1
+        },
+        {
+          "text": "梦境空间",
+          "weight": 1
+        },
+        {
+          "text": "平行世界",
+          "weight": 1
+        },
+        {
+          "text": "深渊",
+          "weight": 1
+        },
+        {
+          "text": "神域",
+          "weight": 1
+        },
+        {
+          "text": "冥界",
+          "weight": 1
+        },
+        {
+          "text": "人造天堂",
+          "weight": 1
+        },
+        {
+          "text": "后启示录",
+          "weight": 1
+        },
+        {
+          "text": "赛博空间",
+          "weight": 1
+        },
+        {
+          "text": "近未来",
+          "weight": 1
+        },
+        {
+          "text": "远未来",
+          "weight": 1
+        },
+        {
+          "text": "赛博城市",
+          "weight": 1
+        },
+        {
+          "text": "蒸汽时代",
+          "weight": 1
+        },
+        {
+          "text": "工业革命",
+          "weight": 1
+        },
+        {
+          "text": "架空历史",
+          "weight": 1
+        },
+        {
+          "text": "古代幻想",
+          "weight": 1
+        },
+        {
+          "text": "西方奇幻",
+          "weight": 1
+        },
+        {
+          "text": "末日",
+          "weight": 1
+        },
+        {
+          "text": "废土",
+          "weight": 1
+        },
+        {
+          "text": "太空殖民",
+          "weight": 1
+        },
+        {
+          "text": "海底文明",
+          "weight": 1
+        },
+        {
+          "text": "地下文明",
+          "weight": 1
+        },
+        {
+          "text": "巨型都市",
+          "weight": 1
+        },
+        {
+          "text": "生态文明",
+          "weight": 1
+        },
+        {
+          "text": "魔法文明",
+          "weight": 1
+        },
+        {
+          "text": "人类与AI共存",
+          "weight": 1
+        },
+        {
+          "text": "人与自然共生",
+          "weight": 1
+        },
+        {
+          "text": "隐秘社会（麻瓜/魔法）",
+          "weight": 1
+        },
+        {
+          "text": "学院制世界",
+          "weight": 1
+        },
+        {
+          "text": "中世纪骑士王国",
+          "weight": 1
+        },
+        {
+          "text": "北欧神话世界",
+          "weight": 1
+        },
+        {
+          "text": "中土世界",
+          "weight": 1
+        },
+        {
+          "text": "严冬世界",
+          "weight": 1
+        },
+        {
+          "text": "封建王国",
+          "weight": 1
+        },
+        {
+          "text": "巫师社会",
+          "weight": 1
+        },
+        {
+          "text": "半兽人战争世界",
+          "weight": 1
+        },
+        {
+          "text": "精灵森林世界",
+          "weight": 1
+        },
+        {
+          "text": "末代王朝",
+          "weight": 1
+        },
+        {
+          "text": "双月世界",
+          "weight": 1
+        },
+        {
+          "text": "武侠江湖世界",
+          "weight": 1
+        },
+        {
+          "text": "神话现代世界",
+          "weight": 1
+        },
+        {
+          "text": "半兽人大陆",
+          "weight": 1
+        },
+        {
+          "text": "中式神话世界",
+          "weight": 1
+        },
+        {
+          "text": "赛博朋克世界",
+          "weight": 1
+        },
+        {
+          "text": "蒸汽朋克世界",
+          "weight": 1
+        },
+        {
+          "text": "反乌托邦近未来世界",
+          "weight": 1
+        },
+        {
+          "text": "架空维多利亚世界",
+          "weight": 1
+        },
+        {
+          "text": "蒸汽机械乌托邦世界",
+          "weight": 1
+        },
+        {
+          "text": "克苏鲁神话世界",
+          "weight": 1
+        },
+        {
+          "text": "克系宇宙（不可名状恐惧为主调）",
+          "weight": 1
+        },
+        {
+          "text": "恐怖都市世界",
+          "weight": 1
+        },
+        {
+          "text": "守秘社会与邪教组织",
+          "weight": 1
+        },
+        {
+          "text": "中式志怪世界（聊斋式狐鬼精怪）",
+          "weight": 1
+        },
+        {
+          "text": "阴阳两界世界（人鬼共居·幽冥并存）",
+          "weight": 1
+        },
+        {
+          "text": "希腊神话世界（奥林匹斯·半神英雄）",
+          "weight": 1
+        },
+        {
+          "text": "埃及神话世界（九柱神·冥界审判）",
+          "weight": 1
+        },
+        {
+          "text": "末世废土世界（核战后的废土）",
+          "weight": 1
+        },
+        {
+          "text": "地下幸存者世界（地铁式封闭聚落）",
+          "weight": 1
+        },
+        {
+          "text": "Medieval(中世纪)",
+          "weight": 1
+        },
+        {
+          "text": "Fantasy(奇幻)",
+          "weight": 1
+        },
+        {
+          "text": "Worldbuilding(世界观构建)",
+          "weight": 1
+        },
+        {
+          "text": "Fantasy Map(奇幻地图)",
+          "weight": 1
+        },
+        {
+          "text": "科幻太空歌剧世界",
+          "weight": 1
+        },
+        {
+          "text": "废土末世世界",
+          "weight": 1
+        },
+        {
+          "text": "硬科幻世界",
+          "weight": 1
+        },
+        {
+          "text": "星际文明世界",
+          "weight": 1
+        },
+        {
+          "text": "后人类世界",
+          "weight": 1
+        },
+        {
+          "text": "黑暗森林宇宙",
+          "weight": 1
+        },
+        {
+          "text": "平行宇宙世界",
+          "weight": 1
+        },
+        {
+          "text": "规则怪谈世界（诡异规则笼罩）",
+          "weight": 1
+        },
+        {
+          "text": "灵气复苏世界（都市修炼）",
+          "weight": 1
+        },
+        {
+          "text": "无限流副本世界",
+          "weight": 1
+        },
+        {
+          "text": "领地基建世界（开荒建设）",
+          "weight": 1
+        },
+        {
+          "text": "觉醒者都市",
+          "weight": 1
+        },
+        {
+          "text": "原始部落世界",
+          "weight": 1
+        },
+        {
+          "text": "诡异复苏世界（灵异时代·驭鬼）",
+          "weight": 1
+        },
+        {
+          "text": "天灾囤货世界（灾前倒计时）",
+          "weight": 1
+        },
+        {
+          "text": "高武孤岛世界（城镇孤岛化）",
+          "weight": 1
+        },
+        {
+          "text": "秘境游戏化世界（全民转职）",
+          "weight": 1
+        },
+        {
+          "text": "民俗灵异世界（白事规矩下的日常）",
+          "weight": 1
+        },
+        {
+          "text": "修仙家族世界（以代计的传承）",
+          "weight": 1
+        },
+        {
+          "text": "大荒神话世界（神兽食效体系）",
+          "weight": 1
+        },
+        {
+          "text": "票证年代世界（匮乏里的秩序）",
+          "weight": 1
+        },
+        {
+          "text": "穿书世界（带着剧本进来）",
+          "weight": 1
+        },
+        {
+          "text": "游戏化末世世界（被拉进来的求生游戏）",
+          "weight": 1
+        },
+        {
+          "text": "侯府宅门世界（位分即命运）",
+          "weight": 1
+        },
+        {
+          "text": "现代都市独居世界（一个人的城市与虚构的关系）",
+          "weight": 1
+        },
+        {
+          "text": "电竞竞技世界（赛场即战场）",
+          "weight": 1
+        },
+        {
+          "text": "营业CP世界（人设即商品·捆绑营业与解绑仪式）",
+          "weight": 1
+        },
+        {
+          "text": "女尊宫廷世界（女为尊·外戚势大·朝堂派系）",
+          "weight": 1
+        },
+        {
+          "text": "真千金宅门世界（位分即命运·真假千金互换）",
+          "weight": 1
+        },
+        {
+          "text": "民国沪上孤岛世界（租界·战时演艺·梨园风骨）",
+          "weight": 1
+        },
+        {
+          "text": "校园青春世界（班级小社会·宿舍关系·青春成长刻度）",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "外观元素",
+      "category": "角色与二次元",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "长发",
+          "weight": 1
+        },
+        {
+          "text": "短发",
+          "weight": 1
+        },
+        {
+          "text": "卷发",
+          "weight": 1
+        },
+        {
+          "text": "编发",
+          "weight": 1
+        },
+        {
+          "text": "双马尾",
+          "weight": 1
+        },
+        {
+          "text": "高马尾",
+          "weight": 1
+        },
+        {
+          "text": "侧分",
+          "weight": 1
+        },
+        {
+          "text": "凌乱发型",
+          "weight": 1
+        },
+        {
+          "text": "异色瞳",
+          "weight": 1
+        },
+        {
+          "text": "眼镜",
+          "weight": 1
+        },
+        {
+          "text": "角",
+          "weight": 1
+        },
+        {
+          "text": "翅膀",
+          "weight": 1
+        },
+        {
+          "text": "尾巴",
+          "weight": 1
+        },
+        {
+          "text": "耳饰",
+          "weight": 1
+        },
+        {
+          "text": "纹身",
+          "weight": 1
+        },
+        {
+          "text": "伤疤",
+          "weight": 1
+        },
+        {
+          "text": "胎记",
+          "weight": 1
+        },
+        {
+          "text": "机械义肢",
+          "weight": 1
+        },
+        {
+          "text": "面纱",
+          "weight": 1
+        },
+        {
+          "text": "项圈",
+          "weight": 1
+        },
+        {
+          "text": "丸子头",
+          "weight": 1
+        },
+        {
+          "text": "麻花辫",
+          "weight": 1
+        },
+        {
+          "text": "脏辫",
+          "weight": 1
+        },
+        {
+          "text": "独眼罩",
+          "weight": 1
+        },
+        {
+          "text": "义眼",
+          "weight": 1
+        },
+        {
+          "text": "第三只眼",
+          "weight": 1
+        },
+        {
+          "text": "唇环",
+          "weight": 1
+        },
+        {
+          "text": "绷带",
+          "weight": 1
+        },
+        {
+          "text": "锁链",
+          "weight": 1
+        },
+        {
+          "text": "羽翼",
+          "weight": 1
+        },
+        {
+          "text": "兽耳",
+          "weight": 1
+        },
+        {
+          "text": "猫耳",
+          "weight": 1
+        },
+        {
+          "text": "兔耳",
+          "weight": 1
+        },
+        {
+          "text": "鳞片",
+          "weight": 1
+        },
+        {
+          "text": "荧光纹路",
+          "weight": 1
+        },
+        {
+          "text": "发光体",
+          "weight": 1
+        },
+        {
+          "text": "水晶装饰",
+          "weight": 1
+        },
+        {
+          "text": "丝带",
+          "weight": 1
+        },
+        {
+          "text": "面具",
+          "weight": 1
+        },
+        {
+          "text": "眼罩",
+          "weight": 1
+        },
+        {
+          "text": "羽毛",
+          "weight": 1
+        },
+        {
+          "text": "机械结构",
+          "weight": 1
+        },
+        {
+          "text": "透明部件",
+          "weight": 1
+        },
+        {
+          "text": "植物寄生",
+          "weight": 1
+        },
+        {
+          "text": "晶体",
+          "weight": 1
+        },
+        {
+          "text": "金属装甲",
+          "weight": 1
+        },
+        {
+          "text": "特殊发型",
+          "weight": 1
+        },
+        {
+          "text": "Angel Wings(天使翅膀)",
+          "weight": 1
+        },
+        {
+          "text": "Butterfly Wings(蝴蝶翅膀)",
+          "weight": 1
+        },
+        {
+          "text": "Bat Wings(蝙蝠翅膀)",
+          "weight": 1
+        },
+        {
+          "text": "Dragon Wings(龙翼)",
+          "weight": 1
+        },
+        {
+          "text": "Moth Wings(蛾翅)",
+          "weight": 1
+        },
+        {
+          "text": "Mechanical Wings(机械翅膀)",
+          "weight": 1
+        },
+        {
+          "text": "Antlers(鹿角)",
+          "weight": 1
+        },
+        {
+          "text": "Ram Horns(公羊角)",
+          "weight": 1
+        },
+        {
+          "text": "Auburn Hair(赤褐发色)",
+          "weight": 1
+        },
+        {
+          "text": "Ginger Hair(姜红发色)",
+          "weight": 1
+        },
+        {
+          "text": "Peekaboo Hair(内层挑染)",
+          "weight": 1
+        },
+        {
+          "text": "Cherry Cola Hair(樱桃可乐发色)",
+          "weight": 1
+        },
+        {
+          "text": "Milk Tea Hair(奶茶发色)",
+          "weight": 1
+        },
+        {
+          "text": "Mushroom Brown Hair(蘑菇棕发色)",
+          "weight": 1
+        },
+        {
+          "text": "Mahogany Hair(红木棕发色)",
+          "weight": 1
+        },
+        {
+          "text": "Copper Hair(铜色发)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "性格特征",
+      "category": "角色与二次元",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "温柔",
+          "weight": 1
+        },
+        {
+          "text": "冷静",
+          "weight": 1
+        },
+        {
+          "text": "活泼",
+          "weight": 1
+        },
+        {
+          "text": "慵懒",
+          "weight": 1
+        },
+        {
+          "text": "傲娇",
+          "weight": 1
+        },
+        {
+          "text": "腹黑",
+          "weight": 1
+        },
+        {
+          "text": "理性",
+          "weight": 1
+        },
+        {
+          "text": "感性",
+          "weight": 1
+        },
+        {
+          "text": "孤独",
+          "weight": 1
+        },
+        {
+          "text": "坚定",
+          "weight": 1
+        },
+        {
+          "text": "好奇",
+          "weight": 1
+        },
+        {
+          "text": "疯狂",
+          "weight": 1
+        },
+        {
+          "text": "严谨",
+          "weight": 1
+        },
+        {
+          "text": "乐观",
+          "weight": 1
+        },
+        {
+          "text": "悲观",
+          "weight": 1
+        },
+        {
+          "text": "毒舌",
+          "weight": 1
+        },
+        {
+          "text": "天然呆",
+          "weight": 1
+        },
+        {
+          "text": "强势",
+          "weight": 1
+        },
+        {
+          "text": "神秘",
+          "weight": 1
+        },
+        {
+          "text": "热血",
+          "weight": 1
+        },
+        {
+          "text": "害羞",
+          "weight": 1
+        },
+        {
+          "text": "病娇",
+          "weight": 1
+        },
+        {
+          "text": "三无",
+          "weight": 1
+        },
+        {
+          "text": "电波系",
+          "weight": 1
+        },
+        {
+          "text": "中二",
+          "weight": 1
+        },
+        {
+          "text": "社恐",
+          "weight": 1
+        },
+        {
+          "text": "社牛",
+          "weight": 1
+        },
+        {
+          "text": "钝感",
+          "weight": 1
+        },
+        {
+          "text": "敏锐",
+          "weight": 1
+        },
+        {
+          "text": "自恋",
+          "weight": 1
+        },
+        {
+          "text": "胆小",
+          "weight": 1
+        },
+        {
+          "text": "勇敢",
+          "weight": 1
+        },
+        {
+          "text": "忠犬",
+          "weight": 1
+        },
+        {
+          "text": "女王",
+          "weight": 1
+        },
+        {
+          "text": "反差萌",
+          "weight": 1
+        },
+        {
+          "text": "沙雕",
+          "weight": 1
+        },
+        {
+          "text": "稳重",
+          "weight": 1
+        },
+        {
+          "text": "钝感力",
+          "weight": 1
+        },
+        {
+          "text": "表面温和内心腹黑",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "服装风格",
+      "category": "角色与二次元",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "日常休闲",
+          "weight": 1
+        },
+        {
+          "text": "学院风",
+          "weight": 1
+        },
+        {
+          "text": "制服",
+          "weight": 1
+        },
+        {
+          "text": "礼服",
+          "weight": 1
+        },
+        {
+          "text": "古风",
+          "weight": 1
+        },
+        {
+          "text": "汉服",
+          "weight": 1
+        },
+        {
+          "text": "哥特",
+          "weight": 1
+        },
+        {
+          "text": "洛丽塔",
+          "weight": 1
+        },
+        {
+          "text": "朋克",
+          "weight": 1
+        },
+        {
+          "text": "军装",
+          "weight": 1
+        },
+        {
+          "text": "未来装甲",
+          "weight": 1
+        },
+        {
+          "text": "蒸汽朋克",
+          "weight": 1
+        },
+        {
+          "text": "民族服饰",
+          "weight": 1
+        },
+        {
+          "text": "运动风",
+          "weight": 1
+        },
+        {
+          "text": "泳装",
+          "weight": 1
+        },
+        {
+          "text": "水手服",
+          "weight": 1
+        },
+        {
+          "text": "西装",
+          "weight": 1
+        },
+        {
+          "text": "和服",
+          "weight": 1
+        },
+        {
+          "text": "旗袍",
+          "weight": 1
+        },
+        {
+          "text": "浴衣",
+          "weight": 1
+        },
+        {
+          "text": "女仆装",
+          "weight": 1
+        },
+        {
+          "text": "女巫服",
+          "weight": 1
+        },
+        {
+          "text": "机甲",
+          "weight": 1
+        },
+        {
+          "text": "道袍",
+          "weight": 1
+        },
+        {
+          "text": "法袍",
+          "weight": 1
+        },
+        {
+          "text": "骑士铠甲",
+          "weight": 1
+        },
+        {
+          "text": "休闲卫衣",
+          "weight": 1
+        },
+        {
+          "text": "芭蕾舞裙",
+          "weight": 1
+        },
+        {
+          "text": "戏曲服",
+          "weight": 1
+        },
+        {
+          "text": "宇航服",
+          "weight": 1
+        },
+        {
+          "text": "森系",
+          "weight": 1
+        },
+        {
+          "text": "暗黑系",
+          "weight": 1
+        },
+        {
+          "text": "汉元素",
+          "weight": 1
+        },
+        {
+          "text": "日常",
+          "weight": 1
+        },
+        {
+          "text": "职业装",
+          "weight": 1
+        },
+        {
+          "text": "舞台服",
+          "weight": 1
+        },
+        {
+          "text": "运动服",
+          "weight": 1
+        },
+        {
+          "text": "户外服",
+          "weight": 1
+        },
+        {
+          "text": "工作服",
+          "weight": 1
+        },
+        {
+          "text": "传统服饰",
+          "weight": 1
+        },
+        {
+          "text": "维多利亚",
+          "weight": 1
+        },
+        {
+          "text": "洛可可",
+          "weight": 1
+        },
+        {
+          "text": "赛博",
+          "weight": 1
+        },
+        {
+          "text": "未来主义",
+          "weight": 1
+        },
+        {
+          "text": "幻想",
+          "weight": 1
+        },
+        {
+          "text": "废土",
+          "weight": 1
+        },
+        {
+          "text": "机能风",
+          "weight": 1
+        },
+        {
+          "text": "街头",
+          "weight": 1
+        },
+        {
+          "text": "Punk(朋克)",
+          "weight": 1
+        },
+        {
+          "text": "Steampunk(蒸汽朋克)",
+          "weight": 1
+        },
+        {
+          "text": "Casual(休闲)",
+          "weight": 1
+        },
+        {
+          "text": "Pirate(海盗)",
+          "weight": 1
+        },
+        {
+          "text": "Gothic(哥特)",
+          "weight": 1
+        },
+        {
+          "text": "Medieval(中世纪)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "种族设定",
+      "category": "角色与二次元",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "人类",
+          "weight": 1
+        },
+        {
+          "text": "精灵",
+          "weight": 1
+        },
+        {
+          "text": "兽人",
+          "weight": 1
+        },
+        {
+          "text": "龙族",
+          "weight": 1
+        },
+        {
+          "text": "机械生命",
+          "weight": 1
+        },
+        {
+          "text": "人偶",
+          "weight": 1
+        },
+        {
+          "text": "半妖",
+          "weight": 1
+        },
+        {
+          "text": "神裔",
+          "weight": 1
+        },
+        {
+          "text": "魔族",
+          "weight": 1
+        },
+        {
+          "text": "改造人",
+          "weight": 1
+        },
+        {
+          "text": "外星生命",
+          "weight": 1
+        },
+        {
+          "text": "天使",
+          "weight": 1
+        },
+        {
+          "text": "恶魔",
+          "weight": 1
+        },
+        {
+          "text": "幽灵",
+          "weight": 1
+        },
+        {
+          "text": "史莱姆",
+          "weight": 1
+        },
+        {
+          "text": "鱼人",
+          "weight": 1
+        },
+        {
+          "text": "矮人",
+          "weight": 1
+        },
+        {
+          "text": "巨人",
+          "weight": 1
+        },
+        {
+          "text": "树人",
+          "weight": 1
+        },
+        {
+          "text": "元素生命",
+          "weight": 1
+        },
+        {
+          "text": "亡灵",
+          "weight": 1
+        },
+        {
+          "text": "妖精",
+          "weight": 1
+        },
+        {
+          "text": "天人",
+          "weight": 1
+        },
+        {
+          "text": "龙人",
+          "weight": 1
+        },
+        {
+          "text": "触手系",
+          "weight": 1
+        },
+        {
+          "text": "影子生物",
+          "weight": 1
+        },
+        {
+          "text": "星灵",
+          "weight": 1
+        },
+        {
+          "text": "梦魇",
+          "weight": 1
+        },
+        {
+          "text": "构装体",
+          "weight": 1
+        },
+        {
+          "text": "渡鸦族",
+          "weight": 1
+        },
+        {
+          "text": "半鱼人",
+          "weight": 1
+        },
+        {
+          "text": "半兽人",
+          "weight": 1
+        },
+        {
+          "text": "地精",
+          "weight": 1
+        },
+        {
+          "text": "巨魔",
+          "weight": 1
+        },
+        {
+          "text": "狼人",
+          "weight": 1
+        },
+        {
+          "text": "吸血鬼",
+          "weight": 1
+        },
+        {
+          "text": "侏儒",
+          "weight": 1
+        },
+        {
+          "text": "半身人",
+          "weight": 1
+        },
+        {
+          "text": "娜迦",
+          "weight": 1
+        },
+        {
+          "text": "不死族",
+          "weight": 1
+        },
+        {
+          "text": "泰坦",
+          "weight": 1
+        },
+        {
+          "text": "石巨人",
+          "weight": 1
+        },
+        {
+          "text": "蜥蜴人",
+          "weight": 1
+        },
+        {
+          "text": "貔貅",
+          "weight": 1
+        },
+        {
+          "text": "麒麟",
+          "weight": 1
+        },
+        {
+          "text": "九尾狐",
+          "weight": 1
+        },
+        {
+          "text": "穷奇",
+          "weight": 1
+        },
+        {
+          "text": "獬豸",
+          "weight": 1
+        },
+        {
+          "text": "龙族",
+          "weight": 1
+        },
+        {
+          "text": "猫妖",
+          "weight": 1
+        },
+        {
+          "text": "兔精",
+          "weight": 1
+        },
+        {
+          "text": "仿生人",
+          "weight": 1
+        },
+        {
+          "text": "改造人",
+          "weight": 1
+        },
+        {
+          "text": "发条人(自动机)",
+          "weight": 1
+        },
+        {
+          "text": "智能AI意识体",
+          "weight": 1
+        },
+        {
+          "text": "合成人",
+          "weight": 1
+        },
+        {
+          "text": "神经接驳者",
+          "weight": 1
+        },
+        {
+          "text": "旧日支配者（克苏鲁式古神）",
+          "weight": 1
+        },
+        {
+          "text": "外神（阿撒托斯式宇宙本源）",
+          "weight": 1
+        },
+        {
+          "text": "眷族（深潜者/修格斯式非人种族）",
+          "weight": 1
+        },
+        {
+          "text": "异化半族（血缘异化人）",
+          "weight": 1
+        },
+        {
+          "text": "狐仙（修炼化形的狐）",
+          "weight": 1
+        },
+        {
+          "text": "鬼魂（滞留人间的亡者）",
+          "weight": 1
+        },
+        {
+          "text": "精怪（老物成精·花木兽精）",
+          "weight": 1
+        },
+        {
+          "text": "僵尸（停尸诈起·尸变）",
+          "weight": 1
+        },
+        {
+          "text": "Alien(外星人)",
+          "weight": 1
+        },
+        {
+          "text": "Angel(天使)",
+          "weight": 1
+        },
+        {
+          "text": "Dragon(龙)",
+          "weight": 1
+        },
+        {
+          "text": "Elf(精灵)",
+          "weight": 1
+        },
+        {
+          "text": "Fairy(仙子)",
+          "weight": 1
+        },
+        {
+          "text": "Mermaid(美人鱼)",
+          "weight": 1
+        },
+        {
+          "text": "Monster(怪物)",
+          "weight": 1
+        },
+        {
+          "text": "Robot(机器人)",
+          "weight": 1
+        },
+        {
+          "text": "Eldritch",
+          "weight": 1
+        },
+        {
+          "text": "硅基生命",
+          "weight": 1
+        },
+        {
+          "text": "能量态生命",
+          "weight": 1
+        },
+        {
+          "text": "机械文明",
+          "weight": 1
+        },
+        {
+          "text": "群体意识",
+          "weight": 1
+        },
+        {
+          "text": "量子态生命",
+          "weight": 1
+        },
+        {
+          "text": "晶体生命",
+          "weight": 1
+        },
+        {
+          "text": "共生聚合体",
+          "weight": 1
+        },
+        {
+          "text": "契约宠兽（御兽流搭档）",
+          "weight": 1
+        },
+        {
+          "text": "进化体凶兽（可进化升级）",
+          "weight": 1
+        },
+        {
+          "text": "觉醒异能者（超凡血脉）",
+          "weight": 1
+        },
+        {
+          "text": "域级大鬼（自成空间）",
+          "weight": 1
+        },
+        {
+          "text": "异化野兽（高武城外）",
+          "weight": 1
+        },
+        {
+          "text": "异界召唤兽（秘境产出）",
+          "weight": 1
+        },
+        {
+          "text": "大荒神兽族群（食之有异效）",
+          "weight": 1
+        },
+        {
+          "text": "水邪水族（河里的老人家）",
+          "weight": 1
+        },
+        {
+          "text": "灾变异兽群（定时来的那一波）",
+          "weight": 1
+        },
+        {
+          "text": "纸片人族群（原著里只有一句设定）",
+          "weight": 1
+        },
+        {
+          "text": "城市隐形人（没人记得他存在过）",
+          "weight": 1
+        },
+        {
+          "text": "人设化身（被虚构出来的完美恋人）",
+          "weight": 1
+        },
+        {
+          "text": "营业CP组合（捆绑人设·假戏真假难分）",
+          "weight": 1
+        },
+        {
+          "text": "病娇长公主（偏执占有·囚爱执念）",
+          "weight": 1
+        },
+        {
+          "text": "真假千金（身份反转·位分更迭）",
+          "weight": 1
+        },
+        {
+          "text": "民国梨园人（戏台上下·风骨担当）",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "角色关系",
+      "category": "角色与二次元",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "师徒",
+          "weight": 1
+        },
+        {
+          "text": "朋友",
+          "weight": 1
+        },
+        {
+          "text": "竞争者",
+          "weight": 1
+        },
+        {
+          "text": "宿敌",
+          "weight": 1
+        },
+        {
+          "text": "家族成员",
+          "weight": 1
+        },
+        {
+          "text": "同事",
+          "weight": 1
+        },
+        {
+          "text": "委托关系",
+          "weight": 1
+        },
+        {
+          "text": "合作者",
+          "weight": 1
+        },
+        {
+          "text": "恩人",
+          "weight": 1
+        },
+        {
+          "text": "被保护者",
+          "weight": 1
+        },
+        {
+          "text": "恋人",
+          "weight": 1
+        },
+        {
+          "text": "上下级",
+          "weight": 1
+        },
+        {
+          "text": "青梅竹马",
+          "weight": 1
+        },
+        {
+          "text": "兄弟",
+          "weight": 1
+        },
+        {
+          "text": "姐妹",
+          "weight": 1
+        },
+        {
+          "text": "双胞胎",
+          "weight": 1
+        },
+        {
+          "text": "主仆",
+          "weight": 1
+        },
+        {
+          "text": "医患",
+          "weight": 1
+        },
+        {
+          "text": "战友",
+          "weight": 1
+        },
+        {
+          "text": "前任",
+          "weight": 1
+        },
+        {
+          "text": "暗恋对象",
+          "weight": 1
+        },
+        {
+          "text": "情敌",
+          "weight": 1
+        },
+        {
+          "text": "监护人",
+          "weight": 1
+        },
+        {
+          "text": "偶像与粉丝",
+          "weight": 1
+        },
+        {
+          "text": "互救者",
+          "weight": 1
+        },
+        {
+          "text": "Duo(二人组)",
+          "weight": 1
+        },
+        {
+          "text": "Trio(三人组)",
+          "weight": 1
+        },
+        {
+          "text": "Siblings(兄弟姐妹)",
+          "weight": 1
+        },
+        {
+          "text": "Platonic(柏拉图式)",
+          "weight": 1
+        },
+        {
+          "text": "Enemies(敌对关系)",
+          "weight": 1
+        },
+        {
+          "text": "Poly(多角关系)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "身份职业",
+      "category": "角色与二次元",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "骑士",
+          "weight": 1
+        },
+        {
+          "text": "魔法师",
+          "weight": 1
+        },
+        {
+          "text": "学者",
+          "weight": 1
+        },
+        {
+          "text": "商人",
+          "weight": 1
+        },
+        {
+          "text": "医生",
+          "weight": 1
+        },
+        {
+          "text": "侦探",
+          "weight": 1
+        },
+        {
+          "text": "机械师",
+          "weight": 1
+        },
+        {
+          "text": "艺术家",
+          "weight": 1
+        },
+        {
+          "text": "探险家",
+          "weight": 1
+        },
+        {
+          "text": "教师",
+          "weight": 1
+        },
+        {
+          "text": "研究员",
+          "weight": 1
+        },
+        {
+          "text": "神官",
+          "weight": 1
+        },
+        {
+          "text": "刺客",
+          "weight": 1
+        },
+        {
+          "text": "炼金术师",
+          "weight": 1
+        },
+        {
+          "text": "守墓人",
+          "weight": 1
+        },
+        {
+          "text": "收藏家",
+          "weight": 1
+        },
+        {
+          "text": "旅行者",
+          "weight": 1
+        },
+        {
+          "text": "厨师",
+          "weight": 1
+        },
+        {
+          "text": "音乐家",
+          "weight": 1
+        },
+        {
+          "text": "发明家",
+          "weight": 1
+        },
+        {
+          "text": "剑士",
+          "weight": 1
+        },
+        {
+          "text": "弓箭手",
+          "weight": 1
+        },
+        {
+          "text": "盗贼",
+          "weight": 1
+        },
+        {
+          "text": "吟游诗人",
+          "weight": 1
+        },
+        {
+          "text": "铁匠",
+          "weight": 1
+        },
+        {
+          "text": "园丁",
+          "weight": 1
+        },
+        {
+          "text": "渔夫",
+          "weight": 1
+        },
+        {
+          "text": "记者",
+          "weight": 1
+        },
+        {
+          "text": "律师",
+          "weight": 1
+        },
+        {
+          "text": "法官",
+          "weight": 1
+        },
+        {
+          "text": "巫女",
+          "weight": 1
+        },
+        {
+          "text": "占星师",
+          "weight": 1
+        },
+        {
+          "text": "驯兽师",
+          "weight": 1
+        },
+        {
+          "text": "赏金猎人",
+          "weight": 1
+        },
+        {
+          "text": "制图师",
+          "weight": 1
+        },
+        {
+          "text": "图书管理员",
+          "weight": 1
+        },
+        {
+          "text": "调香师",
+          "weight": 1
+        },
+        {
+          "text": "占卜师",
+          "weight": 1
+        },
+        {
+          "text": "舞者",
+          "weight": 1
+        },
+        {
+          "text": "歌姬",
+          "weight": 1
+        },
+        {
+          "text": "考古学家",
+          "weight": 1
+        },
+        {
+          "text": "博物学家",
+          "weight": 1
+        },
+        {
+          "text": "天文学家",
+          "weight": 1
+        },
+        {
+          "text": "植物学家",
+          "weight": 1
+        },
+        {
+          "text": "摄影师",
+          "weight": 1
+        },
+        {
+          "text": "建筑师",
+          "weight": 1
+        },
+        {
+          "text": "设计师",
+          "weight": 1
+        },
+        {
+          "text": "策展人",
+          "weight": 1
+        },
+        {
+          "text": "画廊主理人",
+          "weight": 1
+        },
+        {
+          "text": "作家",
+          "weight": 1
+        },
+        {
+          "text": "调酒师",
+          "weight": 1
+        },
+        {
+          "text": "裁缝",
+          "weight": 1
+        },
+        {
+          "text": "工匠",
+          "weight": 1
+        },
+        {
+          "text": "钟表匠",
+          "weight": 1
+        },
+        {
+          "text": "工程师",
+          "weight": 1
+        },
+        {
+          "text": "程序员",
+          "weight": 1
+        },
+        {
+          "text": "飞行员",
+          "weight": 1
+        },
+        {
+          "text": "船员",
+          "weight": 1
+        },
+        {
+          "text": "魔术师",
+          "weight": 1
+        },
+        {
+          "text": "演员",
+          "weight": 1
+        },
+        {
+          "text": "Witch(女巫)",
+          "weight": 1
+        },
+        {
+          "text": "Goddess(女神)",
+          "weight": 1
+        },
+        {
+          "text": "Warrior(战士)",
+          "weight": 1
+        },
+        {
+          "text": "Jester(弄臣)",
+          "weight": 1
+        },
+        {
+          "text": "Cowboy(牛仔)",
+          "weight": 1
+        },
+        {
+          "text": "Superhero(超级英雄)",
+          "weight": 1
+        },
+        {
+          "text": "御兽师",
+          "weight": 1
+        },
+        {
+          "text": "觉醒者",
+          "weight": 1
+        },
+        {
+          "text": "副本闯关者",
+          "weight": 1
+        },
+        {
+          "text": "领主（基建开拓）",
+          "weight": 1
+        },
+        {
+          "text": "部落首领",
+          "weight": 1
+        },
+        {
+          "text": "怪谈调查员",
+          "weight": 1
+        },
+        {
+          "text": "驭鬼者",
+          "weight": 1
+        },
+        {
+          "text": "镇鬼使",
+          "weight": 1
+        },
+        {
+          "text": "武者（武道序列）",
+          "weight": 1
+        },
+        {
+          "text": "觉醒职业者",
+          "weight": 1
+        },
+        {
+          "text": "召唤师",
+          "weight": 1
+        },
+        {
+          "text": "重生囤货者",
+          "weight": 1
+        },
+        {
+          "text": "捞尸人（水上讨生活的行当）",
+          "weight": 1
+        },
+        {
+          "text": "白事人（殡葬一条龙手艺人）",
+          "weight": 1
+        },
+        {
+          "text": "民间法师（半真半假的先生）",
+          "weight": 1
+        },
+        {
+          "text": "修仙家主（修为与手腕并重）",
+          "weight": 1
+        },
+        {
+          "text": "单位干事（管分配与介绍信的人）",
+          "weight": 1
+        },
+        {
+          "text": "管事妈妈（宅门里说规矩的那张嘴）",
+          "weight": 1
+        },
+        {
+          "text": "囤货党（末世里的仓鼠）",
+          "weight": 1
+        },
+        {
+          "text": "穿书者（带着剧本进来的异类）",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "道具装备",
+      "category": "角色与二次元",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "古剑",
+          "weight": 1
+        },
+        {
+          "text": "魔导书",
+          "weight": 1
+        },
+        {
+          "text": "怀表",
+          "weight": 1
+        },
+        {
+          "text": "手杖",
+          "weight": 1
+        },
+        {
+          "text": "弓箭",
+          "weight": 1
+        },
+        {
+          "text": "枪械",
+          "weight": 1
+        },
+        {
+          "text": "乐器",
+          "weight": 1
+        },
+        {
+          "text": "法杖",
+          "weight": 1
+        },
+        {
+          "text": "机械装置",
+          "weight": 1
+        },
+        {
+          "text": "神秘石板",
+          "weight": 1
+        },
+        {
+          "text": "收藏品",
+          "weight": 1
+        },
+        {
+          "text": "宠物伙伴",
+          "weight": 1
+        },
+        {
+          "text": "盾牌",
+          "weight": 1
+        },
+        {
+          "text": "匕首",
+          "weight": 1
+        },
+        {
+          "text": "望远镜",
+          "weight": 1
+        },
+        {
+          "text": "相机",
+          "weight": 1
+        },
+        {
+          "text": "符咒",
+          "weight": 1
+        },
+        {
+          "text": "权杖",
+          "weight": 1
+        },
+        {
+          "text": "长枪",
+          "weight": 1
+        },
+        {
+          "text": "双刀",
+          "weight": 1
+        },
+        {
+          "text": "链刃",
+          "weight": 1
+        },
+        {
+          "text": "飞镖",
+          "weight": 1
+        },
+        {
+          "text": "罗盘",
+          "weight": 1
+        },
+        {
+          "text": "灯笼",
+          "weight": 1
+        },
+        {
+          "text": "宝珠",
+          "weight": 1
+        },
+        {
+          "text": "圣杯",
+          "weight": 1
+        },
+        {
+          "text": "面具",
+          "weight": 1
+        },
+        {
+          "text": "披风",
+          "weight": 1
+        },
+        {
+          "text": "腰带",
+          "weight": 1
+        },
+        {
+          "text": "护腕",
+          "weight": 1
+        },
+        {
+          "text": "戒指",
+          "weight": 1
+        },
+        {
+          "text": "项链",
+          "weight": 1
+        },
+        {
+          "text": "耳坠",
+          "weight": 1
+        },
+        {
+          "text": "留声机",
+          "weight": 1
+        },
+        {
+          "text": "八音盒",
+          "weight": 1
+        },
+        {
+          "text": "油灯",
+          "weight": 1
+        },
+        {
+          "text": "骨笛",
+          "weight": 1
+        },
+        {
+          "text": "图腾",
+          "weight": 1
+        },
+        {
+          "text": "Magic Staff(法杖)",
+          "weight": 1
+        },
+        {
+          "text": "Wizard Staff(巫师法杖)",
+          "weight": 1
+        },
+        {
+          "text": "Plate Armor(板甲)",
+          "weight": 1
+        },
+        {
+          "text": "Leather Armor(皮甲)",
+          "weight": 1
+        },
+        {
+          "text": "系统面板",
+          "weight": 1
+        },
+        {
+          "text": "契约徽章",
+          "weight": 1
+        },
+        {
+          "text": "宠兽空间",
+          "weight": 1
+        },
+        {
+          "text": "领地图卷",
+          "weight": 1
+        },
+        {
+          "text": "超凡商品",
+          "weight": 1
+        },
+        {
+          "text": "人皮纸（主动认主的邪物）",
+          "weight": 1
+        },
+        {
+          "text": "随身空间（血契认主）",
+          "weight": 1
+        },
+        {
+          "text": "粮票（灾币）",
+          "weight": 1
+        },
+        {
+          "text": "本命装备（觉醒具现）",
+          "weight": 1
+        },
+        {
+          "text": "反差神器（家常器物）",
+          "weight": 1
+        },
+        {
+          "text": "民俗法器（桃木剑/铜铃/罗盘）",
+          "weight": 1
+        },
+        {
+          "text": "捞尸行头（钩杆与船）",
+          "weight": 1
+        },
+        {
+          "text": "族谱与祠堂牌位（家族的法统）",
+          "weight": 1
+        },
+        {
+          "text": "巫器（骨卜/龟甲/神杖）",
+          "weight": 1
+        },
+        {
+          "text": "粮本（一家人的口粮账）",
+          "weight": 1
+        },
+        {
+          "text": "卖身契（一张纸定一辈子）",
+          "weight": 1
+        },
+        {
+          "text": "宝箱（从木质到钻石）",
+          "weight": 1
+        },
+        {
+          "text": "手写剧本（写着结局的那本）",
+          "weight": 1
+        }
+      ]
+    }
+  ],
+  "presets": []
+}

@@ -1,0 +1,1821 @@
+{
+  "ranges": [],
+  "banks": [
+    {
+      "name": "动物",
+      "category": "日常生活",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "猫",
+          "weight": 1
+        },
+        {
+          "text": "狗",
+          "weight": 1
+        },
+        {
+          "text": "兔子",
+          "weight": 1
+        },
+        {
+          "text": "仓鼠",
+          "weight": 1
+        },
+        {
+          "text": "狐狸",
+          "weight": 1
+        },
+        {
+          "text": "狼",
+          "weight": 1
+        },
+        {
+          "text": "鹿",
+          "weight": 1
+        },
+        {
+          "text": "熊",
+          "weight": 1
+        },
+        {
+          "text": "鸟",
+          "weight": 1
+        },
+        {
+          "text": "蝴蝶",
+          "weight": 1
+        },
+        {
+          "text": "蜜蜂",
+          "weight": 1
+        },
+        {
+          "text": "鱼",
+          "weight": 1
+        },
+        {
+          "text": "鲸鱼",
+          "weight": 1
+        },
+        {
+          "text": "海豚",
+          "weight": 1
+        },
+        {
+          "text": "乌龟",
+          "weight": 1
+        },
+        {
+          "text": "蜗牛",
+          "weight": 1
+        },
+        {
+          "text": "青蛙",
+          "weight": 1
+        },
+        {
+          "text": "蜻蜓",
+          "weight": 1
+        },
+        {
+          "text": "孔雀",
+          "weight": 1
+        },
+        {
+          "text": "天鹅",
+          "weight": 1
+        },
+        {
+          "text": "企鹅",
+          "weight": 1
+        },
+        {
+          "text": "海豹",
+          "weight": 1
+        },
+        {
+          "text": "水獭",
+          "weight": 1
+        },
+        {
+          "text": "羊驼",
+          "weight": 1
+        },
+        {
+          "text": "考拉",
+          "weight": 1
+        },
+        {
+          "text": "树懒",
+          "weight": 1
+        },
+        {
+          "text": "鳄鱼",
+          "weight": 1
+        },
+        {
+          "text": "蛇",
+          "weight": 1
+        },
+        {
+          "text": "章鱼",
+          "weight": 1
+        },
+        {
+          "text": "水母",
+          "weight": 1
+        },
+        {
+          "text": "螃蟹",
+          "weight": 1
+        },
+        {
+          "text": "龙虾",
+          "weight": 1
+        },
+        {
+          "text": "海星",
+          "weight": 1
+        },
+        {
+          "text": "萤火虫",
+          "weight": 1
+        },
+        {
+          "text": "瓢虫",
+          "weight": 1
+        },
+        {
+          "text": "燕子",
+          "weight": 1
+        },
+        {
+          "text": "锦鲤",
+          "weight": 1
+        },
+        {
+          "text": "象",
+          "weight": 1
+        },
+        {
+          "text": "刺猬",
+          "weight": 1
+        },
+        {
+          "text": "松鼠",
+          "weight": 1
+        },
+        {
+          "text": "Ragdoll(布偶猫)",
+          "weight": 1
+        },
+        {
+          "text": "Calico(三花猫)",
+          "weight": 1
+        },
+        {
+          "text": "Red Panda(小熊猫)",
+          "weight": 1
+        },
+        {
+          "text": "Sausage Dog(腊肠犬)",
+          "weight": 1
+        },
+        {
+          "text": "Fox(狐狸)",
+          "weight": 1
+        },
+        {
+          "text": "Owl(猫头鹰)",
+          "weight": 1
+        },
+        {
+          "text": "Bunny(兔子)",
+          "weight": 1
+        },
+        {
+          "text": "Bear(熊)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "场景地点",
+      "category": "日常生活",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "厨房",
+          "weight": 1
+        },
+        {
+          "text": "书房",
+          "weight": 1
+        },
+        {
+          "text": "卧室",
+          "weight": 1
+        },
+        {
+          "text": "阳台",
+          "weight": 1
+        },
+        {
+          "text": "庭院",
+          "weight": 1
+        },
+        {
+          "text": "花园",
+          "weight": 1
+        },
+        {
+          "text": "咖啡馆",
+          "weight": 1
+        },
+        {
+          "text": "书店",
+          "weight": 1
+        },
+        {
+          "text": "车站",
+          "weight": 1
+        },
+        {
+          "text": "街道",
+          "weight": 1
+        },
+        {
+          "text": "公园",
+          "weight": 1
+        },
+        {
+          "text": "学校",
+          "weight": 1
+        },
+        {
+          "text": "教室",
+          "weight": 1
+        },
+        {
+          "text": "博物馆",
+          "weight": 1
+        },
+        {
+          "text": "集市",
+          "weight": 1
+        },
+        {
+          "text": "森林小屋",
+          "weight": 1
+        },
+        {
+          "text": "海边",
+          "weight": 1
+        },
+        {
+          "text": "山顶",
+          "weight": 1
+        },
+        {
+          "text": "温室",
+          "weight": 1
+        },
+        {
+          "text": "旧仓库",
+          "weight": 1
+        },
+        {
+          "text": "天台",
+          "weight": 1
+        },
+        {
+          "text": "屋顶",
+          "weight": 1
+        },
+        {
+          "text": "桥",
+          "weight": 1
+        },
+        {
+          "text": "隧道",
+          "weight": 1
+        },
+        {
+          "text": "码头",
+          "weight": 1
+        },
+        {
+          "text": "港口",
+          "weight": 1
+        },
+        {
+          "text": "灯塔",
+          "weight": 1
+        },
+        {
+          "text": "神庙",
+          "weight": 1
+        },
+        {
+          "text": "钟楼",
+          "weight": 1
+        },
+        {
+          "text": "广场",
+          "weight": 1
+        },
+        {
+          "text": "夜市",
+          "weight": 1
+        },
+        {
+          "text": "天桥",
+          "weight": 1
+        },
+        {
+          "text": "回廊",
+          "weight": 1
+        },
+        {
+          "text": "长廊",
+          "weight": 1
+        },
+        {
+          "text": "美术馆",
+          "weight": 1
+        },
+        {
+          "text": "水族馆",
+          "weight": 1
+        },
+        {
+          "text": "动物园",
+          "weight": 1
+        },
+        {
+          "text": "植物园",
+          "weight": 1
+        },
+        {
+          "text": "旧工厂",
+          "weight": 1
+        },
+        {
+          "text": "废墟",
+          "weight": 1
+        },
+        {
+          "text": "巷弄",
+          "weight": 1
+        },
+        {
+          "text": "Cafe(咖啡馆)",
+          "weight": 1
+        },
+        {
+          "text": "Paradise(乐园)",
+          "weight": 1
+        },
+        {
+          "text": "Garden(花园)",
+          "weight": 1
+        },
+        {
+          "text": "Park(公园)",
+          "weight": 1
+        },
+        {
+          "text": "Paris(巴黎)",
+          "weight": 1
+        },
+        {
+          "text": "Italy(意大利)",
+          "weight": 1
+        },
+        {
+          "text": "London(伦敦)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "季节天气",
+      "category": "日常生活",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "春天",
+          "weight": 1
+        },
+        {
+          "text": "夏天",
+          "weight": 1
+        },
+        {
+          "text": "秋天",
+          "weight": 1
+        },
+        {
+          "text": "冬天",
+          "weight": 1
+        },
+        {
+          "text": "清晨",
+          "weight": 1
+        },
+        {
+          "text": "午后",
+          "weight": 1
+        },
+        {
+          "text": "黄昏",
+          "weight": 1
+        },
+        {
+          "text": "夜晚",
+          "weight": 1
+        },
+        {
+          "text": "晴天",
+          "weight": 1
+        },
+        {
+          "text": "阴天",
+          "weight": 1
+        },
+        {
+          "text": "雨天",
+          "weight": 1
+        },
+        {
+          "text": "暴雨",
+          "weight": 1
+        },
+        {
+          "text": "雪天",
+          "weight": 1
+        },
+        {
+          "text": "雾气",
+          "weight": 1
+        },
+        {
+          "text": "微风",
+          "weight": 1
+        },
+        {
+          "text": "炎热",
+          "weight": 1
+        },
+        {
+          "text": "凉爽",
+          "weight": 1
+        },
+        {
+          "text": "潮湿",
+          "weight": 1
+        },
+        {
+          "text": "干燥",
+          "weight": 1
+        },
+        {
+          "text": "早春",
+          "weight": 1
+        },
+        {
+          "text": "盛夏",
+          "weight": 1
+        },
+        {
+          "text": "深秋",
+          "weight": 1
+        },
+        {
+          "text": "隆冬",
+          "weight": 1
+        },
+        {
+          "text": "梅雨",
+          "weight": 1
+        },
+        {
+          "text": "台风",
+          "weight": 1
+        },
+        {
+          "text": "冰雹",
+          "weight": 1
+        },
+        {
+          "text": "晚霞",
+          "weight": 1
+        },
+        {
+          "text": "极光",
+          "weight": 1
+        },
+        {
+          "text": "月全食",
+          "weight": 1
+        },
+        {
+          "text": "流星雨",
+          "weight": 1
+        },
+        {
+          "text": "回南天",
+          "weight": 1
+        },
+        {
+          "text": "倒春寒",
+          "weight": 1
+        },
+        {
+          "text": "秋老虎",
+          "weight": 1
+        },
+        {
+          "text": "霜降",
+          "weight": 1
+        },
+        {
+          "text": "立春",
+          "weight": 1
+        },
+        {
+          "text": "冬至",
+          "weight": 1
+        },
+        {
+          "text": "飘雪",
+          "weight": 1
+        },
+        {
+          "text": "落叶",
+          "weight": 1
+        },
+        {
+          "text": "朝霞",
+          "weight": 1
+        },
+        {
+          "text": "长冬",
+          "weight": 1
+        },
+        {
+          "text": "长夏",
+          "weight": 1
+        },
+        {
+          "text": "血月",
+          "weight": 1
+        },
+        {
+          "text": "永昼",
+          "weight": 1
+        },
+        {
+          "text": "永夜",
+          "weight": 1
+        },
+        {
+          "text": "沙尘暴",
+          "weight": 1
+        },
+        {
+          "text": "瘟疫季",
+          "weight": 1
+        },
+        {
+          "text": "丰收季",
+          "weight": 1
+        },
+        {
+          "text": "双月同天",
+          "weight": 1
+        },
+        {
+          "text": "极夜",
+          "weight": 1
+        },
+        {
+          "text": "异相天象（星象错乱·月红·双日）",
+          "weight": 1
+        },
+        {
+          "text": "异常气节（不该有的季节出现）",
+          "weight": 1
+        },
+        {
+          "text": "中元（鬼门开·百鬼夜行）",
+          "weight": 1
+        },
+        {
+          "text": "阴雨天（阴阳交界的压抑天象）",
+          "weight": 1
+        },
+        {
+          "text": "灯会（元宵视觉主题）",
+          "weight": 1
+        },
+        {
+          "text": "踏青（春日郊游主题）",
+          "weight": 1
+        },
+        {
+          "text": "赛龙舟（端午竞渡主题）",
+          "weight": 1
+        },
+        {
+          "text": "中秋灯市（月圆市集主题）",
+          "weight": 1
+        },
+        {
+          "text": "腊祭（岁暮谢神主题）",
+          "weight": 1
+        },
+        {
+          "text": "Rainy(雨天)",
+          "weight": 1
+        },
+        {
+          "text": "Sunset(日落)",
+          "weight": 1
+        },
+        {
+          "text": "Foggy Morning(雾晨)",
+          "weight": 1
+        },
+        {
+          "text": "Sunrise(日出)",
+          "weight": 1
+        },
+        {
+          "text": "Mist(薄雾)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "日常活动",
+      "category": "日常生活",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "阅读",
+          "weight": 1
+        },
+        {
+          "text": "写信",
+          "weight": 1
+        },
+        {
+          "text": "绘画",
+          "weight": 1
+        },
+        {
+          "text": "摄影",
+          "weight": 1
+        },
+        {
+          "text": "烘焙",
+          "weight": 1
+        },
+        {
+          "text": "泡茶",
+          "weight": 1
+        },
+        {
+          "text": "喝咖啡",
+          "weight": 1
+        },
+        {
+          "text": "散步",
+          "weight": 1
+        },
+        {
+          "text": "旅行",
+          "weight": 1
+        },
+        {
+          "text": "露营",
+          "weight": 1
+        },
+        {
+          "text": "园艺",
+          "weight": 1
+        },
+        {
+          "text": "购物",
+          "weight": 1
+        },
+        {
+          "text": "听音乐",
+          "weight": 1
+        },
+        {
+          "text": "看电影",
+          "weight": 1
+        },
+        {
+          "text": "收集",
+          "weight": 1
+        },
+        {
+          "text": "制作手工",
+          "weight": 1
+        },
+        {
+          "text": "整理房间",
+          "weight": 1
+        },
+        {
+          "text": "观察星星",
+          "weight": 1
+        },
+        {
+          "text": "野餐",
+          "weight": 1
+        },
+        {
+          "text": "钓鱼",
+          "weight": 1
+        },
+        {
+          "text": "滑雪",
+          "weight": 1
+        },
+        {
+          "text": "冲浪",
+          "weight": 1
+        },
+        {
+          "text": "滑冰",
+          "weight": 1
+        },
+        {
+          "text": "放风筝",
+          "weight": 1
+        },
+        {
+          "text": "做陶",
+          "weight": 1
+        },
+        {
+          "text": "织毛衣",
+          "weight": 1
+        },
+        {
+          "text": "拼图",
+          "weight": 1
+        },
+        {
+          "text": "练字",
+          "weight": 1
+        },
+        {
+          "text": "插花",
+          "weight": 1
+        },
+        {
+          "text": "调香",
+          "weight": 1
+        },
+        {
+          "text": "煮咖啡",
+          "weight": 1
+        },
+        {
+          "text": "发呆",
+          "weight": 1
+        },
+        {
+          "text": "晒太阳",
+          "weight": 1
+        },
+        {
+          "text": "撸猫",
+          "weight": 1
+        },
+        {
+          "text": "逛展",
+          "weight": 1
+        },
+        {
+          "text": "看展",
+          "weight": 1
+        },
+        {
+          "text": "约饭",
+          "weight": 1
+        },
+        {
+          "text": "冥想",
+          "weight": 1
+        },
+        {
+          "text": "写日记",
+          "weight": 1
+        },
+        {
+          "text": "做饭",
+          "weight": 1
+        },
+        {
+          "text": "吃饭",
+          "weight": 1
+        },
+        {
+          "text": "喝茶",
+          "weight": 1
+        },
+        {
+          "text": "写作",
+          "weight": 1
+        },
+        {
+          "text": "运动",
+          "weight": 1
+        },
+        {
+          "text": "聚会",
+          "weight": 1
+        },
+        {
+          "text": "约会",
+          "weight": 1
+        },
+        {
+          "text": "逛街",
+          "weight": 1
+        },
+        {
+          "text": "工作",
+          "weight": 1
+        },
+        {
+          "text": "学习",
+          "weight": 1
+        },
+        {
+          "text": "Picnic(野餐)",
+          "weight": 1
+        },
+        {
+          "text": "Crochet(钩针编织)",
+          "weight": 1
+        },
+        {
+          "text": "Photography(摄影)",
+          "weight": 1
+        },
+        {
+          "text": "Reading(阅读)",
+          "weight": 1
+        },
+        {
+          "text": "Coloring(涂色)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "植物与自然",
+      "category": "日常生活",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "玫瑰",
+          "weight": 1
+        },
+        {
+          "text": "向日葵",
+          "weight": 1
+        },
+        {
+          "text": "郁金香",
+          "weight": 1
+        },
+        {
+          "text": "樱花",
+          "weight": 1
+        },
+        {
+          "text": "梅花",
+          "weight": 1
+        },
+        {
+          "text": "荷花",
+          "weight": 1
+        },
+        {
+          "text": "竹子",
+          "weight": 1
+        },
+        {
+          "text": "松树",
+          "weight": 1
+        },
+        {
+          "text": "藤蔓",
+          "weight": 1
+        },
+        {
+          "text": "苔藓",
+          "weight": 1
+        },
+        {
+          "text": "蘑菇",
+          "weight": 1
+        },
+        {
+          "text": "蒲公英",
+          "weight": 1
+        },
+        {
+          "text": "麦田",
+          "weight": 1
+        },
+        {
+          "text": "草地",
+          "weight": 1
+        },
+        {
+          "text": "森林",
+          "weight": 1
+        },
+        {
+          "text": "湖泊",
+          "weight": 1
+        },
+        {
+          "text": "河流",
+          "weight": 1
+        },
+        {
+          "text": "海岸",
+          "weight": 1
+        },
+        {
+          "text": "沙滩",
+          "weight": 1
+        },
+        {
+          "text": "山脉",
+          "weight": 1
+        },
+        {
+          "text": "云朵",
+          "weight": 1
+        },
+        {
+          "text": "星空",
+          "weight": 1
+        },
+        {
+          "text": "月亮",
+          "weight": 1
+        },
+        {
+          "text": "夕阳",
+          "weight": 1
+        },
+        {
+          "text": "雨滴",
+          "weight": 1
+        },
+        {
+          "text": "雪花",
+          "weight": 1
+        },
+        {
+          "text": "银杏",
+          "weight": 1
+        },
+        {
+          "text": "梧桐",
+          "weight": 1
+        },
+        {
+          "text": "枫叶",
+          "weight": 1
+        },
+        {
+          "text": "芦苇",
+          "weight": 1
+        },
+        {
+          "text": "菖蒲",
+          "weight": 1
+        },
+        {
+          "text": "睡莲",
+          "weight": 1
+        },
+        {
+          "text": "鸢尾",
+          "weight": 1
+        },
+        {
+          "text": "铃兰",
+          "weight": 1
+        },
+        {
+          "text": "雏菊",
+          "weight": 1
+        },
+        {
+          "text": "三色堇",
+          "weight": 1
+        },
+        {
+          "text": "山茶",
+          "weight": 1
+        },
+        {
+          "text": "桂花",
+          "weight": 1
+        },
+        {
+          "text": "茉莉",
+          "weight": 1
+        },
+        {
+          "text": "薰衣草",
+          "weight": 1
+        },
+        {
+          "text": "鼠尾草",
+          "weight": 1
+        },
+        {
+          "text": "蕨类",
+          "weight": 1
+        },
+        {
+          "text": "星河",
+          "weight": 1
+        },
+        {
+          "text": "银河",
+          "weight": 1
+        },
+        {
+          "text": "潮汐",
+          "weight": 1
+        },
+        {
+          "text": "礁石",
+          "weight": 1
+        },
+        {
+          "text": "珊瑚",
+          "weight": 1
+        },
+        {
+          "text": "海藻",
+          "weight": 1
+        },
+        {
+          "text": "浪花",
+          "weight": 1
+        },
+        {
+          "text": "薄雾",
+          "weight": 1
+        },
+        {
+          "text": "朝霞",
+          "weight": 1
+        },
+        {
+          "text": "Wildflower(野花)",
+          "weight": 1
+        },
+        {
+          "text": "Houseplant(室内盆栽)",
+          "weight": 1
+        },
+        {
+          "text": "Fern(蕨类)",
+          "weight": 1
+        },
+        {
+          "text": "Orchid(兰花)",
+          "weight": 1
+        },
+        {
+          "text": "Rose(玫瑰)",
+          "weight": 1
+        },
+        {
+          "text": "Poppy(虞美人)",
+          "weight": 1
+        },
+        {
+          "text": "Lavender(薰衣草)",
+          "weight": 1
+        },
+        {
+          "text": "Iris(鸢尾花)",
+          "weight": 1
+        },
+        {
+          "text": "Lily(百合)",
+          "weight": 1
+        },
+        {
+          "text": "Tulip(郁金香)",
+          "weight": 1
+        },
+        {
+          "text": "Peony(牡丹)",
+          "weight": 1
+        },
+        {
+          "text": "Sunflower(向日葵)",
+          "weight": 1
+        },
+        {
+          "text": "Magnolia(玉兰)",
+          "weight": 1
+        },
+        {
+          "text": "Fig(无花果)",
+          "weight": 1
+        },
+        {
+          "text": "Daisy(雏菊)",
+          "weight": 1
+        },
+        {
+          "text": "Mushroom(蘑菇)",
+          "weight": 1
+        },
+        {
+          "text": "Bouquet(花束)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "生活物件",
+      "category": "日常生活",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "书本",
+          "weight": 1
+        },
+        {
+          "text": "信件",
+          "weight": 1
+        },
+        {
+          "text": "邮票",
+          "weight": 1
+        },
+        {
+          "text": "信封",
+          "weight": 1
+        },
+        {
+          "text": "钢笔",
+          "weight": 1
+        },
+        {
+          "text": "铅笔",
+          "weight": 1
+        },
+        {
+          "text": "墨水",
+          "weight": 1
+        },
+        {
+          "text": "日记本",
+          "weight": 1
+        },
+        {
+          "text": "相机",
+          "weight": 1
+        },
+        {
+          "text": "唱片",
+          "weight": 1
+        },
+        {
+          "text": "耳机",
+          "weight": 1
+        },
+        {
+          "text": "雨伞",
+          "weight": 1
+        },
+        {
+          "text": "手提箱",
+          "weight": 1
+        },
+        {
+          "text": "钥匙",
+          "weight": 1
+        },
+        {
+          "text": "怀表",
+          "weight": 1
+        },
+        {
+          "text": "镜子",
+          "weight": 1
+        },
+        {
+          "text": "玻璃杯",
+          "weight": 1
+        },
+        {
+          "text": "陶瓷杯",
+          "weight": 1
+        },
+        {
+          "text": "茶壶",
+          "weight": 1
+        },
+        {
+          "text": "花瓶",
+          "weight": 1
+        },
+        {
+          "text": "蜡烛",
+          "weight": 1
+        },
+        {
+          "text": "灯笼",
+          "weight": 1
+        },
+        {
+          "text": "台灯",
+          "weight": 1
+        },
+        {
+          "text": "窗帘",
+          "weight": 1
+        },
+        {
+          "text": "桌椅",
+          "weight": 1
+        },
+        {
+          "text": "木箱",
+          "weight": 1
+        },
+        {
+          "text": "旧家具",
+          "weight": 1
+        },
+        {
+          "text": "火柴",
+          "weight": 1
+        },
+        {
+          "text": "怀炉",
+          "weight": 1
+        },
+        {
+          "text": "团扇",
+          "weight": 1
+        },
+        {
+          "text": "折扇",
+          "weight": 1
+        },
+        {
+          "text": "香囊",
+          "weight": 1
+        },
+        {
+          "text": "木梳",
+          "weight": 1
+        },
+        {
+          "text": "发簪",
+          "weight": 1
+        },
+        {
+          "text": "玉佩",
+          "weight": 1
+        },
+        {
+          "text": "铃铛",
+          "weight": 1
+        },
+        {
+          "text": "风铃",
+          "weight": 1
+        },
+        {
+          "text": "纸灯笼",
+          "weight": 1
+        },
+        {
+          "text": "油纸伞",
+          "weight": 1
+        },
+        {
+          "text": "算盘",
+          "weight": 1
+        },
+        {
+          "text": "铜镜",
+          "weight": 1
+        },
+        {
+          "text": "镇纸",
+          "weight": 1
+        },
+        {
+          "text": "砚台",
+          "weight": 1
+        },
+        {
+          "text": "印章",
+          "weight": 1
+        },
+        {
+          "text": "线香",
+          "weight": 1
+        },
+        {
+          "text": "香炉",
+          "weight": 1
+        },
+        {
+          "text": "茶则",
+          "weight": 1
+        },
+        {
+          "text": "茶宠",
+          "weight": 1
+        },
+        {
+          "text": "鸟笼",
+          "weight": 1
+        },
+        {
+          "text": "鱼缸",
+          "weight": 1
+        },
+        {
+          "text": "相框",
+          "weight": 1
+        },
+        {
+          "text": "拍立得",
+          "weight": 1
+        },
+        {
+          "text": "黑胶",
+          "weight": 1
+        },
+        {
+          "text": "磁带",
+          "weight": 1
+        },
+        {
+          "text": "游戏机",
+          "weight": 1
+        },
+        {
+          "text": "眼镜",
+          "weight": 1
+        },
+        {
+          "text": "手表",
+          "weight": 1
+        },
+        {
+          "text": "钱包",
+          "weight": 1
+        },
+        {
+          "text": "背包",
+          "weight": 1
+        },
+        {
+          "text": "行李箱",
+          "weight": 1
+        },
+        {
+          "text": "杯子",
+          "weight": 1
+        },
+        {
+          "text": "餐具",
+          "weight": 1
+        },
+        {
+          "text": "茶具",
+          "weight": 1
+        },
+        {
+          "text": "闹钟",
+          "weight": 1
+        },
+        {
+          "text": "收音机",
+          "weight": 1
+        },
+        {
+          "text": "书",
+          "weight": 1
+        },
+        {
+          "text": "玩具",
+          "weight": 1
+        },
+        {
+          "text": "文具",
+          "weight": 1
+        },
+        {
+          "text": "工具箱",
+          "weight": 1
+        },
+        {
+          "text": "Antiques(古董)",
+          "weight": 1
+        },
+        {
+          "text": "Stationery(文具)",
+          "weight": 1
+        },
+        {
+          "text": "Umbrella(雨伞)",
+          "weight": 1
+        },
+        {
+          "text": "Coloring Book(涂色书)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "食物与饮品",
+      "category": "日常生活",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "苹果",
+          "weight": 1
+        },
+        {
+          "text": "梨",
+          "weight": 1
+        },
+        {
+          "text": "桃子",
+          "weight": 1
+        },
+        {
+          "text": "樱桃",
+          "weight": 1
+        },
+        {
+          "text": "草莓",
+          "weight": 1
+        },
+        {
+          "text": "蓝莓",
+          "weight": 1
+        },
+        {
+          "text": "葡萄",
+          "weight": 1
+        },
+        {
+          "text": "柠檬",
+          "weight": 1
+        },
+        {
+          "text": "橙子",
+          "weight": 1
+        },
+        {
+          "text": "西瓜",
+          "weight": 1
+        },
+        {
+          "text": "石榴",
+          "weight": 1
+        },
+        {
+          "text": "无花果",
+          "weight": 1
+        },
+        {
+          "text": "栗子",
+          "weight": 1
+        },
+        {
+          "text": "南瓜",
+          "weight": 1
+        },
+        {
+          "text": "面包",
+          "weight": 1
+        },
+        {
+          "text": "蛋糕",
+          "weight": 1
+        },
+        {
+          "text": "饼干",
+          "weight": 1
+        },
+        {
+          "text": "糖果",
+          "weight": 1
+        },
+        {
+          "text": "巧克力",
+          "weight": 1
+        },
+        {
+          "text": "冰淇淋",
+          "weight": 1
+        },
+        {
+          "text": "布丁",
+          "weight": 1
+        },
+        {
+          "text": "奶茶",
+          "weight": 1
+        },
+        {
+          "text": "咖啡",
+          "weight": 1
+        },
+        {
+          "text": "红茶",
+          "weight": 1
+        },
+        {
+          "text": "绿茶",
+          "weight": 1
+        },
+        {
+          "text": "果汁",
+          "weight": 1
+        },
+        {
+          "text": "汽水",
+          "weight": 1
+        },
+        {
+          "text": "冰可乐",
+          "weight": 1
+        },
+        {
+          "text": "热可可",
+          "weight": 1
+        },
+        {
+          "text": "蜂蜜",
+          "weight": 1
+        },
+        {
+          "text": "果酱",
+          "weight": 1
+        },
+        {
+          "text": "芒果",
+          "weight": 1
+        },
+        {
+          "text": "香蕉",
+          "weight": 1
+        },
+        {
+          "text": "猕猴桃",
+          "weight": 1
+        },
+        {
+          "text": "柚子",
+          "weight": 1
+        },
+        {
+          "text": "荔枝",
+          "weight": 1
+        },
+        {
+          "text": "龙眼",
+          "weight": 1
+        },
+        {
+          "text": "枇杷",
+          "weight": 1
+        },
+        {
+          "text": "李子",
+          "weight": 1
+        },
+        {
+          "text": "杏",
+          "weight": 1
+        },
+        {
+          "text": "柿子",
+          "weight": 1
+        },
+        {
+          "text": "山楂",
+          "weight": 1
+        },
+        {
+          "text": "红枣",
+          "weight": 1
+        },
+        {
+          "text": "芝麻",
+          "weight": 1
+        },
+        {
+          "text": "花生",
+          "weight": 1
+        },
+        {
+          "text": "杏仁",
+          "weight": 1
+        },
+        {
+          "text": "核桃",
+          "weight": 1
+        },
+        {
+          "text": "酸奶",
+          "weight": 1
+        },
+        {
+          "text": "奶酪",
+          "weight": 1
+        },
+        {
+          "text": "可丽饼",
+          "weight": 1
+        },
+        {
+          "text": "华夫饼",
+          "weight": 1
+        },
+        {
+          "text": "马卡龙",
+          "weight": 1
+        },
+        {
+          "text": "司康",
+          "weight": 1
+        },
+        {
+          "text": "泡芙",
+          "weight": 1
+        },
+        {
+          "text": "麻薯",
+          "weight": 1
+        },
+        {
+          "text": "大福",
+          "weight": 1
+        },
+        {
+          "text": "和果子",
+          "weight": 1
+        },
+        {
+          "text": "抹茶",
+          "weight": 1
+        },
+        {
+          "text": "可可",
+          "weight": 1
+        },
+        {
+          "text": "气泡水",
+          "weight": 1
+        },
+        {
+          "text": "苏打水",
+          "weight": 1
+        },
+        {
+          "text": "清酒",
+          "weight": 1
+        },
+        {
+          "text": "梅酒",
+          "weight": 1
+        },
+        {
+          "text": "米酒",
+          "weight": 1
+        },
+        {
+          "text": "花茶",
+          "weight": 1
+        },
+        {
+          "text": "果茶",
+          "weight": 1
+        },
+        {
+          "text": "茶",
+          "weight": 1
+        },
+        {
+          "text": "葡萄酒",
+          "weight": 1
+        },
+        {
+          "text": "啤酒",
+          "weight": 1
+        },
+        {
+          "text": "甜点",
+          "weight": 1
+        },
+        {
+          "text": "面条",
+          "weight": 1
+        },
+        {
+          "text": "米饭",
+          "weight": 1
+        },
+        {
+          "text": "火锅",
+          "weight": 1
+        },
+        {
+          "text": "烧烤",
+          "weight": 1
+        },
+        {
+          "text": "早餐",
+          "weight": 1
+        },
+        {
+          "text": "便当",
+          "weight": 1
+        },
+        {
+          "text": "街头小吃",
+          "weight": 1
+        },
+        {
+          "text": "Pancake(松饼)",
+          "weight": 1
+        },
+        {
+          "text": "Cereal(麦片)",
+          "weight": 1
+        },
+        {
+          "text": "Egg(鸡蛋)",
+          "weight": 1
+        },
+        {
+          "text": "Vanilla(香草)",
+          "weight": 1
+        },
+        {
+          "text": "Latte(拿铁)",
+          "weight": 1
+        },
+        {
+          "text": "Matcha(抹茶)",
+          "weight": 1
+        },
+        {
+          "text": "Ice Cream(冰淇淋)",
+          "weight": 1
+        }
+      ]
+    }
+  ],
+  "presets": []
+}

@@ -2,6 +2,9 @@
 // 扫描所有 learning-manager:* 前缀的 localStorage，打包成 JSON
 // 导入时写回 localStorage 并刷新页面，让 useSyncExternalStore 重新读取
 
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
+
 const KEY_PREFIX = 'learning-manager:'
 const EXPORT_VERSION = 1
 
@@ -59,24 +62,43 @@ export function exportAllData(): BackupFile {
   }
 }
 
-// 触发浏览器下载备份文件
-export function downloadBackup(): void {
+// 触发下载 / 原生写盘
+// - 桌面 Web：用 Blob + <a download>，浏览器直接存盘
+// - 原生（Android）：用 @capacitor/filesystem 写到「下载」目录（经 MediaStore，
+//   无需危险权限，文件会出现在系统文件管理/下载中）。
+//   注意：Android WebView 对 blob URL 的 <a download> 支持不可靠，会静默失败，
+//   所以原生端必须走 Filesystem。
+// 返回保存位置描述，便于 UI 给出精确提示。
+export async function downloadBackup(): Promise<string> {
   const backup = exportAllData()
   const json = JSON.stringify(backup, null, 2)
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const fileName = `今天摸啥鱼-备份-${dateStr}.json`
+
+  if (Capacitor.isNativePlatform()) {
+    await Filesystem.writeFile({
+      path: fileName,
+      data: json,
+      directory: Directory.Documents,
+      encoding: Encoding.UTF8,
+    })
+    return `已保存到文档目录：${fileName}`
+  }
+
+  // Web 端：Blob 下载方案
   const blob = new Blob([json], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  // 文件名：今天摸啥鱼-备份-2026-07-28.json
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  a.download = `今天摸啥鱼-备份-${dateStr}.json`
+  a.download = fileName
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
   // 释放 URL
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+  return `已导出，请到下载目录查找 ${fileName}`
 }
 
 // 解析备份文件内容
@@ -132,14 +154,23 @@ export function validateBackup(backup: BackupFile): ValidationResult {
 // 注意：会覆盖现有持久数据，调用方应先确认
 export function importBackup(backup: BackupFile): void {
   // 1. 清除现有持久键（瞬态键原样保留，不破坏当前设备运行态）
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (
-      key &&
-      key.startsWith(KEY_PREFIX) &&
-      !TRANSIENT_KEYS.has(key)
-    ) {
+  // 先收集再删除：边遍历边 removeItem 会让索引跳位，留下漏删的陈旧键
+  const staleKeys: string[] = []
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(KEY_PREFIX) && !TRANSIENT_KEYS.has(key)) {
+        staleKeys.push(key)
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  for (const key of staleKeys) {
+    try {
       localStorage.removeItem(key)
+    } catch {
+      /* ignore */
     }
   }
   // 2. 写回备份数据（跳过任何瞬态键，防御性）

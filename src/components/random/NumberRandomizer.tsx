@@ -4,9 +4,20 @@ import {
   addRange,
   updateRange,
   deleteRange,
+  randInt,
   randNum,
   addRandomRecord,
 } from '../../randomStore'
+
+// 「不重复」偏好持久化 key
+const NUM_UNIQUE_KEY = 'learning-manager:num-unique'
+function loadUnique(): boolean {
+  try {
+    return localStorage.getItem(NUM_UNIQUE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 export function NumberRandomizer() {
   const data = useRandomData()
@@ -18,27 +29,102 @@ export function NumberRandomizer() {
   const [results, setResults] = useState<number[]>([])
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
+  // 不重复：同一批内不出现相同数字（仅整数模式）
+  const [uniqueOn, setUniqueOn] = useState(loadUnique)
+  // 复制按钮反馈
+  const [copied, setCopied] = useState(false)
 
   const minNum = Number(min)
   const maxNum = Number(max)
   const decimals = Math.min(10, Math.max(0, Math.floor(Number(decimalsInput) || 0)))
   const decimalsLabel = decimals === 0 ? '整数' : `${decimals} 位小数`
+  const unique = uniqueOn && decimals === 0
+  // 去重时的实际可抽条数（范围内整数不足时自动降）
+  const uniqueN = Number.isFinite(minNum) && Number.isFinite(maxNum)
+    ? Math.min(drawCount, Math.floor(maxNum) - Math.ceil(minNum) + 1)
+    : drawCount
+
+  const toggleUnique = () => {
+    const next = !uniqueOn
+    setUniqueOn(next)
+    setResults([])
+    try {
+      localStorage.setItem(NUM_UNIQUE_KEY, next ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+  }
 
   const handleRoll = () => {
     if (isNaN(minNum) || isNaN(maxNum)) return
     if (minNum > maxNum) return
-    const picks: number[] = []
-    for (let i = 0; i < drawCount; i++) {
-      picks.push(randNum(minNum, maxNum, decimals))
+    let picks: number[] = []
+    if (unique) {
+      // 去重抽取：整批不出现相同数字（实际条数不足时按可抽条数取）
+      const lo = Math.ceil(minNum)
+      const hi = Math.floor(maxNum)
+      const n = Math.min(drawCount, hi - lo + 1)
+      const s = new Set<number>()
+      while (s.size < n) s.add(randInt(lo, hi))
+      picks = [...s]
+    } else {
+      for (let i = 0; i < drawCount; i++) {
+        picks.push(randNum(minNum, maxNum, decimals))
+      }
     }
     setResults(picks)
     // 写入随机记录
     const resultText = picks.map((n) => formatNumber(n, decimals)).join('、')
     addRandomRecord({
       type: 'number',
-      summary: `${minNum}–${maxNum} · ${decimalsLabel} ×${drawCount}`,
+      summary: `${minNum}–${maxNum} · ${decimalsLabel}${unique ? ' · 不重复' : ''} ×${picks.length}`,
       result: resultText,
     })
+  }
+
+  const handleCopy = () => {
+    if (!results.length) return
+    const text = results.map((n) => formatNumber(n, decimals)).join('、')
+    let ok = false
+    try {
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {})
+        ok = true
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+      } catch {
+        /* ignore */
+      }
+    }
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
+  }
+
+  // 快捷范围：一键填好常用随机场景
+  const QUICK_RANGES: Array<[string, number, number]> = [
+    ['硬币 1-2', 1, 2],
+    ['骰子 1-6', 1, 6],
+    ['1-100', 1, 100],
+    ['正负 10', -10, 10],
+  ]
+  const applyQuick = (lo: number, hi: number) => {
+    setMin(String(lo))
+    setMax(String(hi))
+    setResults([])
   }
 
   const handleLoadRange = (r: typeof data.ranges[0]) => {
@@ -61,7 +147,7 @@ export function NumberRandomizer() {
 
         <div className="form-stack">
           <div className="row">
-            <div className="field" style={{ flex: 1 }}>
+            <div className="field" style={{ flex: '0 0 auto' }}>
               <label>最小值</label>
               <input
                 type="number"
@@ -73,7 +159,7 @@ export function NumberRandomizer() {
                 }}
               />
             </div>
-            <div className="field" style={{ flex: 1 }}>
+            <div className="field" style={{ flex: '0 0 auto' }}>
               <label>最大值</label>
               <input
                 type="number"
@@ -87,15 +173,29 @@ export function NumberRandomizer() {
             </div>
           </div>
 
+          {/* 快捷范围 */}
+          <div className="row wrap" style={{ gap: 6, marginTop: 2 }}>
+            <span className="faint" style={{ fontSize: 12 }}>快捷</span>
+            {QUICK_RANGES.map(([label, lo, hi]) => (
+              <button
+                key={label}
+                type="button"
+                className="btn sm"
+                onClick={() => applyQuick(lo, hi)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           <div className="field">
-            <label>小数位（0-10）</label>
+            <label>小数位</label>
             <div className="row">
               <input
                 type="number"
                 min={0}
                 max={10}
                 className="input"
-                style={{ width: 100 }}
                 value={decimalsInput}
                 onChange={(e) => {
                   setDecimalsInput(e.target.value)
@@ -113,15 +213,31 @@ export function NumberRandomizer() {
             </div>
           </div>
 
+          {/* 不重复开关（仅整数） */}
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <label
+              className="row"
+              style={{ gap: 6, fontSize: 13, cursor: decimals === 0 ? 'pointer' : 'not-allowed', opacity: decimals === 0 ? 1 : 0.5 }}
+              title={decimals === 0 ? '同一批内不出现相同数字' : '不重复仅支持整数（小数位为 0）'}
+            >
+              <input
+                type="checkbox"
+                checked={unique}
+                disabled={decimals !== 0}
+                onChange={toggleUnique}
+              />
+              不重复（同一批内不出现相同数字）
+            </label>
+          </div>
+
           <div className="field">
             <label>抽取数量</label>
-            <input
-              type="number"
-              min={1}
-              max={50}
-              className="input"
-              style={{ width: 100 }}
-              value={drawCount}
+              <input
+                type="number"
+                min={1}
+                max={50}
+                className="input"
+                value={drawCount}
               onChange={(e) =>
                 setDrawCount(Math.max(1, Math.min(50, Math.floor(Number(e.target.value) || 1))))
               }
@@ -130,13 +246,23 @@ export function NumberRandomizer() {
 
           <div className="rt-result">
             {results.length ? (
-              <div className="rt-number-list">
-                {results.map((n, i) => (
-                  <span key={i} className="rt-number">
-                    {formatNumber(n, decimals)}
-                  </span>
-                ))}
-              </div>
+              <>
+                <div className="rt-number-list">
+                  {results.map((n, i) => (
+                    <span key={i} className="rt-number">
+                      {formatNumber(n, decimals)}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="btn sm ghost rt-copy-btn"
+                  onClick={handleCopy}
+                  title="复制结果"
+                >
+                  {copied ? '已复制' : '复制结果'}
+                </button>
+              </>
             ) : (
               <span className="faint">点击下方按钮开始随机</span>
             )}
@@ -146,16 +272,16 @@ export function NumberRandomizer() {
             className="btn primary lg"
             onClick={handleRoll}
             disabled={isNaN(minNum) || isNaN(maxNum) || minNum > maxNum}
+            title={unique && uniqueN < drawCount ? '范围内整数不够，实际抽取 ' + uniqueN + ' 个' : undefined}
           >
-            随机 ×{drawCount}
+            随机 ×{unique ? Math.max(0, uniqueN) : drawCount}
           </button>
 
           <div className="field">
-            <label>保存为常用</label>
+            <label>名称</label>
             <div className="row">
               <input
                 className="input"
-                placeholder="名称，如：页码 1-300"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
@@ -254,27 +380,34 @@ function RangeEditRow({
   const [max, setMax] = useState(String(range.max))
   return (
     <div className="inline-edit" style={{ flex: 1 }}>
-      <input
-        className="input"
-        style={{ flex: 1, minWidth: 100 }}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="名称"
-      />
-      <input
-        type="number"
-        className="input"
-        style={{ width: 80 }}
-        value={min}
-        onChange={(e) => setMin(e.target.value)}
-      />
-      <input
-        type="number"
-        className="input"
-        style={{ width: 80 }}
-        value={max}
-        onChange={(e) => setMax(e.target.value)}
-      />
+      <div className="field" style={{ flex: 1, minWidth: 100, marginBottom: 0 }}>
+        <label>名称</label>
+        <input
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>最小</label>
+        <input
+          type="number"
+          className="input"
+          style={{ width: 80 }}
+          value={min}
+          onChange={(e) => setMin(e.target.value)}
+        />
+      </div>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>最大</label>
+        <input
+          type="number"
+          className="input"
+          style={{ width: 80 }}
+          value={max}
+          onChange={(e) => setMax(e.target.value)}
+        />
+      </div>
       <button
         className="btn sm primary"
         onClick={() => {

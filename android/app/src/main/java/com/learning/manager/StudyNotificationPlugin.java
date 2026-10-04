@@ -6,6 +6,8 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -19,6 +21,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.ArrayList;
 
 /**
  * 原生发布通知插件。
@@ -41,7 +45,7 @@ public class StudyNotificationPlugin extends Plugin {
 
     @Override
     public void load() {
-        ensureChannel(getContext());
+        ensureChannels(getContext());
     }
 
     /** MainActivity 在 onCreate / onNewIntent 中调用：写入 pending action */
@@ -63,7 +67,13 @@ public class StudyNotificationPlugin extends Plugin {
 
     @PluginMethod
     public void ensureChannel(PluginCall call) {
-        ensureChannel(getContext());
+        ensureChannels(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void ensureChannels(PluginCall call) {
+        ensureChannels(getContext());
         call.resolve();
     }
 
@@ -73,12 +83,13 @@ public class StudyNotificationPlugin extends Plugin {
      */
     @PluginMethod
     public void fireNow(PluginCall call) {
-        int    id      = call.getInt("id", 1);
-        String title   = call.getString("title", "今天摸啥鱼");
-        String body    = call.getString("body",  "该摸一条鱼了。");
-        String taskId  = call.getString("taskId");
+        int    id       = call.getInt("id", 1);
+        String title    = call.getString("title", "今天摸啥鱼");
+        String body     = call.getString("body",  "该摸一条鱼了。");
+        String taskId   = call.getString("taskId");
+        String channel  = call.getString("channel", StudyNotificationActionReceiver.CHANNEL_ID_STRONG);
 
-        fireImpl(getContext(), id, title, body, taskId);
+        fireImpl(getContext(), id, title, body, taskId, channel);
         call.resolve();
     }
 
@@ -97,15 +108,19 @@ public class StudyNotificationPlugin extends Plugin {
                 Object raw = list.get(i);
                 if (!(raw instanceof JSONObject)) continue;
                 JSONObject o = (JSONObject) raw;
-                int    id      = o.has("id")    ? o.getInt("id") : (i + 1);
-                String title   = o.optString("title", "今天摸啥鱼");
-                String body    = o.optString("body",  "该摸一条鱼了。");
-                String taskId  = o.isNull("taskId") ? null : o.optString("taskId", null);
-                long   atMs    = o.has("atMs")  ? o.getLong("atMs") : 0L;
+                int    id       = o.has("id")    ? o.getInt("id") : (i + 1);
+                String title    = o.optString("title", "今天摸啥鱼");
+                String body     = o.optString("body",  "该摸一条鱼了。");
+                String taskId   = o.isNull("taskId") ? null : o.optString("taskId", null);
+                long   atMs     = o.has("atMs")  ? o.getLong("atMs") : 0L;
+                String channel  = o.optString("channel", StudyNotificationActionReceiver.CHANNEL_ID_STRONG);
                 if (atMs <= 0 || atMs <= System.currentTimeMillis()) {
-                    fireImpl(ctx, id, title, body, taskId);
+                    fireImpl(ctx, id, title, body, taskId, channel);
                 } else {
-                    scheduleExact(ctx, id, title, body, taskId, atMs);
+                    scheduleExact(ctx, id, title, body, taskId, atMs, channel);
+                    // 镜像到本地存储：设备重启会清空 AlarmManager，届时由
+                    // StudyNotificationBootReceiver 据此原样重排
+                    NotifScheduleStore.put(ctx, id, title, body, taskId, atMs, channel);
                 }
                 ok++;
             } catch (JSONException ignored) {}
@@ -117,8 +132,29 @@ public class StudyNotificationPlugin extends Plugin {
 
     @PluginMethod
     public void cancelAll(PluginCall call) {
-        try { NotificationManagerCompat.from(getContext()).cancelAll(); }
-        catch (Throwable ignored) {}
+        try {
+            JSArray ids = call.getArray("ids");
+            NotificationManagerCompat nm = NotificationManagerCompat.from(getContext());
+            if (ids != null && ids.length() > 0) {
+                // 只取消 JS 指定的提醒 id：cancelAll() 会连带清掉
+                // 计时常驻通知（2000）与越界提醒（3001）。
+                ArrayList<Integer> idList = new ArrayList<>();
+                for (int i = 0; i < ids.length(); i++) {
+                    try {
+                        Integer id = ids.getInt(i);
+                        if (id != null && id >= 0) {
+                            nm.cancel(id);
+                            idList.add(id);
+                        }
+                    } catch (Exception ignored) {}
+                }
+                // 同步清掉本地镜像，避免开机后把已取消的提醒又恢复出来
+                NotifScheduleStore.removeAll(getContext(), idList);
+            } else {
+                nm.cancelAll();
+                NotifScheduleStore.clear(getContext());
+            }
+        } catch (Throwable ignored) {}
         call.resolve();
     }
 
@@ -159,12 +195,13 @@ public class StudyNotificationPlugin extends Plugin {
 
     // ---------------------- internal ----------------------
 
-    private void scheduleExact(Context ctx, int id, String title, String body, String taskId, long atMs) {
+    static void scheduleExact(Context ctx, int id, String title, String body, String taskId, long atMs, String channel) {
         Intent fire = new Intent(ctx, StudyNotificationActionReceiver.class);
         fire.setAction("com.learning.manager.NOTIF_REFIRE");
         fire.putExtra(StudyNotificationActionReceiver.EXTRA_TITLE, title);
         fire.putExtra(StudyNotificationActionReceiver.EXTRA_BODY, body);
         fire.putExtra(StudyNotificationActionReceiver.EXTRA_NOTIF_ID, id);
+        fire.putExtra(StudyNotificationActionReceiver.EXTRA_CHANNEL, channel);
         if (taskId != null) fire.putExtra(StudyNotificationActionReceiver.EXTRA_TASK_ID, taskId);
 
         PendingIntent pi = PendingIntent.getBroadcast(
@@ -182,17 +219,19 @@ public class StudyNotificationPlugin extends Plugin {
                     // 已获精确闹钟权限：准时触发
                     am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi);
                 } else {
-                    // 未获精确闹钟权限：降级为宽松定时（可能漂移，但不会崩溃/静默失败）
-                    am.set(AlarmManager.RTC_WAKEUP, atMs, pi);
+                    // 未获精确闹钟权限：降级为「宽松但允许打盹触发」。
+                    // 这里刻意不用 am.set()：set() 在 Doze 下会被推迟到维护窗口（可能几小时），
+                    // setAndAllowWhileIdle 无需精确闹钟权限，仍能在打盹中送达（约 9 分钟节流）。
+                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi);
                 }
             } catch (Throwable t) {
-                try { am.set(AlarmManager.RTC_WAKEUP, atMs, pi); } catch (Throwable ignored) {}
+                try { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi); } catch (Throwable ignored) {}
             }
         }
     }
 
-    static void fireImpl(Context ctx, int id, String title, String body, String taskId) {
-        ensureChannel(ctx);
+    static void fireImpl(Context ctx, int id, String title, String body, String taskId, String channel) {
+        ensureChannels(ctx);
 
         // 点击通知本体时打开 MainActivity，带 action=start
         Intent openApp = new Intent(ctx, MainActivity.class);
@@ -220,8 +259,8 @@ public class StudyNotificationPlugin extends Plugin {
                 StudyNotificationActionReceiver.buildBroadcastAction(ctx, id, title, body, taskId,
                         "com.learning.manager.NOTIF_CANCEL", "取消", 50000 + id);
 
-        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, StudyNotificationActionReceiver.CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
+        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, channel)
+                .setSmallIcon(R.drawable.ic_stat_notify)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
@@ -236,18 +275,51 @@ public class StudyNotificationPlugin extends Plugin {
         catch (Throwable ignored) {}
     }
 
-    static void ensureChannel(Context ctx) {
+    static void ensureChannels(Context ctx) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm == null) return;
-            if (nm.getNotificationChannel(StudyNotificationActionReceiver.CHANNEL_ID) == null) {
+
+            // 强提醒：自带提神闹钟声 + 震动 + 弹 heads-up，确保外部可感知
+            if (nm.getNotificationChannel(StudyNotificationActionReceiver.CHANNEL_ID_STRONG) == null) {
                 NotificationChannel ch = new NotificationChannel(
-                        StudyNotificationActionReceiver.CHANNEL_ID,
-                        StudyNotificationActionReceiver.CHANNEL_NAME,
+                        StudyNotificationActionReceiver.CHANNEL_ID_STRONG,
+                        "强提醒",
                         NotificationManager.IMPORTANCE_HIGH);
-                ch.setDescription("学习/摸鱼提醒，含延迟与忽略按钮（延迟不打开App）");
+                ch.setDescription("提神闹钟声+震动，确保不错过");
                 ch.enableLights(true);
                 ch.enableVibration(true);
+                ch.setVibrationPattern(new long[]{0, 220, 120, 220, 120, 220, 120, 360});
+                // 优先用自带的升调闹钟声（更提神），缺失时退回系统闹钟声
+                Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+                try {
+                    soundUri = Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.alarm_reminder);
+                } catch (Throwable ignored) {}
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build();
+                ch.setSound(soundUri, attrs);
+                nm.createNotificationChannel(ch);
+            }
+
+            // 弱提醒：仅在通知栏显示，不发声不震动
+            if (nm.getNotificationChannel(StudyNotificationActionReceiver.CHANNEL_ID_WEAK) == null) {
+                NotificationChannel ch = new NotificationChannel(
+                        StudyNotificationActionReceiver.CHANNEL_ID_WEAK,
+                        "弱提醒",
+                        NotificationManager.IMPORTANCE_LOW);
+                ch.setDescription("只出现在通知栏，不打扰");
+                nm.createNotificationChannel(ch);
+            }
+
+            // 静默提醒：不发声、不震动、不弹 heads-up，最小程度存在感
+            if (nm.getNotificationChannel(StudyNotificationActionReceiver.CHANNEL_ID_SILENT) == null) {
+                NotificationChannel ch = new NotificationChannel(
+                        StudyNotificationActionReceiver.CHANNEL_ID_SILENT,
+                        "静默提醒",
+                        NotificationManager.IMPORTANCE_MIN);
+                ch.setDescription("仅保留通知记录，几乎无打扰");
                 nm.createNotificationChannel(ch);
             }
         }

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type {
   AppData,
+  AppEntry,
   Task,
   TaskStatus,
   TaskGroup,
@@ -11,6 +12,10 @@ import type {
   StudyRecord,
   ReminderConfig,
   ProgressNode,
+  PlanDay,
+  PlanItem,
+  PinnedTask,
+  TimeWindow,
 } from './types'
 import { DEFAULT_REMINDER } from './types'
 import {
@@ -22,6 +27,25 @@ import {
 } from './migrate'
 
 const STORAGE_KEY = 'learning-manager:data:v1'
+const DEFAULT_TASK_SEEDED_KEY = 'learning-manager:default-task-seeded'
+// 原文备份键：主数据解析/迁移失败时把原始字符串留在这里，避免被默认数据静默覆盖
+const CORRUPT_BACKUP_KEY = 'learning-manager:data:corrupt-backup'
+
+function readSeededFlag(): boolean {
+  try {
+    return localStorage.getItem(DEFAULT_TASK_SEEDED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeSeededFlag() {
+  try {
+    localStorage.setItem(DEFAULT_TASK_SEEDED_KEY, '1')
+  } catch {
+    /* ignore */
+  }
+}
 
 // 学习记录滚动上限：超出后截断最旧记录，避免 localStorage 长期无限增长
 const MAX_STUDY_RECORDS = 2000
@@ -35,21 +59,84 @@ const uid = (): string =>
 // ---------- 进度解析（迁移与学习会话共用） ----------
 // parseProgressNumber / deriveProgressModel 已迁移至 ./migrate.ts，此处按需 import
 
+function createDefaultTask(): Task {
+  const now = Date.now()
+  return {
+    id: uid(),
+    name: '即时',
+    icon: '',
+    status: 'not_started',
+    enabled: true,
+    weight: 1,
+    group: null,
+    currentObjectId: null,
+    totalStudyTime: 0,
+    createdAt: now,
+    updatedAt: now,
+    weekdays: [],
+  }
+}
+
 function load(): AppData {
+  let raw: string | null = null
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
+    raw = localStorage.getItem(STORAGE_KEY)
+  } catch {
+    raw = null
+  }
+  if (raw) {
+    try {
       const parsed = JSON.parse(raw)
       // 统一走 migrateAppData：处理字段补全 / progressModel 推导 / reminder 兼容
       const data = migrateAppData(parsed)
       // 标记当前 schema 版本，便于后续升级判定
       writeSchemaVersion(CURRENT_SCHEMA_VERSION)
+
+      // 默认「即时」方向：从未种子化且当前没有同名方向时自动补一个，作为垃圾箱/临时计划桶。
+      // 种子化标记一旦写入，用户后续删除「即时」方向便不再自动重建，保证可删。
+      const seeded = readSeededFlag()
+      const hasInstant = data.tasks.some((t) => t.name === '即时')
+      if (!seeded && !hasInstant) {
+        data.tasks.push(createDefaultTask())
+        writeSeededFlag()
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+        } catch {
+          /* ignore quota */
+        }
+      } else if (!seeded && hasInstant) {
+        // 已有「即时」方向，只需标记种子化，避免重复补
+        writeSeededFlag()
+      }
       return data
+    } catch (e) {
+      // 解析/迁移失败：先把原文备份到恢复键，再退回默认数据。
+      // 绝不静默丢弃用户数据——原文仍可从 CORRUPT_BACKUP_KEY 中找回。
+      try {
+        localStorage.setItem(CORRUPT_BACKUP_KEY, raw)
+      } catch {
+        /* ignore */
+      }
+      console.error(
+        '[learning-manager] 本地数据解析失败，原文已备份到 ' + CORRUPT_BACKUP_KEY,
+        e,
+      )
     }
-  } catch {
-    /* ignore */
   }
-  return { tasks: [], records: [], reminder: { ...DEFAULT_REMINDER } }
+  // 首次安装 / 无数据 / 数据损坏：写入默认数据
+  const data: AppData = {
+    tasks: [createDefaultTask()],
+    records: [],
+    reminder: { ...DEFAULT_REMINDER },
+    plans: [],
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    writeSeededFlag()
+  } catch {
+    /* ignore quota */
+  }
+  return data
 }
 
 // ---------- 响应式 store ----------
@@ -84,6 +171,11 @@ export function useAppData(): AppData {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
+// 非组件场景读取当前数据（供 reminderService 调度使用）
+export function getAppData(): AppData {
+  return state
+}
+
 // ---------- ID 生成 ----------
 export const newId = uid
 
@@ -91,6 +183,10 @@ export const newId = uid
 export function createTask(input: {
   name: string
   icon: string
+  // 可选：插入位置（默认顶部=最高权重；bottom=追加到末尾）
+  insertAt?: 'top' | 'bottom'
+  // 可选：提醒星期（0=周日…6=周六，空=每天）
+  weekdays?: number[]
   // 可选：初始学习序列名称列表（从模板创建时用），创建后逐个生成空进度的序列
   sequenceNames?: string[]
   // 可选：每个序列名对应的进阶字段（长度与 sequenceNames 对齐则一一对应，空时用 templateDefault）
@@ -154,8 +250,12 @@ export function createTask(input: {
     totalStudyTime: 0,
     createdAt: now,
     updatedAt: now,
+    weekdays: input.weekdays ?? [],
   }
-  setState((prev) => ({ ...prev, tasks: [...prev.tasks, task] }))
+  setState((prev) => ({
+    ...prev,
+    tasks: input.insertAt === 'bottom' ? [...prev.tasks, task] : [task, ...prev.tasks],
+  }))
   return task
 }
 
@@ -166,6 +266,62 @@ export function updateTask(id: string, patch: Partial<Task>) {
       t.id === id ? { ...t, ...patch, updatedAt: Date.now() } : t,
     ),
   }))
+}
+
+// ---------- 应用池（纯元数据缓存，不带策略立场） ----------
+// 策略（允许 / 分心）一律存在 Task.allowedApps / Task.blockedApps 上。
+
+/** 把选中的应用写入池子（按包名去重）；无变化时不做任何写入 */
+export function addAppsToPool(entries: AppEntry[]) {
+  if (!entries || entries.length === 0) return
+  setState((prev) => {
+    const pool = prev.appPool ?? []
+    const seen = new Set(pool.map((e) => e.packageName))
+    const next = [...pool]
+    for (const e of entries) {
+      const pkg = e?.packageName?.trim()
+      if (!pkg || seen.has(pkg)) continue
+      seen.add(pkg)
+      next.push({ packageName: pkg, appName: (e.appName || '').trim() || pkg })
+    }
+    return next.length === pool.length ? prev : { ...prev, appPool: next }
+  })
+}
+
+/** 从池中移除应用，并同步清理所有方向名单里的引用（避免留下死引用） */
+export function removeAppFromPool(packageName: string) {
+  if (!packageName) return
+  setState((prev) => ({
+    ...prev,
+    appPool: (prev.appPool ?? []).filter((e) => e.packageName !== packageName),
+    tasks: prev.tasks.map((t) => {
+      const a = t.allowedApps ?? []
+      const b = t.blockedApps ?? []
+      if (!a.includes(packageName) && !b.includes(packageName)) return t
+      return {
+        ...t,
+        allowedApps: a.filter((p) => p !== packageName),
+        blockedApps: b.filter((p) => p !== packageName),
+        updatedAt: Date.now(),
+      }
+    }),
+  }))
+}
+
+/** 包名 → 显示名（池子里查不到时回退包名本身） */
+export function appLabelOf(pool: AppEntry[] | undefined, packageName: string): string {
+  const hit = (pool ?? []).find((e) => e.packageName === packageName)
+  return hit?.appName || packageName
+}
+
+/** 某方向的应用名单归类；同包名同时出现在两边时**以允许为准**（见文档 §3.1） */
+export function classifyAppForTask(
+  task: Pick<Task, 'allowedApps' | 'blockedApps'>,
+  packageName: string,
+): 'allow' | 'block' | 'none' {
+  if ((task.allowedApps ?? []).includes(packageName)) return 'allow'
+  if ((task.blockedApps ?? []).includes(packageName)) return 'block'
+  return 'none'
 }
 
 export function deleteTask(id: string) {
@@ -184,6 +340,32 @@ export function setTaskEnabled(id: string, enabled: boolean) {
 export function setTaskWeight(id: string, weight: number) {
   const w = Math.max(0, Math.floor(weight || 0))
   updateTask(id, { weight: w })
+}
+
+// 手动调整方向顺序：上移 / 下移，并重排权重（自上而下权重递减，顺序即权重）
+export function reorderTask(id: string, dir: 'up' | 'down') {
+  setState((prev) => {
+    const arr = [...prev.tasks]
+    const i = arr.findIndex((t) => t.id === id)
+    if (i < 0) return prev
+    const j = dir === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= arr.length) return prev
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    const reindexed = arr.map((t, idx) => ({ ...t, weight: arr.length - idx }))
+    return { ...prev, tasks: reindexed }
+  })
+}
+
+// 一次移到顶部 / 底部（方向多时省去连点上移），同样重排权重
+export function moveTaskToEdge(id: string, edge: 'top' | 'bottom') {
+  setState((prev) => {
+    const target = prev.tasks.find((t) => t.id === id)
+    if (!target) return prev
+    const rest = prev.tasks.filter((t) => t.id !== id)
+    const arr = edge === 'top' ? [target, ...rest] : [...rest, target]
+    const reindexed = arr.map((t, idx) => ({ ...t, weight: arr.length - idx }))
+    return { ...prev, tasks: reindexed }
+  })
 }
 
 export function setTaskStatus(id: string, status: TaskStatus) {
@@ -438,19 +620,16 @@ export function pickNextObject(
   }
 
   if (mode === 'weighted_random') {
-    const weighted = remaining.filter((i) => i.weight > 0)
-    // 全部权重为 0：退化为等概率随机
-    if (weighted.length === 0) {
-      const idx = Math.floor(Math.random() * remaining.length)
-      return remaining[idx].id
-    }
-    const total = weighted.reduce((s, i) => s + i.weight, 0)
+    // 按列表顺序把排序视作权重：从上往下依次降低（首项最高，末项最低）
+    // 不依赖手动填写的 item.weight，避免与「手动排序」语义冲突
+    const n = remaining.length
+    const total = (n * (n + 1)) / 2 // 权重和 = n + (n-1) + ... + 1
     let r = Math.random() * total
-    for (const i of weighted) {
-      r -= i.weight
-      if (r <= 0) return i.id
+    for (let k = 0; k < n; k++) {
+      r -= n - k // 第 k 项（从上往下）权重 = n - k
+      if (r <= 0) return remaining[k].id
     }
-    return weighted[weighted.length - 1].id
+    return remaining[n - 1].id
   }
 
   // sequential（默认）
@@ -623,7 +802,32 @@ export function finishStudySession(args: {
     if (nextRecords.length > MAX_STUDY_RECORDS) {
       nextRecords.length = MAX_STUDY_RECORDS
     }
-    return { ...prev, tasks, records: nextRecords }
+
+    // 自动标记计划项：今天 pending、方向匹配的最早一项 → done
+    // （覆盖 App 内「开始」与通知「开始」两条路径，无需界面层传参）
+    // 仅当本次时长达到 60 秒：防误触的一两秒会话把计划项错误标完成
+    const todayStr = dateKey(new Date())
+    const today = prev.plans?.find((p) => p.date === todayStr)
+    let plans = prev.plans
+    if (today && args.duration >= 60) {
+      const target = today.items
+        .filter((it) => it.status === 'pending' && it.taskId === args.taskId)
+        .sort((a, b) => a.minuteOfDay - b.minuteOfDay)[0]
+      if (target) {
+        plans = plans!.map((d) =>
+          d.date === todayStr
+            ? {
+                ...d,
+                items: d.items.map((it) =>
+                  it.id === target.id ? { ...it, status: 'done' as const } : it,
+                ),
+              }
+            : d,
+        )
+      }
+    }
+
+    return { ...prev, tasks, records: nextRecords, plans }
   })
 }
 
@@ -792,18 +996,24 @@ export function getRandomPool(tasks: Task[]): Task[] {
   )
 }
 
+// 加权随机：从给定池中按 weight 加权随机选一个（池已过滤，weight<=0 的按 1 处理）
+export function pickWeightedFrom(pool: Task[]): Task | null {
+  if (!pool.length) return null
+  const weighted = pool.filter((t) => t.weight > 0)
+  const use = weighted.length ? weighted : pool
+  const total = use.reduce((s, t) => s + Math.max(t.weight, 1), 0)
+  let r = Math.random() * total
+  for (const t of use) {
+    r -= Math.max(t.weight, 1)
+    if (r <= 0) return t
+  }
+  return use[use.length - 1]
+}
+
 // 加权随机：从候选池中按 weight 加权随机选择一个
 // weight 默认 1，weight <= 0 的任务已在候选池阶段排除
 export function pickRandomTask(tasks: Task[]): Task | null {
-  const pool = getRandomPool(tasks)
-  if (!pool.length) return null
-  const total = pool.reduce((s, t) => s + t.weight, 0)
-  let r = Math.random() * total
-  for (const t of pool) {
-    r -= t.weight
-    if (r <= 0) return t
-  }
-  return pool[pool.length - 1]
+  return pickWeightedFrom(getRandomPool(tasks))
 }
 
 // 继续学习：优先 in_progress 且有当前对象的任务，回退到最近学习过的任务
@@ -839,118 +1049,559 @@ export function updateReminder(patch: Partial<ReminderConfig>) {
   }))
 }
 
-// ---------- 提醒池筛选 ----------
-// 取参与提醒的任务：
-//   - enabled=true
-//   - id 在 enabledTaskIds 白名单内（白名单空=不限任务）
-export function getReminderPool(
-  tasks: Task[],
-  reminder: ReminderConfig | undefined,
-): Task[] {
-  if (!reminder) return []
-  return tasks.filter((t) => {
-    if (!t.enabled) return false
-    if (
-      reminder.enabledTaskIds.length &&
-      !reminder.enabledTaskIds.includes(t.id)
-    ) {
-      return false
-    }
-    return true
-  })
-}
+// ---------- 次日计划系统 ----------
 
-// 指定时间窗的提醒池：若窗口绑了独立 taskIds，则用窗口白名单；
-// 否则回退到全局白名单。每段窗口可"绑死"具体任务（仿闹钟）。
-export function getReminderPoolForWindow(
-  tasks: Task[],
-  reminder: ReminderConfig | undefined,
-  window: { taskIds?: string[] } | undefined,
-): Task[] {
-  if (!reminder) return []
-  const localIds = window?.taskIds
-  const useWindowWhitelist = localIds && localIds.length > 0
-  return tasks.filter((t) => {
-    if (!t.enabled) return false
-    if (useWindowWhitelist) {
-      return localIds!.includes(t.id)
-    }
-    if (
-      reminder.enabledTaskIds.length &&
-      !reminder.enabledTaskIds.includes(t.id)
-    ) {
-      return false
-    }
-    return true
-  })
-}
-
-// 窗口在某天是否生效：若窗口绑了独立 weekdays，则用窗口星期；否则用全局星期
-export function isWindowActiveOnWeekday(
-  window: { weekdays?: number[] } | undefined,
-  dow06: number,
-  globalWeekdays: number[],
-): boolean {
-  const wd = window?.weekdays
-  if (wd && wd.length > 0) return wd.includes(dow06)
-  return isWeekdayEnabled(dow06, globalWeekdays)
-}
-
-// ---------- 时间窗工具 ----------
-// 单个窗口：start <= end 正常区间；start > end 跨午夜
-export function isMinuteInWindow(
-  minuteOfDay: number,
-  startMinute: number,
-  endMinute: number,
-): boolean {
-  if (startMinute <= endMinute) return minuteOfDay >= startMinute && minuteOfDay < endMinute
-  return minuteOfDay >= startMinute || minuteOfDay < endMinute
-}
-
-// 多窗口中命中任一即可
-export function isMinuteInAnyWindow(
-  minuteOfDay: number,
-  windows: { startMinute: number; endMinute: number }[],
-): boolean {
-  if (!windows?.length) return false
-  return windows.some((w) => isMinuteInWindow(minuteOfDay, w.startMinute, w.endMinute))
-}
-
-// 星期判断：enabledWeekdays 空=每天
-export function isWeekdayEnabled(dow06: number, enabledWeekdays: number[]): boolean {
-  if (!enabledWeekdays?.length) return true
-  return enabledWeekdays.includes(dow06)
-}
-
-// ---------- 今日提醒次数（跨天自动清零）----------
-const REMINDER_FIRED_KEY = 'learning-manager:reminder-fired'
-export function getReminderFiredToday(): { date: string; count: number } {
-  try {
-    const raw = localStorage.getItem(REMINDER_FIRED_KEY)
-    if (!raw) return { date: todayKey(), count: 0 }
-    const obj = JSON.parse(raw) as { date: string; count: number }
-    if (obj.date !== todayKey()) return { date: todayKey(), count: 0 }
-    return obj
-  } catch {
-    return { date: todayKey(), count: 0 }
-  }
-}
-export function incrementReminderFiredToday(): number {
-  const cur = getReminderFiredToday()
-  const next = { date: todayKey(), count: cur.count + 1 }
-  try { localStorage.setItem(REMINDER_FIRED_KEY, JSON.stringify(next)) } catch { /* ignore */ }
-  return next.count
-}
-function todayKey(): string {
-  const d = new Date()
+// 日期 → 'YYYY-MM-DD'（本地时区）
+export function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// 方向在某星期是否参与计划（weekdays 空 = 每天）
+export function isTaskActiveOnWeekday(t: Task, dow: number): boolean {
+  if (!t.weekdays || t.weekdays.length === 0) return true
+  return t.weekdays.includes(dow)
+}
+
+// 某日的计划池：随机候选池 + 星期匹配
+export function getPlanPoolForDate(tasks: Task[], dow: number): Task[] {
+  return getRandomPool(tasks).filter((t) => isTaskActiveOnWeekday(t, dow))
+}
+
+// 窗口按当日有效区间展开：
+//   start < end → 正常区间
+//   start > end → 跨夜：当日同时拥有 [start,1439]（当晚段）与 [0,end]（凌晨段）
+//   start = end → 无效，跳过
+function effectiveSpans(windows: TimeWindow[]): Array<{ start: number; end: number }> {
+  const spans: Array<{ start: number; end: number }> = []
+  for (const w of windows) {
+    if (w.startMinute < w.endMinute) {
+      spans.push({ start: w.startMinute, end: w.endMinute })
+    } else if (w.startMinute > w.endMinute) {
+      spans.push({ start: w.startMinute, end: 1439 })
+      spans.push({ start: 0, end: w.endMinute })
+    }
+  }
+  return spans.sort((a, b) => a.start - b.start)
+}
+
+// 生成某日计划：N 个时刻 × 随机方向（避免同方向连续），序列取当前序列
+// opts.fromMinute：今日补齐时只排该分钟之后；跨夜凌晨段视为"当日开头"，不受影响
+export function generatePlanDay(
+  tasks: Task[],
+  reminder: ReminderConfig,
+  date: Date,
+  opts?: { fromMinute?: number },
+): PlanDay | null {
+  const dow = date.getDay()
+  const pool = getPlanPoolForDate(tasks, dow)
+  if (!pool.length) return null
+
+  const from = opts?.fromMinute ?? 0
+  const usable = effectiveSpans(reminder.windows)
+    .map((s) => ({ start: Math.max(s.start, from), end: s.end }))
+    .filter((s) => s.end - s.start >= 5) // 裁剪后至少留 5 分钟
+  if (!usable.length) return null
+
+  const n = Math.min(12, Math.max(1, reminder.planSessions))
+  const picked: number[] = []
+
+  if (reminder.planTiming === 'interval') {
+    // 固定间隔：从首段开始顺排，跨段时跳过关闭时段保持节奏
+    const step = Math.min(1440, Math.max(5, reminder.intervalMinutes))
+    let cursor: number | null = null
+    for (const span of usable) {
+      let t: number = cursor === null ? span.start : Math.max(span.start, cursor)
+      while (t <= span.end && picked.length < n) {
+        picked.push(t)
+        t += step
+      }
+      cursor = t
+      if (picked.length >= n) break
+    }
+  } else {
+    // 随机：分层随机 —— 把可用总时长按 n 等分，每份内随机取一点
+    // 保证总能排满 n 项，且时刻既随机又大致分散（不会扎堆挤掉后面的项）
+    const gap = Math.min(720, Math.max(reminder.cooldownMinutes, 15))
+    const totalLen = usable.reduce((s, u) => s + (u.end - u.start), 0)
+    const segLen = totalLen / n
+    for (let k = 0; k < n; k++) {
+      const r = k * segLen + Math.random() * segLen
+      // 线性位置 → 映射回具体窗口的分钟
+      let m = -1
+      let base = 0
+      for (let i = 0; i < usable.length; i++) {
+        const u = usable[i]
+        const len = u.end - u.start
+        if (r < base + len) { m = u.start + Math.floor(r - base); break }
+        base += len
+      }
+      if (m < 0) m = usable[usable.length - 1].end
+      // 防御：与上一项至少隔 min(gap, 段长)（分层后一般天然满足）
+      const minGap = Math.min(gap, Math.floor(segLen * 0.9))
+      if (picked.length && m - picked[picked.length - 1] < minGap) {
+        m = Math.min(picked[picked.length - 1] + minGap, usable[usable.length - 1].end)
+      }
+      picked.push(m)
+    }
+  }
+
+  if (!picked.length) return null
+
+  // 方向分配：加权随机，避免同方向连续两项
+  const items: PlanItem[] = []
+  let prevTaskId: string | null = null
+  for (const m of picked) {
+    const candidates = pool.length < 2 ? pool : pool.filter((t) => t.id !== prevTaskId)
+    const task = pickWeightedFrom(candidates.length ? candidates : pool)
+    if (!task) break
+    const seq = pickSequence(task)
+    items.push({
+      id: uid(),
+      minuteOfDay: m,
+      taskId: task.id,
+      taskName: task.name,
+      sequenceId: seq?.id,
+      sequenceName: seq?.name,
+      durationSec: seq?.countdownSeconds ?? null,
+      status: 'pending',
+    })
+    prevTaskId = task.id
+  }
+
+  // 固定任务注入：被用户标星固定的方向/序列，每天自动进入计划（直到手动取消固定）。
+  // 用 some() 去重，避免与随机抽到的同任务/序列重复。
+  const pinned = state.pinnedTasks ?? []
+  if (pinned.length) {
+    const firstStart = usable.length ? usable[0].start : (opts?.fromMinute ?? 0)
+    for (const p of pinned) {
+      if (
+        items.some(
+          (it) =>
+            it.taskId === p.taskId &&
+            (it.sequenceId ?? undefined) === (p.sequenceId ?? undefined),
+        )
+      ) {
+        continue
+      }
+      const t = tasks.find((x) => x.id === p.taskId)
+      if (!t || t.enabled === false) continue
+      const seq = p.sequenceId
+        ? t.group?.items.find((s) => s.id === p.sequenceId)
+        : pickSequence(t)
+      items.push({
+        id: uid(),
+        minuteOfDay: Math.max(firstStart, opts?.fromMinute ?? 0),
+        taskId: t.id,
+        taskName: t.name,
+        sequenceId: seq?.id,
+        sequenceName: seq?.name,
+        durationSec: seq?.countdownSeconds ?? null,
+        status: 'pending',
+        pinned: true,
+      })
+    }
+  }
+
+  return { date: dateKey(date), items, generatedAt: Date.now() }
+}
+
+// 保留近 7 天 + 明天，更早的丢弃
+function trimPlans(plans: PlanDay[], now: Date): PlanDay[] {
+  const minKey = dateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6))
+  return plans.filter((p) => p.date >= minKey)
+}
+
+// 确保今天/明天的计划存在（纯函数：不变时返回原引用）
+//   - 今天缺：从当前时间起生成剩余项（用于打开 App 补齐）
+//   - 明天缺：预生成全天计划
+export function ensurePlans(
+  tasks: Task[],
+  reminder: ReminderConfig,
+  plans: PlanDay[],
+): PlanDay[] {
+  const now = new Date()
+  const todayStr = dateKey(now)
+  const lookahead = Math.min(7, Math.max(1, reminder.planLookaheadDays || 3))
+  const next = [...plans]
+  let changed = false
+
+  for (let d = 0; d <= lookahead; d++) {
+    const dayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d)
+    const dayStr = dateKey(dayDate)
+    if (next.some((p) => p.date === dayStr)) continue
+    if (d === 0) {
+      // 今日补齐：从 max(now+5, 学习后跳过结束点) 起排剩余项
+      let fromMinute = now.getHours() * 60 + now.getMinutes() + 5
+      if (reminder.skipAfterSessionMinutes > 0) {
+        const lastEnd = getLastSessionEnd()
+        if (lastEnd > 0) {
+          const skipUntilMin =
+            Math.ceil((lastEnd + reminder.skipAfterSessionMinutes * 60 * 1000 - now.getTime()) / 60000)
+          if (skipUntilMin > fromMinute) fromMinute = skipUntilMin
+        }
+      }
+      const day = generatePlanDay(tasks, reminder, dayDate, { fromMinute })
+      if (day && day.items.length > 0) {
+        next.push(day)
+        changed = true
+      }
+    } else {
+      // 未来天：整窗排程（不受 fromMinute 约束）
+      const day = generatePlanDay(tasks, reminder, dayDate)
+      if (day && day.items.length > 0) {
+        next.push(day)
+        changed = true
+      }
+    }
+  }
+
+  // 手动计划顺延：过去日期仍待办的手动项并入今天
+  if (carryManualIntoToday(next, todayStr)) changed = true
+
+  const trimmed = trimPlans(next.sort((a, b) => (a.date < b.date ? -1 : 1)), now)
+  if (trimmed.length !== next.length) changed = true
+  return changed ? trimmed : plans
+}
+
+// 把过去日期仍 pending 的手动计划项并入今天（持续保留直到完成/跳过/删除）。
+// 就地修改传入数组（触碰到的日期会拷贝替换）；有顺延时返回 true。
+// 自动生成的项不顺延——到点没做按既有规则处理。
+function carryManualIntoToday(days: PlanDay[], todayStr: string): boolean {
+  const carry: PlanItem[] = []
+  for (const d of days) {
+    if (d.date >= todayStr) continue
+    for (const it of d.items) {
+      if (it.manual && it.status === 'pending') {
+        carry.push({ ...it, deferredAtMs: undefined, carriedFrom: d.date })
+      }
+    }
+  }
+  if (!carry.length) return false
+  const ti = days.findIndex((d) => d.date === todayStr)
+  if (ti === -1) {
+    days.push({ date: todayStr, items: carry, generatedAt: Date.now() })
+  } else {
+    const day = days[ti]
+    const have = new Set(day.items.map((i) => i.id))
+    days[ti] = { ...day, items: [...day.items, ...carry.filter((c) => !have.has(c.id))] }
+  }
+  for (let i = days.length - 1; i >= 0; i--) {
+    const d = days[i]
+    if (d.date >= todayStr) continue
+    if (!d.items.some((it) => it.manual && it.status === 'pending')) continue
+    const rest = d.items.filter((it) => !(it.manual && it.status === 'pending'))
+    if (rest.length > 0) days[i] = { ...d, items: rest }
+    else days.splice(i, 1)
+  }
+  return true
+}
+
+// 在 store 内确保计划存在（供 reminderService 调度前调用），返回最新 plans
+export function ensurePlansInStore(): PlanDay[] {
+  const next = ensurePlans(state.tasks, state.reminder ?? DEFAULT_REMINDER, state.plans ?? [])
+  if (next !== state.plans) {
+    setState((prev) => ({ ...prev, plans: next }))
+  }
+  return next
+}
+
+// 顺延手动计划项到今天（供打开/切回前台时调用，与提醒开关无关）
+export function carryOverManualPlanItems(): boolean {
+  const todayStr = dateKey(new Date())
+  const plans = [...(state.plans ?? [])].sort((a, b) => (a.date < b.date ? -1 : 1))
+  if (!carryManualIntoToday(plans, todayStr)) return false
+  setState((prev) => ({ ...prev, plans }))
+  return true
+}
+
+// 丢弃某日计划（如设置变更后让调度器按新参数重排明天）。
+// 仍待办的手动项保留在该日（不受重排影响，由顺延机制跟进）。
+export function dropPlanForDate(dateStr: string): void {
+  setState((prev) => ({
+    ...prev,
+    plans: (prev.plans ?? [])
+      .map((p) =>
+        p.date === dateStr
+          ? { ...p, items: p.items.filter((it) => it.manual && it.status === 'pending') }
+          : p,
+      )
+      .filter((p) => p.items.length > 0),
+  }))
+}
+
+// 查询某日计划
+export function getPlanForDate(plans: PlanDay[] | undefined, key: string): PlanDay | undefined {
+  return plans?.find((p) => p.date === key)
+}
+
+// 更新计划项状态（完成/跳过/恢复待办）
+export function updatePlanItemStatus(dateStr: string, itemId: string, status: PlanItem['status']) {
+  setState((prev) => ({
+    ...prev,
+    plans: (prev.plans ?? []).map((d) =>
+      d.date === dateStr
+        ? { ...d, items: d.items.map((it) => (it.id === itemId ? { ...it, status } : it)) }
+        : d,
+    ),
+  }))
+}
+
+// ============ 固定任务（标星）============
+// 被固定的方向/序列每天自动进入计划，直到手动取消固定。
+
+// 判断某方向/序列当前是否被固定
+export function isTaskPinned(taskId: string, sequenceId?: string): boolean {
+  return (state.pinnedTasks ?? []).some(
+    (p) =>
+      p.taskId === taskId && (p.sequenceId ?? undefined) === (sequenceId ?? undefined),
+  )
+}
+
+// 切换固定状态。固定时立即注入到今天~未来 lookahead 天的计划；取消时移除这些天里
+// 仍处于 pending 的固定项（已完成的不动，保留历史）。返回最新固定列表。
+export function togglePinnedTask(taskId: string, sequenceId?: string): PinnedTask[] {
+  const cur = state.pinnedTasks ?? []
+  const exists = cur.some(
+    (p) =>
+      p.taskId === taskId && (p.sequenceId ?? undefined) === (sequenceId ?? undefined),
+  )
+  let nextPinned: PinnedTask[]
+  if (exists) {
+    nextPinned = cur.filter(
+      (p) =>
+        !(p.taskId === taskId && (p.sequenceId ?? undefined) === (sequenceId ?? undefined)),
+    )
+    removePinnedItems(taskId, sequenceId)
+  } else {
+    nextPinned = [...cur, { taskId, sequenceId }]
+    // 必须传入「新的」固定列表：此刻 state.pinnedTasks 尚未更新，
+    // 读全局态会让刚固定的项当天不生效
+    injectPinnedIntoExistingPlans(nextPinned)
+  }
+  setState((prev) => ({ ...prev, pinnedTasks: nextPinned }))
+  // 重新补齐计划（确保未来缺失的天也含固定项；生成逻辑已注入固定任务）
+  ensurePlansInStore()
+  return nextPinned
+}
+
+// 移除所有计划日中仍处于 pending 的固定项（取消固定时调用）
+export function removePinnedItems(taskId: string, sequenceId?: string): void {
+  const plans = state.plans ?? []
+  let changed = false
+  const next = plans.map((d) => {
+    const idx = d.items.findIndex(
+      (it) =>
+        it.pinned &&
+        it.taskId === taskId &&
+        (it.sequenceId ?? undefined) === (sequenceId ?? undefined) &&
+        it.status === 'pending',
+    )
+    if (idx === -1) return d
+    changed = true
+    return { ...d, items: d.items.filter((_, i) => i !== idx) }
+  })
+  if (changed) setState((prev) => ({ ...prev, plans: next }))
+}
+
+// 把当前固定任务立即注入到今天~未来 lookahead 天已存在的计划日中（固定当天即生效）。
+// 与 generatePlanDay 的注入互补：generatePlanDay 覆盖「未来重新生成的天」，本函数覆盖
+// 「已经存在、本次不会重排的天」（如今天）。
+function injectPinnedIntoExistingPlans(pinnedList?: PinnedTask[]): void {
+  const { reminder } = getAppData()
+  if (!reminder) return
+  const pinned = pinnedList ?? state.pinnedTasks ?? []
+  if (!pinned.length) return
+  const now = new Date()
+  const lookahead = Math.min(7, Math.max(1, reminder.planLookaheadDays || 3))
+  const spans = effectiveSpans(reminder.windows)
+  const firstStart = spans.length ? spans[0].start : 9 * 60
+  const plans = state.plans ?? []
+  let changed = false
+  const next = plans.map((d) => {
+    const dIdx = Math.round(
+      (new Date(d.date).getTime() -
+        new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
+        86400000,
+    )
+    if (dIdx < 0 || dIdx > lookahead) return d
+    const fromMinute = dIdx === 0 ? now.getHours() * 60 + now.getMinutes() + 5 : 0
+    const minute = Math.max(firstStart, fromMinute)
+    let items = d.items
+    let dayChanged = false
+    for (const p of pinned) {
+      if (
+        items.some(
+          (it) =>
+            it.taskId === p.taskId &&
+            (it.sequenceId ?? undefined) === (p.sequenceId ?? undefined),
+        )
+      ) {
+        continue
+      }
+      const t = state.tasks.find((x) => x.id === p.taskId)
+      if (!t || t.enabled === false) continue
+      const seq = p.sequenceId
+        ? t.group?.items.find((s) => s.id === p.sequenceId)
+        : pickSequence(t)
+      items = [
+        ...items,
+        {
+          id: uid(),
+          minuteOfDay: minute,
+          taskId: t.id,
+          taskName: t.name,
+          sequenceId: seq?.id,
+          sequenceName: seq?.name,
+          durationSec: seq?.countdownSeconds ?? null,
+          status: 'pending' as const,
+          pinned: true,
+        },
+      ]
+      dayChanged = true
+    }
+    if (dayChanged) {
+      changed = true
+      return { ...d, items }
+    }
+    return d
+  })
+  if (changed) setState((prev) => ({ ...prev, plans: next }))
+}
+
+// 写入冲突延迟补发的目标时刻（deferredAtMs），供 scheduleReminders 据此重排
+// 仅修改匹配 id 的项；其他项不变。跨多次 reschedule 也能存活（持久化在 plan 内）。
+export function setPlanItemsDeferred(
+  dateStr: string,
+  updates: { id: string; at: number }[],
+): void {
+  if (!updates.length) return
+  const map = new Map(updates.map((u) => [u.id, u.at]))
+  setState((prev) => ({
+    ...prev,
+    plans: (prev.plans ?? []).map((d) =>
+      d.date === dateStr
+        ? {
+            ...d,
+            items: d.items.map((it) =>
+              map.has(it.id) ? { ...it, deferredAtMs: map.get(it.id) } : it,
+            ),
+          }
+        : d,
+    ),
+  }))
+}
+
+// 手动插入一条计划项（新建计划）：直接追加到指定日期的计划，可立即开始 / 等提醒
+// minuteOfDay 由调用方给定（可指定时刻或随机插入当日未来时刻）
+export function addPlanItem(
+  dateStr: string,
+  input: {
+    taskId: string
+    taskName: string
+    minuteOfDay: number
+    sequenceId?: string
+    sequenceName?: string
+    durationSec?: number | null
+    manual?: boolean
+    remindOnly?: boolean
+  },
+): PlanItem {
+  const item: PlanItem = {
+    id: uid(),
+    minuteOfDay: input.minuteOfDay,
+    taskId: input.taskId,
+    taskName: input.taskName,
+    sequenceId: input.sequenceId,
+    sequenceName: input.sequenceName,
+    durationSec: input.durationSec ?? null,
+    status: 'pending',
+    manual: input.manual,
+    remindOnly: input.remindOnly,
+  }
+  setState((prev) => {
+    const plans = prev.plans ?? []
+    const idx = plans.findIndex((p) => p.date === dateStr)
+    if (idx === -1) {
+      return {
+        ...prev,
+        plans: [...plans, { date: dateStr, items: [item], generatedAt: Date.now() }],
+      }
+    }
+    return {
+      ...prev,
+      plans: plans.map((p, i) => (i === idx ? { ...p, items: [...p.items, item] } : p)),
+    }
+  })
+  return item
+}
+
+// 删除单条计划项（手动项的「删除」操作）；删空的日期一并移除
+export function deletePlanItem(dateStr: string, itemId: string): void {
+  setState((prev) => ({
+    ...prev,
+    plans: (prev.plans ?? [])
+      .map((d) =>
+        d.date === dateStr ? { ...d, items: d.items.filter((it) => it.id !== itemId) } : d,
+      )
+      .filter((d) => d.items.length > 0),
+  }))
+}
+
+// 计划项「换一个」：同一时刻换一个方向（池中无可换项时返回 null）
+export function rerollPlanItem(dateStr: string, itemId: string): PlanItem | null {
+  const day = state.plans?.find((d) => d.date === dateStr)
+  const item = day?.items.find((i) => i.id === itemId)
+  if (!day || !item) return null
+  const d = new Date(`${dateStr}T00:00:00`)
+  const pool = getPlanPoolForDate(state.tasks, d.getDay()).filter((t) => t.id !== item.taskId)
+  const alt = pickWeightedFrom(pool)
+  if (!alt) return null
+  const seq = pickSequence(alt)
+  const updated: PlanItem = {
+    ...item,
+    taskId: alt.id,
+    taskName: alt.name,
+    sequenceId: seq?.id,
+    sequenceName: seq?.name,
+    durationSec: seq?.countdownSeconds ?? null,
+    status: 'pending',
+  }
+  setState((prev) => ({
+    ...prev,
+    plans: (prev.plans ?? []).map((dd) =>
+      dd.date === dateStr
+        ? { ...dd, items: dd.items.map((it) => (it.id === itemId ? updated : it)) }
+        : dd,
+    ),
+  }))
+  return updated
+}
+
+// 重新生成某日全部计划（保留已完成项，只重排 pending 项的时刻与方向）
+// 用于用户手动「重新排今天剩余」
+export function regeneratePlanDayInStore(dateStr: string): void {
+  const reminder = state.reminder ?? DEFAULT_REMINDER
+  const day = state.plans?.find((p) => p.date === dateStr)
+  if (!day) return
+  const d = new Date(`${dateStr}T00:00:00`)
+  const keep = day.items.filter((it) => it.status === 'pending')
+  if (!keep.length) return
+  const now = new Date()
+  const fromMinute =
+    dateStr === dateKey(now) ? now.getHours() * 60 + now.getMinutes() + 5 : 0
+  const fresh = generatePlanDay(state.tasks, reminder, d, { fromMinute })
+  if (!fresh || !fresh.items.length) return
+  const done = day.items.filter((it) => it.status !== 'pending')
+  setState((prev) => ({
+    ...prev,
+    plans: (prev.plans ?? []).map((p) =>
+      p.date === dateStr ? { ...p, items: [...done, ...fresh.items], generatedAt: Date.now() } : p,
+    ),
+  }))
 }
 
 // ---------- 最近学习会话结束时间（用于"学习后跳过"）----------
 const LAST_SESSION_END_KEY = 'learning-manager:last-session-end'
-export function markSessionEndedNow(): void {
-  try { localStorage.setItem(LAST_SESSION_END_KEY, String(Date.now())) } catch { /* ignore */ }
-}
 export function getLastSessionEnd(): number {
   try {
     const ts = Number(localStorage.getItem(LAST_SESSION_END_KEY))

@@ -6,6 +6,7 @@ import android.content.Intent;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.Bridge;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -13,6 +14,9 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 学习计时 Capacitor 插件
@@ -35,6 +39,22 @@ public class StudyTimerPlugin extends Plugin {
     // Bridge 存活时的静态引用，供 StudyTimerReceiver 调用 notifyListeners
     private static volatile Bridge staticBridge;
 
+    // 将 JS 数组（JSArray）转为字符串列表，空/异常返回空列表
+    private static ArrayList<String> toStringList(Object arr) {
+        ArrayList<String> out = new ArrayList<>();
+        if (arr == null) return out;
+        try {
+            if (arr instanceof JSArray) {
+                List<Object> list = ((JSArray) arr).toList();
+                for (Object o : list) {
+                    if (o != null) out.add(o.toString());
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
     @Override
     public void load() {
         super.load();
@@ -45,12 +65,23 @@ public class StudyTimerPlugin extends Plugin {
     public void start(PluginCall call) {
         String taskName = call.getString("taskName", "");
         String objectName = call.getString("objectName", "");
+        String nodeLabel = call.getString("nodeLabel", "");
         int elapsedSeconds = call.getInt("elapsedSeconds", 0);
+        boolean guardEnabled = call.getBoolean("guardEnabled", false);
+        int guardGraceMinutes = call.getInt("guardGraceMinutes", 5);
+        ArrayList<String> allowedApps = toStringList(call.getArray("allowedApps"));
+        ArrayList<String> blockedApps = toStringList(call.getArray("blockedApps"));
         Context ctx = getContext();
         Intent i = new Intent(ctx, StudyTimerService.class);
         i.putExtra(StudyTimerService.EXTRA_TASK_NAME, taskName);
         i.putExtra(StudyTimerService.EXTRA_OBJECT_NAME, objectName);
+        i.putExtra(StudyTimerService.EXTRA_NODE_LABEL, nodeLabel);
         i.putExtra(StudyTimerService.EXTRA_ELAPSED_SECONDS, elapsedSeconds);
+        // P3 越界提醒配置：随 start 一并传给前台服务
+        i.putExtra(StudyTimerService.EXTRA_GUARD_ENABLED, guardEnabled);
+        i.putExtra(StudyTimerService.EXTRA_GUARD_GRACE, guardGraceMinutes);
+        i.putStringArrayListExtra(StudyTimerService.EXTRA_GUARD_ALLOWED, allowedApps);
+        i.putStringArrayListExtra(StudyTimerService.EXTRA_GUARD_BLOCKED, blockedApps);
         try {
             ContextCompat.startForegroundService(ctx, i);
         } catch (Exception ignored) {
@@ -62,11 +93,13 @@ public class StudyTimerPlugin extends Plugin {
     public void update(PluginCall call) {
         String taskName = call.getString("taskName", "");
         String objectName = call.getString("objectName", "");
+        String nodeLabel = call.getString("nodeLabel", "");
         int elapsedSeconds = call.getInt("elapsedSeconds", 0);
         Context ctx = getContext();
         Intent i = new Intent(ctx, StudyTimerService.class);
         i.putExtra(StudyTimerService.EXTRA_TASK_NAME, taskName);
         i.putExtra(StudyTimerService.EXTRA_OBJECT_NAME, objectName);
+        i.putExtra(StudyTimerService.EXTRA_NODE_LABEL, nodeLabel);
         i.putExtra(StudyTimerService.EXTRA_ELAPSED_SECONDS, elapsedSeconds);
         // 标记为 update：Service 仅更新名称，不重置计时
         i.putExtra(StudyTimerService.EXTRA_IS_UPDATE, true);

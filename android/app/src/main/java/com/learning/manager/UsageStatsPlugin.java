@@ -20,6 +20,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -115,6 +116,46 @@ public class UsageStatsPlugin extends Plugin {
             r.put("stats", arr);
             r.put("startMs", start);
             r.put("endMs", end);
+        } catch (Exception e) {
+            r.put("ok", false);
+            r.put("error", e.getMessage() == null ? "exception" : e.getMessage());
+        }
+        call.resolve(r);
+    }
+
+    /**
+     * 取当前最近前台应用包名（用于设置页演示 / 调试）。
+     * 取最近 10s 窗口内 lastTimeUsed 最新、且有过前台时长的应用。
+     */
+    @PluginMethod
+    public void getForegroundApp(PluginCall call) {
+        JSObject r = new JSObject();
+        try {
+            UsageStatsManager usm = (UsageStatsManager) getContext()
+                    .getSystemService(Context.USAGE_STATS_SERVICE);
+            if (usm == null) {
+                r.put("ok", false);
+                r.put("error", "no_usage_stats_service");
+                call.resolve(r);
+                return;
+            }
+            long now = System.currentTimeMillis();
+            List<UsageStats> stats = usm.queryUsageStats(
+                    UsageStatsManager.INTERVAL_BEST, now - 10_000, now);
+            String top = null;
+            long topTime = -1;
+            if (stats != null) {
+                for (UsageStats s : stats) {
+                    if (s.getTotalTimeInForeground() <= 0) continue;
+                    long last = s.getLastTimeUsed();
+                    if (last > topTime) {
+                        topTime = last;
+                        top = s.getPackageName();
+                    }
+                }
+            }
+            r.put("ok", true);
+            r.put("packageName", top == null ? "" : top);
         } catch (Exception e) {
             r.put("ok", false);
             r.put("error", e.getMessage() == null ? "exception" : e.getMessage());

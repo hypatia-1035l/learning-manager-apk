@@ -1,0 +1,1635 @@
+{
+  "ranges": [],
+  "banks": [
+    {
+      "name": "主题关键词",
+      "category": "设计方向",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "夏日",
+          "weight": 1
+        },
+        {
+          "text": "冬季",
+          "weight": 1
+        },
+        {
+          "text": "节日",
+          "weight": 1
+        },
+        {
+          "text": "旅行",
+          "weight": 1
+        },
+        {
+          "text": "自然",
+          "weight": 1
+        },
+        {
+          "text": "城市",
+          "weight": 1
+        },
+        {
+          "text": "宇宙",
+          "weight": 1
+        },
+        {
+          "text": "海洋",
+          "weight": 1
+        },
+        {
+          "text": "森林",
+          "weight": 1
+        },
+        {
+          "text": "历史",
+          "weight": 1
+        },
+        {
+          "text": "神话",
+          "weight": 1
+        },
+        {
+          "text": "科技",
+          "weight": 1
+        },
+        {
+          "text": "传统文化",
+          "weight": 1
+        },
+        {
+          "text": "校园",
+          "weight": 1
+        },
+        {
+          "text": "美食",
+          "weight": 1
+        },
+        {
+          "text": "音乐",
+          "weight": 1
+        },
+        {
+          "text": "运动",
+          "weight": 1
+        },
+        {
+          "text": "婚礼",
+          "weight": 1
+        },
+        {
+          "text": "宠物",
+          "weight": 1
+        },
+        {
+          "text": "童年",
+          "weight": 1
+        },
+        {
+          "text": "节气",
+          "weight": 1
+        },
+        {
+          "text": "生肖",
+          "weight": 1
+        },
+        {
+          "text": "仙境",
+          "weight": 1
+        },
+        {
+          "text": "梦境",
+          "weight": 1
+        },
+        {
+          "text": "赛博",
+          "weight": 1
+        },
+        {
+          "text": "废土",
+          "weight": 1
+        },
+        {
+          "text": "末日",
+          "weight": 1
+        },
+        {
+          "text": "山庄",
+          "weight": 1
+        },
+        {
+          "text": "古镇",
+          "weight": 1
+        },
+        {
+          "text": "市集",
+          "weight": 1
+        },
+        {
+          "text": "乡愁",
+          "weight": 1
+        },
+        {
+          "text": "军旅",
+          "weight": 1
+        },
+        {
+          "text": "武侠",
+          "weight": 1
+        },
+        {
+          "text": "修仙",
+          "weight": 1
+        },
+        {
+          "text": "宫廷",
+          "weight": 1
+        },
+        {
+          "text": "民俗",
+          "weight": 1
+        },
+        {
+          "text": "茶道",
+          "weight": 1
+        },
+        {
+          "text": "禅意",
+          "weight": 1
+        },
+        {
+          "text": "岁时",
+          "weight": 1
+        },
+        {
+          "text": "航海",
+          "weight": 1
+        },
+        {
+          "text": "探险",
+          "weight": 1
+        },
+        {
+          "text": "考古",
+          "weight": 1
+        },
+        {
+          "text": "非遗",
+          "weight": 1
+        },
+        {
+          "text": "乡村",
+          "weight": 1
+        },
+        {
+          "text": "节庆",
+          "weight": 1
+        },
+        {
+          "text": "宗教",
+          "weight": 1
+        },
+        {
+          "text": "未来",
+          "weight": 1
+        },
+        {
+          "text": "太空",
+          "weight": 1
+        },
+        {
+          "text": "沙漠",
+          "weight": 1
+        },
+        {
+          "text": "极地",
+          "weight": 1
+        },
+        {
+          "text": "工业",
+          "weight": 1
+        },
+        {
+          "text": "商业",
+          "weight": 1
+        },
+        {
+          "text": "教育",
+          "weight": 1
+        },
+        {
+          "text": "娱乐",
+          "weight": 1
+        },
+        {
+          "text": "艺术",
+          "weight": 1
+        },
+        {
+          "text": "电影",
+          "weight": 1
+        },
+        {
+          "text": "文学",
+          "weight": 1
+        },
+        {
+          "text": "游戏",
+          "weight": 1
+        },
+        {
+          "text": "时尚",
+          "weight": 1
+        },
+        {
+          "text": "生活方式",
+          "weight": 1
+        },
+        {
+          "text": "环保",
+          "weight": 1
+        },
+        {
+          "text": "可持续",
+          "weight": 1
+        },
+        {
+          "text": "怀旧",
+          "weight": 1
+        },
+        {
+          "text": "记忆",
+          "weight": 1
+        },
+        {
+          "text": "梦想",
+          "weight": 1
+        },
+        {
+          "text": "幻想",
+          "weight": 1
+        },
+        {
+          "text": "Wedding(婚礼)",
+          "weight": 1
+        },
+        {
+          "text": "Christmas(圣诞)",
+          "weight": 1
+        },
+        {
+          "text": "Halloween(万圣节)",
+          "weight": 1
+        },
+        {
+          "text": "Summer(夏天)",
+          "weight": 1
+        },
+        {
+          "text": "Spring(春天)",
+          "weight": 1
+        },
+        {
+          "text": "Autumn(秋天)",
+          "weight": 1
+        },
+        {
+          "text": "Winter(冬天)",
+          "weight": 1
+        },
+        {
+          "text": "Beach(海滩)",
+          "weight": 1
+        },
+        {
+          "text": "Nature(自然)",
+          "weight": 1
+        },
+        {
+          "text": "规则怪谈",
+          "weight": 1
+        },
+        {
+          "text": "灵气复苏",
+          "weight": 1
+        },
+        {
+          "text": "无限流",
+          "weight": 1
+        },
+        {
+          "text": "御兽",
+          "weight": 1
+        },
+        {
+          "text": "基建",
+          "weight": 1
+        },
+        {
+          "text": "觉醒",
+          "weight": 1
+        },
+        {
+          "text": "诡异",
+          "weight": 1
+        },
+        {
+          "text": "囤货",
+          "weight": 1
+        },
+        {
+          "text": "高武",
+          "weight": 1
+        },
+        {
+          "text": "转职",
+          "weight": 1
+        },
+        {
+          "text": "传承",
+          "weight": 1
+        },
+        {
+          "text": "宗族",
+          "weight": 1
+        },
+        {
+          "text": "大荒",
+          "weight": 1
+        },
+        {
+          "text": "匮乏",
+          "weight": 1
+        },
+        {
+          "text": "体面",
+          "weight": 1
+        },
+        {
+          "text": "改写",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "情绪关键词",
+      "category": "设计方向",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "活力",
+          "weight": 1
+        },
+        {
+          "text": "温暖",
+          "weight": 1
+        },
+        {
+          "text": "清凉",
+          "weight": 1
+        },
+        {
+          "text": "怀旧",
+          "weight": 1
+        },
+        {
+          "text": "神秘",
+          "weight": 1
+        },
+        {
+          "text": "浪漫",
+          "weight": 1
+        },
+        {
+          "text": "庄重",
+          "weight": 1
+        },
+        {
+          "text": "欢乐",
+          "weight": 1
+        },
+        {
+          "text": "孤独",
+          "weight": 1
+        },
+        {
+          "text": "梦幻",
+          "weight": 1
+        },
+        {
+          "text": "安静",
+          "weight": 1
+        },
+        {
+          "text": "热烈",
+          "weight": 1
+        },
+        {
+          "text": "治愈",
+          "weight": 1
+        },
+        {
+          "text": "未来感",
+          "weight": 1
+        },
+        {
+          "text": "松弛",
+          "weight": 1
+        },
+        {
+          "text": "紧张",
+          "weight": 1
+        },
+        {
+          "text": "优雅",
+          "weight": 1
+        },
+        {
+          "text": "叛逆",
+          "weight": 1
+        },
+        {
+          "text": "温馨",
+          "weight": 1
+        },
+        {
+          "text": "空灵",
+          "weight": 1
+        },
+        {
+          "text": "忧郁",
+          "weight": 1
+        },
+        {
+          "text": "诙谐",
+          "weight": 1
+        },
+        {
+          "text": "神圣",
+          "weight": 1
+        },
+        {
+          "text": "荒诞",
+          "weight": 1
+        },
+        {
+          "text": "凄美",
+          "weight": 1
+        },
+        {
+          "text": "慵懒",
+          "weight": 1
+        },
+        {
+          "text": "锐利",
+          "weight": 1
+        },
+        {
+          "text": "柔软",
+          "weight": 1
+        },
+        {
+          "text": "克制",
+          "weight": 1
+        },
+        {
+          "text": "喧嚣",
+          "weight": 1
+        },
+        {
+          "text": "孤傲",
+          "weight": 1
+        },
+        {
+          "text": "纯真",
+          "weight": 1
+        },
+        {
+          "text": "性感",
+          "weight": 1
+        },
+        {
+          "text": "肃穆",
+          "weight": 1
+        },
+        {
+          "text": "灵动",
+          "weight": 1
+        },
+        {
+          "text": "暧昧",
+          "weight": 1
+        },
+        {
+          "text": "苍凉",
+          "weight": 1
+        },
+        {
+          "text": "顽皮",
+          "weight": 1
+        },
+        {
+          "text": "释然",
+          "weight": 1
+        },
+        {
+          "text": "傲娇",
+          "weight": 1
+        },
+        {
+          "text": "宁静",
+          "weight": 1
+        },
+        {
+          "text": "轻盈",
+          "weight": 1
+        },
+        {
+          "text": "甜蜜",
+          "weight": 1
+        },
+        {
+          "text": "活泼",
+          "weight": 1
+        },
+        {
+          "text": "童趣",
+          "weight": 1
+        },
+        {
+          "text": "诡异",
+          "weight": 1
+        },
+        {
+          "text": "压迫",
+          "weight": 1
+        },
+        {
+          "text": "危险",
+          "weight": 1
+        },
+        {
+          "text": "庄严",
+          "weight": 1
+        },
+        {
+          "text": "宏大",
+          "weight": 1
+        },
+        {
+          "text": "迷离",
+          "weight": 1
+        },
+        {
+          "text": "冷峻",
+          "weight": 1
+        },
+        {
+          "text": "疏离",
+          "weight": 1
+        },
+        {
+          "text": "机械",
+          "weight": 1
+        },
+        {
+          "text": "未来",
+          "weight": 1
+        },
+        {
+          "text": "原始",
+          "weight": 1
+        },
+        {
+          "text": "野性",
+          "weight": 1
+        },
+        {
+          "text": "奢华",
+          "weight": 1
+        },
+        {
+          "text": "粗粝",
+          "weight": 1
+        },
+        {
+          "text": "Dreamy(梦幻)",
+          "weight": 1
+        },
+        {
+          "text": "Cozy(温馨)",
+          "weight": 1
+        },
+        {
+          "text": "Dramatic(戏剧感)",
+          "weight": 1
+        },
+        {
+          "text": "Romantic(浪漫)",
+          "weight": 1
+        },
+        {
+          "text": "Calming(舒缓)",
+          "weight": 1
+        },
+        {
+          "text": "Timeless(经典永恒)",
+          "weight": 1
+        },
+        {
+          "text": "Elegant(优雅)",
+          "weight": 1
+        },
+        {
+          "text": "Dark(暗黑)",
+          "weight": 1
+        },
+        {
+          "text": "Soft(柔和)",
+          "weight": 1
+        },
+        {
+          "text": "Weird(怪诞)",
+          "weight": 1
+        },
+        {
+          "text": "Witchy(女巫风)",
+          "weight": 1
+        },
+        {
+          "text": "反差感",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "色彩关键词",
+      "category": "设计方向",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "红金",
+          "weight": 1
+        },
+        {
+          "text": "蓝白",
+          "weight": 1
+        },
+        {
+          "text": "黑银",
+          "weight": 1
+        },
+        {
+          "text": "莫兰迪色",
+          "weight": 1
+        },
+        {
+          "text": "大地色",
+          "weight": 1
+        },
+        {
+          "text": "高饱和撞色",
+          "weight": 1
+        },
+        {
+          "text": "低饱和柔和色",
+          "weight": 1
+        },
+        {
+          "text": "单色设计",
+          "weight": 1
+        },
+        {
+          "text": "渐变色",
+          "weight": 1
+        },
+        {
+          "text": "透明质感",
+          "weight": 1
+        },
+        {
+          "text": "金属色",
+          "weight": 1
+        },
+        {
+          "text": "霓虹色",
+          "weight": 1
+        },
+        {
+          "text": "马卡龙色",
+          "weight": 1
+        },
+        {
+          "text": "粉彩",
+          "weight": 1
+        },
+        {
+          "text": "黑白灰",
+          "weight": 1
+        },
+        {
+          "text": "原木色",
+          "weight": 1
+        },
+        {
+          "text": "宝石色",
+          "weight": 1
+        },
+        {
+          "text": "荧光色",
+          "weight": 1
+        },
+        {
+          "text": "雾霾蓝",
+          "weight": 1
+        },
+        {
+          "text": "复古暖调",
+          "weight": 1
+        },
+        {
+          "text": "香槟金",
+          "weight": 1
+        },
+        {
+          "text": "蒂芙尼蓝",
+          "weight": 1
+        },
+        {
+          "text": "克莱因蓝",
+          "weight": 1
+        },
+        {
+          "text": "多巴胺色",
+          "weight": 1
+        },
+        {
+          "text": "墨绿",
+          "weight": 1
+        },
+        {
+          "text": "酒红",
+          "weight": 1
+        },
+        {
+          "text": "焦糖色",
+          "weight": 1
+        },
+        {
+          "text": "象牙白",
+          "weight": 1
+        },
+        {
+          "text": "炭黑",
+          "weight": 1
+        },
+        {
+          "text": "蜜桃色",
+          "weight": 1
+        },
+        {
+          "text": "薰衣草紫",
+          "weight": 1
+        },
+        {
+          "text": "薄荷绿",
+          "weight": 1
+        },
+        {
+          "text": "银灰",
+          "weight": 1
+        },
+        {
+          "text": "彩虹色",
+          "weight": 1
+        },
+        {
+          "text": "双色渐变",
+          "weight": 1
+        },
+        {
+          "text": "镭射幻彩",
+          "weight": 1
+        },
+        {
+          "text": "流沙色",
+          "weight": 1
+        },
+        {
+          "text": "枯玫瑰色",
+          "weight": 1
+        },
+        {
+          "text": "冰川蓝",
+          "weight": 1
+        },
+        {
+          "text": "葱绿",
+          "weight": 1
+        },
+        {
+          "text": "单色",
+          "weight": 1
+        },
+        {
+          "text": "双色",
+          "weight": 1
+        },
+        {
+          "text": "低饱和",
+          "weight": 1
+        },
+        {
+          "text": "高饱和",
+          "weight": 1
+        },
+        {
+          "text": "柔和色",
+          "weight": 1
+        },
+        {
+          "text": "糖果色",
+          "weight": 1
+        },
+        {
+          "text": "复古色",
+          "weight": 1
+        },
+        {
+          "text": "黑金",
+          "weight": 1
+        },
+        {
+          "text": "黑红",
+          "weight": 1
+        },
+        {
+          "text": "红蓝",
+          "weight": 1
+        },
+        {
+          "text": "橙蓝",
+          "weight": 1
+        },
+        {
+          "text": "紫绿",
+          "weight": 1
+        },
+        {
+          "text": "粉绿",
+          "weight": 1
+        },
+        {
+          "text": "冷暖对比",
+          "weight": 1
+        },
+        {
+          "text": "互补色",
+          "weight": 1
+        },
+        {
+          "text": "邻近色",
+          "weight": 1
+        },
+        {
+          "text": "多彩渐变",
+          "weight": 1
+        },
+        {
+          "text": "透明色",
+          "weight": 1
+        },
+        {
+          "text": "半透明",
+          "weight": 1
+        },
+        {
+          "text": "荧光渐变",
+          "weight": 1
+        },
+        {
+          "text": "夜间色",
+          "weight": 1
+        },
+        {
+          "text": "晨曦色",
+          "weight": 1
+        },
+        {
+          "text": "暮色",
+          "weight": 1
+        },
+        {
+          "text": "Pastel(柔和淡彩)",
+          "weight": 1
+        },
+        {
+          "text": "Earthy(大地色)",
+          "weight": 1
+        },
+        {
+          "text": "Terracotta(陶土色)",
+          "weight": 1
+        },
+        {
+          "text": "Burgundy(酒红)",
+          "weight": 1
+        },
+        {
+          "text": "Teal(蓝绿色)",
+          "weight": 1
+        },
+        {
+          "text": "Neutral(中性色)",
+          "weight": 1
+        },
+        {
+          "text": "Soft Autumn(柔秋型)",
+          "weight": 1
+        },
+        {
+          "text": "Soft Summer(柔夏型)",
+          "weight": 1
+        },
+        {
+          "text": "Deep Autumn(深秋型)",
+          "weight": 1
+        },
+        {
+          "text": "Deep Winter(深冬型)",
+          "weight": 1
+        },
+        {
+          "text": "Light Spring(浅春型)",
+          "weight": 1
+        },
+        {
+          "text": "Warm Spring(暖春型)",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "视觉语言关键词",
+      "category": "设计方向",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "留白",
+          "weight": 1
+        },
+        {
+          "text": "对称",
+          "weight": 1
+        },
+        {
+          "text": "几何",
+          "weight": 1
+        },
+        {
+          "text": "拼贴",
+          "weight": 1
+        },
+        {
+          "text": "手工感",
+          "weight": 1
+        },
+        {
+          "text": "平面化",
+          "weight": 1
+        },
+        {
+          "text": "立体化",
+          "weight": 1
+        },
+        {
+          "text": "装饰性",
+          "weight": 1
+        },
+        {
+          "text": "图形化",
+          "weight": 1
+        },
+        {
+          "text": "故事化",
+          "weight": 1
+        },
+        {
+          "text": "象征化",
+          "weight": 1
+        },
+        {
+          "text": "纹样化",
+          "weight": 1
+        },
+        {
+          "text": "极简线条",
+          "weight": 1
+        },
+        {
+          "text": "蒙太奇",
+          "weight": 1
+        },
+        {
+          "text": "信息图表风",
+          "weight": 1
+        },
+        {
+          "text": "噪点",
+          "weight": 1
+        },
+        {
+          "text": "像素化",
+          "weight": 1
+        },
+        {
+          "text": "故障感",
+          "weight": 1
+        },
+        {
+          "text": "3D渲染",
+          "weight": 1
+        },
+        {
+          "text": "剪纸风",
+          "weight": 1
+        },
+        {
+          "text": "水彩晕染",
+          "weight": 1
+        },
+        {
+          "text": "扁平化",
+          "weight": 1
+        },
+        {
+          "text": "光影对比",
+          "weight": 1
+        },
+        {
+          "text": "负空间",
+          "weight": 1
+        },
+        {
+          "text": "重复构成",
+          "weight": 1
+        },
+        {
+          "text": "网格系统",
+          "weight": 1
+        },
+        {
+          "text": "超现实",
+          "weight": 1
+        },
+        {
+          "text": "涂鸦感",
+          "weight": 1
+        },
+        {
+          "text": "金箔质感",
+          "weight": 1
+        },
+        {
+          "text": "刺绣感",
+          "weight": 1
+        },
+        {
+          "text": "版画感",
+          "weight": 1
+        },
+        {
+          "text": "线条速写",
+          "weight": 1
+        },
+        {
+          "text": "动态模糊",
+          "weight": 1
+        },
+        {
+          "text": "高对比",
+          "weight": 1
+        },
+        {
+          "text": "拼贴混合",
+          "weight": 1
+        },
+        {
+          "text": "电影感",
+          "weight": 1
+        },
+        {
+          "text": "摄影感",
+          "weight": 1
+        },
+        {
+          "text": "广告感",
+          "weight": 1
+        },
+        {
+          "text": "杂志感",
+          "weight": 1
+        },
+        {
+          "text": "舞台感",
+          "weight": 1
+        },
+        {
+          "text": "纪录片感",
+          "weight": 1
+        },
+        {
+          "text": "插画感",
+          "weight": 1
+        },
+        {
+          "text": "绘画感",
+          "weight": 1
+        },
+        {
+          "text": "极简",
+          "weight": 1
+        },
+        {
+          "text": "密集",
+          "weight": 1
+        },
+        {
+          "text": "非对称",
+          "weight": 1
+        },
+        {
+          "text": "有机",
+          "weight": 1
+        },
+        {
+          "text": "透明",
+          "weight": 1
+        },
+        {
+          "text": "层叠",
+          "weight": 1
+        },
+        {
+          "text": "框景",
+          "weight": 1
+        },
+        {
+          "text": "视觉错位",
+          "weight": 1
+        },
+        {
+          "text": "比例夸张",
+          "weight": 1
+        },
+        {
+          "text": "尺度反差",
+          "weight": 1
+        },
+        {
+          "text": "重复",
+          "weight": 1
+        },
+        {
+          "text": "模块化",
+          "weight": 1
+        },
+        {
+          "text": "解构",
+          "weight": 1
+        },
+        {
+          "text": "重组",
+          "weight": 1
+        },
+        {
+          "text": "符号化",
+          "weight": 1
+        },
+        {
+          "text": "隐喻",
+          "weight": 1
+        },
+        {
+          "text": "叙事性",
+          "weight": 1
+        },
+        {
+          "text": "互动性",
+          "weight": 1
+        },
+        {
+          "text": "沉浸感",
+          "weight": 1
+        },
+        {
+          "text": "Typography(字体设计)",
+          "weight": 1
+        },
+        {
+          "text": "Layout(版式)",
+          "weight": 1
+        },
+        {
+          "text": "Geometric(几何)",
+          "weight": 1
+        },
+        {
+          "text": "Pattern(图案)",
+          "weight": 1
+        },
+        {
+          "text": "Brand Pattern(品牌纹样)",
+          "weight": 1
+        },
+        {
+          "text": "Visual Hierarchy(视觉层级)",
+          "weight": 1
+        },
+        {
+          "text": "Infographic(信息图)",
+          "weight": 1
+        },
+        {
+          "text": "UI Design",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "name": "风格关键词",
+      "category": "设计方向",
+      "tags": [
+        "夏日创艺"
+      ],
+      "words": [
+        {
+          "text": "极简",
+          "weight": 1
+        },
+        {
+          "text": "复古",
+          "weight": 1
+        },
+        {
+          "text": "国潮",
+          "weight": 1
+        },
+        {
+          "text": "未来主义",
+          "weight": 1
+        },
+        {
+          "text": "赛博朋克",
+          "weight": 1
+        },
+        {
+          "text": "蒸汽朋克",
+          "weight": 1
+        },
+        {
+          "text": "哥特",
+          "weight": 1
+        },
+        {
+          "text": "日式清新",
+          "weight": 1
+        },
+        {
+          "text": "北欧",
+          "weight": 1
+        },
+        {
+          "text": "工业风",
+          "weight": 1
+        },
+        {
+          "text": "自然系",
+          "weight": 1
+        },
+        {
+          "text": "童趣",
+          "weight": 1
+        },
+        {
+          "text": "梦幻",
+          "weight": 1
+        },
+        {
+          "text": "高级感",
+          "weight": 1
+        },
+        {
+          "text": "手绘插画",
+          "weight": 1
+        },
+        {
+          "text": "拼贴",
+          "weight": 1
+        },
+        {
+          "text": "像素风",
+          "weight": 1
+        },
+        {
+          "text": "街头潮流",
+          "weight": 1
+        },
+        {
+          "text": "东方美学",
+          "weight": 1
+        },
+        {
+          "text": "科技感",
+          "weight": 1
+        },
+        {
+          "text": "欧美潮流",
+          "weight": 1
+        },
+        {
+          "text": "奢华",
+          "weight": 1
+        },
+        {
+          "text": "孟菲斯",
+          "weight": 1
+        },
+        {
+          "text": "包豪斯",
+          "weight": 1
+        },
+        {
+          "text": "波普",
+          "weight": 1
+        },
+        {
+          "text": "废土风",
+          "weight": 1
+        },
+        {
+          "text": "暗黑系",
+          "weight": 1
+        },
+        {
+          "text": "Y2K",
+          "weight": 1
+        },
+        {
+          "text": "千禧风",
+          "weight": 1
+        },
+        {
+          "text": "盐系",
+          "weight": 1
+        },
+        {
+          "text": "甜系",
+          "weight": 1
+        },
+        {
+          "text": "装饰艺术",
+          "weight": 1
+        },
+        {
+          "text": "新中式",
+          "weight": 1
+        },
+        {
+          "text": "故障艺术",
+          "weight": 1
+        },
+        {
+          "text": "蒸汽波",
+          "weight": 1
+        },
+        {
+          "text": "厚涂",
+          "weight": 1
+        },
+        {
+          "text": "扁平风",
+          "weight": 1
+        },
+        {
+          "text": "极繁主义",
+          "weight": 1
+        },
+        {
+          "text": "复古港风",
+          "weight": 1
+        },
+        {
+          "text": "赛博禅意",
+          "weight": 1
+        },
+        {
+          "text": "现代主义",
+          "weight": 1
+        },
+        {
+          "text": "国际主义",
+          "weight": 1
+        },
+        {
+          "text": "极简主义",
+          "weight": 1
+        },
+        {
+          "text": "新极简",
+          "weight": 1
+        },
+        {
+          "text": "怀旧",
+          "weight": 1
+        },
+        {
+          "text": "复古未来",
+          "weight": 1
+        },
+        {
+          "text": "柴油朋克",
+          "weight": 1
+        },
+        {
+          "text": "生物朋克",
+          "weight": 1
+        },
+        {
+          "text": "超现实",
+          "weight": 1
+        },
+        {
+          "text": "梦境感",
+          "weight": 1
+        },
+        {
+          "text": "童话感",
+          "weight": 1
+        },
+        {
+          "text": "奇幻",
+          "weight": 1
+        },
+        {
+          "text": "暗黑奇幻",
+          "weight": 1
+        },
+        {
+          "text": "巴洛克",
+          "weight": 1
+        },
+        {
+          "text": "洛可可",
+          "weight": 1
+        },
+        {
+          "text": "新艺术运动",
+          "weight": 1
+        },
+        {
+          "text": "构成主义",
+          "weight": 1
+        },
+        {
+          "text": "达达",
+          "weight": 1
+        },
+        {
+          "text": "粗野主义",
+          "weight": 1
+        },
+        {
+          "text": "自然主义",
+          "weight": 1
+        },
+        {
+          "text": "有机设计",
+          "weight": 1
+        },
+        {
+          "text": "手工感",
+          "weight": 1
+        },
+        {
+          "text": "实验性",
+          "weight": 1
+        },
+        {
+          "text": "故障美学",
+          "weight": 1
+        },
+        {
+          "text": "千禧复古",
+          "weight": 1
+        },
+        {
+          "text": "日系",
+          "weight": 1
+        },
+        {
+          "text": "韩系",
+          "weight": 1
+        },
+        {
+          "text": "东方",
+          "weight": 1
+        },
+        {
+          "text": "传统复兴",
+          "weight": 1
+        },
+        {
+          "text": "未来东方",
+          "weight": 1
+        },
+        {
+          "text": "Minimalism(极简主义)",
+          "weight": 1
+        },
+        {
+          "text": "Grunge",
+          "weight": 1
+        },
+        {
+          "text": "Swiss Style(瑞士风格)",
+          "weight": 1
+        },
+        {
+          "text": "Contemporary(当代)",
+          "weight": 1
+        },
+        {
+          "text": "Art Deco(装饰艺术)",
+          "weight": 1
+        },
+        {
+          "text": "Postmodern(后现代)",
+          "weight": 1
+        },
+        {
+          "text": "Art Nouveau(新艺术)",
+          "weight": 1
+        },
+        {
+          "text": "Mid-Century Modern(中古现代风)",
+          "weight": 1
+        },
+        {
+          "text": "Maximalism(极繁主义)",
+          "weight": 1
+        },
+        {
+          "text": "Victorian(维多利亚)",
+          "weight": 1
+        },
+        {
+          "text": "Cottagecore",
+          "weight": 1
+        },
+        {
+          "text": "Fairycore",
+          "weight": 1
+        },
+        {
+          "text": "Angelcore",
+          "weight": 1
+        },
+        {
+          "text": "Mermaidcore",
+          "weight": 1
+        },
+        {
+          "text": "Dreamcore",
+          "weight": 1
+        },
+        {
+          "text": "Medieval(中世纪)",
+          "weight": 1
+        },
+        {
+          "text": "Industrial(工业风)",
+          "weight": 1
+        },
+        {
+          "text": "Flat Design(扁平设计)",
+          "weight": 1
+        },
+        {
+          "text": "Cybersigilism",
+          "weight": 1
+        }
+      ]
+    }
+  ],
+  "presets": []
+}

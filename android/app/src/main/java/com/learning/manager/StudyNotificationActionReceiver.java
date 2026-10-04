@@ -7,6 +7,9 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -32,9 +35,11 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
     public static final String EXTRA_BODY     = "extra_body";
     public static final String EXTRA_NOTIF_ID = "extra_notif_id";
     public static final String EXTRA_TASK_ID  = "extra_task_id";
+    public static final String EXTRA_CHANNEL  = "extra_channel";
 
-    public static final String CHANNEL_ID    = "learning_reminders";
-    public static final String CHANNEL_NAME  = "摸鱼提醒";
+    public static final String CHANNEL_ID_STRONG  = "reminders_strong";
+    public static final String CHANNEL_ID_WEAK    = "reminders_weak";
+    public static final String CHANNEL_ID_SILENT  = "reminders_silent";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -44,6 +49,8 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
         String body    = intent.getStringExtra(EXTRA_BODY);
         int    notifId = intent.getIntExtra(EXTRA_NOTIF_ID, 1);
         String taskId  = intent.getStringExtra(EXTRA_TASK_ID);
+        String channel = intent.getStringExtra(EXTRA_CHANNEL);
+        if (channel == null) channel = CHANNEL_ID_STRONG;
         if (title == null) title = "今天摸啥鱼";
         if (body  == null) body  = "该摸一条鱼了。";
 
@@ -57,10 +64,14 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
         switch (action) {
             case "com.learning.manager.NOTIF_CANCEL":
                 // 仅取消，不再提醒（今日窗口内不重新安排，也不跳 App）
+                // 同步清掉本地镜像：用户已明确取消，开机后不该再恢复
+                NotifScheduleStore.remove(context, notifId);
                 break;
             case "com.learning.manager.NOTIF_REFIRE":
                 // 定时到点了，直接在后台弹出一条新通知（不启动 App）
-                fireNotification(context, title, body, notifId, taskId);
+                fireNotification(context, title, body, notifId, taskId, channel);
+                // 已触发：从本地镜像移除，避免重启后被重复恢复
+                NotifScheduleStore.remove(context, notifId);
                 break;
             default:
                 break;
@@ -70,8 +81,9 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
     /**
      * 由 AlarmManager 回调：直接发 Notification（不启动 App）。
      */
-    public static void fireNotification(Context context, String title, String body, int notifId, String taskId) {
-        ensureChannel(context);
+    public static void fireNotification(Context context, String title, String body, int notifId, String taskId, String channel) {
+        ensureChannels(context);
+        if (channel == null) channel = CHANNEL_ID_STRONG;
 
         // 点击通知本体时打开 MainActivity，带 taskId
         Intent openApp = new Intent(context, MainActivity.class);
@@ -97,8 +109,8 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
         NotificationCompat.Action aCancel = buildBroadcastAction(context, notifId, title, body, taskId,
                 "com.learning.manager.NOTIF_CANCEL", "取消", notifId + 50000);
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channel)
+                .setSmallIcon(R.drawable.ic_stat_notify)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
@@ -157,16 +169,40 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
         return new NotificationCompat.Action(0, label, pi);
     }
 
-    private static void ensureChannel(Context context) {
+    private static void ensureChannels(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm == null) return;
-            if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+
+            if (nm.getNotificationChannel(CHANNEL_ID_STRONG) == null) {
                 NotificationChannel ch = new NotificationChannel(
-                        CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
-                ch.setDescription("摸鱼提醒，含开始/换一个/取消按钮");
+                        CHANNEL_ID_STRONG, "强提醒", NotificationManager.IMPORTANCE_HIGH);
+                ch.setDescription("提神闹钟声+震动，确保不错过");
                 ch.enableLights(true);
                 ch.enableVibration(true);
+                ch.setVibrationPattern(new long[]{0, 220, 120, 220, 120, 220, 120, 360});
+                // 优先用自带的升调闹钟声（更提神），缺失时退回系统闹钟声
+                Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+                try {
+                    soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/" + R.raw.alarm_reminder);
+                } catch (Throwable ignored) {}
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build();
+                ch.setSound(soundUri, attrs);
+                nm.createNotificationChannel(ch);
+            }
+            if (nm.getNotificationChannel(CHANNEL_ID_WEAK) == null) {
+                NotificationChannel ch = new NotificationChannel(
+                        CHANNEL_ID_WEAK, "弱提醒", NotificationManager.IMPORTANCE_LOW);
+                ch.setDescription("只出现在通知栏，不打扰");
+                nm.createNotificationChannel(ch);
+            }
+            if (nm.getNotificationChannel(CHANNEL_ID_SILENT) == null) {
+                NotificationChannel ch = new NotificationChannel(
+                        CHANNEL_ID_SILENT, "静默提醒", NotificationManager.IMPORTANCE_MIN);
+                ch.setDescription("仅保留通知记录，几乎无打扰");
                 nm.createNotificationChannel(ch);
             }
         }

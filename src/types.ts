@@ -67,7 +67,7 @@ export interface TaskGroup {
 }
 
 // 任务（学习方向） —— 一个长期学习方向（如：阅读 / 绘画 / 建模 / 编程）
-// 职责：是否启用、随机权重；本身不承担完成目标/进度。
+// 职责：是否启用、随机权重、提醒星期；本身不承担完成目标/进度。
 // 完成判定由其下各 Sequence 自行负责（Sequence.completed）。
 // status 字段保留用于旧逻辑兼容，但完成态不再以它为唯一依据。
 export interface Task {
@@ -82,6 +82,15 @@ export interface Task {
   totalStudyTime: number // 累计学习时间（秒）
   createdAt: number
   updatedAt: number
+  // 提醒星期（0=周日 … 6=周六）：该方向参与「次日计划」的星期；
+  // 空数组或 undefined = 每天
+  weekdays?: number[]
+  // 应用名单（方向级）：允许进入的应用包名。默认策略=禁止，
+  // 即不在本列表里的应用一律不给入口（计时页不显示图标）。
+  allowedApps?: string[]
+  // 应用名单（方向级）：该方向明确的分心项包名。
+  // 不给入口，且 P3 越界提醒命中时立即提醒（不受容忍分钟数保护）。
+  blockedApps?: string[]
 }
 
 // 学习记录 —— 每次学习的快照
@@ -111,55 +120,131 @@ export interface AppData {
   tasks: Task[]
   records: StudyRecord[]
   reminder?: ReminderConfig
+  // 次日计划（按日期存最近几天 + 明天），见 PlanDay
+  plans?: PlanDay[]
+  // 固定任务：被用户标星固定的方向/序列，每天自动进入计划，直到手动取消
+  pinnedTasks?: PinnedTask[]
+  // 应用池：曾选入过名单的应用元数据缓存（包名 → 应用名）。
+  // 注意：这里只存元数据，**不带策略立场**——允许/分心全部存在 Task 上，
+  // 避免「池里有立场、方向里也有立场」的双份真相。
+  appPool?: AppEntry[]
+}
+
+// 应用元数据（包名唯一）
+export interface AppEntry {
+  packageName: string
+  appName: string // 冗余存名：应用卸载后仍可显示
+}
+
+// 固定任务：某方向（可选绑定序列）被标星后，每天自动排进计划
+export interface PinnedTask {
+  taskId: string
+  sequenceId?: string
+}
+
+// ===== 次日计划 =====
+// 单个计划项：某天某时刻提醒某个方向（可选绑定序列与时长）
+export interface PlanItem {
+  id: string
+  minuteOfDay: number // 计划时刻（当天 0-1439 分钟）
+  taskId: string
+  taskName: string // 冗余存储，方向改名/删除后仍可显示
+  sequenceId?: string
+  sequenceName?: string
+  // 序列自带倒计时时记录时长（秒）；正向计时的序列不绑时长
+  durationSec?: number | null
+  status: 'pending' | 'done' | 'skipped'
+  // 冲突延迟补发的目标触发时刻（ms）；由会话结束时写入，scheduleReminders 据此重排
+  // 仅当大于原定时刻时生效；为空/过期则按原定逻辑处理。
+  deferredAtMs?: number
+  // 手动创建的计划页条目：每天顺延到当天列表，直到完成/跳过/删除
+  manual?: boolean
+  // 由过去某日顺延而来时，记录原日期（仅展示用）
+  carriedFrom?: string
+  // 仅提醒：不进计时会话，在计划页直接标记完成
+  remindOnly?: boolean
+  // 固定任务：被用户「标星固定」后每天自动进入计划，直到手动取消固定
+  pinned?: boolean
+}
+
+// 一天的计划
+export interface PlanDay {
+  date: string // YYYY-MM-DD（本地时区）
+  items: PlanItem[]
+  generatedAt: number
 }
 
 // ===== 提醒功能 =====
-// 提醒模式：固定间隔 / 随机时机 / 每日固定次数
-export type ReminderDailyMode = 'interval' | 'random' | 'dailyCount'
+// 唯一范式：次日计划。打开 App 时自动补齐今天剩余项 + 预生成明天。
+// 参与与否由 Task.weekdays（方向自带星期）+ Task.enabled 决定。
+export type PlanTiming = 'random' | 'interval'
 
-// 单个时间窗口（开始=结束的分钟数，0-1439），支持跨夜（start > end）
-// 可选字段：仿闹钟形式，每段独立绑定任务白名单与生效星期
-//   - taskIds: 空数组或 undefined → 用 ReminderConfig.enabledTaskIds（全局白名单）
-//   - weekdays: 空数组或 undefined → 用 ReminderConfig.enabledWeekdays（全局星期）
+// 单个时间窗口（分钟数 0-1439），支持跨夜（start > end，生成时按当日裁剪）
 export interface TimeWindow {
   startMinute: number
   endMinute: number
-  taskIds?: string[]
-  weekdays?: number[] // 0=周日 … 6=周六
 }
+
+export type NotificationIntensity = 'strong' | 'weak' | 'silent'
 
 export interface ReminderConfig {
   enabled: boolean // 总开关
-  // ---- 时间模式 ----
-  dailyMode: ReminderDailyMode
-  intervalMinutes: number // 仅 interval 模式有效：>0 表示固定间隔
-  dailyCount: number // 仅 dailyCount 模式有效：每日提醒目标次数
-  cooldownMinutes: number // 冷却时间，避免频繁打扰
-  // ---- 时间窗口（可多个，用于区分工作段/午休等）----
-  windows: TimeWindow[] // 至少 1 个，最多 3 个
-  // ---- 星期白名单 ----
-  enabledWeekdays: number[] // 0=周日 … 6=周六，空=每天
+  // ---- 计划规模 ----
+  planSessions: number // 每日方向数（每天随机排几个方向），1-12
+  // ---- 时刻分布 ----
+  planTiming: PlanTiming // random=窗口内随机时刻；interval=从窗口开始按固定间隔顺排
+  intervalMinutes: number // 仅 interval 有效：相邻计划项间隔（分钟）
+  cooldownMinutes: number // 仅 random 有效：相邻计划项最小间隔；也用作通知冷却
+  // ---- 时间窗口（可多个，纯开始/结束）----
+  windows: TimeWindow[] // 至少 1 个，最多 4 个
   // ---- 智能跳过 ----
   skipAfterSessionMinutes: number // 学习会话结束后 N 分钟内不提醒，0=关闭
-  // ---- 参与任务白名单 ----
-  enabledTaskIds: string[] // 空=所有启用任务都参与
-
-  // 遗留字段（迁移兼容：windows 为空时读取）
-  startMinute?: number
-  endMinute?: number
+  // ---- 冲突延迟 ----
+  // 会话进行中、原定计划项到点时，延迟到本次会话结束后再补发（分钟）；
+  // 0 = 不延迟（会话期间到点的项直接丢弃，旧行为）。补发时按"原顺序 + 每项错开 1 分钟"。
+  deferMinutes: number
+  // ---- 回归提醒（跨天留存）----
+  // 连续 N 天未打开 App 时，系统推送一条"回来摸鱼"提醒；0 = 关闭
+  reengageDays: number
+  // ---- 计划提醒提前排程天数 ----
+  // 排程窗口从「今天 + 明天」扩到「今天 + 未来 N 天」，使真实计划提醒能跨天触发（即便 App 多日未打开）
+  planLookaheadDays: number
+  // ---- 提醒强度 ----
+  intensity: NotificationIntensity // strong=声音+震动；weak=静默响铃；silent=仅通知栏
+  // ---- 越界提醒（P3，默认关）----
+  // 仅在学习计时进行中、本 App 在后台时，由原生前台服务轮询检测（见 StudyTimerService）：
+  // 前台应用命中「分心名单」立即提醒；命中「未列出」且停留超 guardGraceMinutes 才提醒；命中「允许名单」不打扰。
+  // 只提醒不拦截。guardEnabled=false 时整个轮询不启动（零耗电）。
+  guardEnabled?: boolean
+  guardGraceMinutes?: number
 }
 
 export const DEFAULT_REMINDER: ReminderConfig = {
   enabled: false,
-  dailyMode: 'random',
-  intervalMinutes: 60,
-  dailyCount: 5,
+  planSessions: 4,
+  planTiming: 'random',
+  intervalMinutes: 90,
   cooldownMinutes: 30,
   windows: [{ startMinute: 9 * 60, endMinute: 22 * 60 }],
-  enabledWeekdays: [],
   skipAfterSessionMinutes: 60,
-  enabledTaskIds: [],
+  deferMinutes: 2,
+  reengageDays: 2,
+  planLookaheadDays: 3,
+  intensity: 'weak',
+  guardEnabled: false,
+  guardGraceMinutes: 5,
 }
+
+// 星期标签（0=周日 … 6=周六），供 UI 与计划池筛选共用
+export const WEEKDAY_LABELS: { label: string; value: number }[] = [
+  { label: '一', value: 1 },
+  { label: '二', value: 2 },
+  { label: '三', value: 3 },
+  { label: '四', value: 4 },
+  { label: '五', value: 5 },
+  { label: '六', value: 6 },
+  { label: '日', value: 0 },
+]
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   not_started: '未开始',

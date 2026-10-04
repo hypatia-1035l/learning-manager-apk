@@ -42,6 +42,8 @@ apk-download/
 .tunnel.py
 APK_DOWNLOAD_INFO.md
 download.html
+# Vite 配置热重载时生成的临时文件
+vite.config.ts.timestamp-*.mjs
 
 # 开发辅助脚本（非应用运行所需，清残留）
 serveo_tunnel.sh

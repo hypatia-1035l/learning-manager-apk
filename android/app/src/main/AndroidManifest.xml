@@ -58,6 +58,21 @@
             </intent-filter>
         </receiver>
 
+        <!-- 开机/应用更新后恢复原生提醒：
+             AlarmManager 的闹钟在设备重启后会全部失效，系统不会自动恢复，
+             这里从 NotifScheduleStore 读回上次排程并重排未到点的条目 -->
+        <receiver
+            android:name=".StudyNotificationBootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- 部分国产 ROM（MIUI/HTC 等）用该 action 代替标准开机广播 -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <!-- 摸鱼提醒动作接收器：Snooze/Ignore 不启动 Activity，后台处理 -->
         <receiver
             android:name=".StudyNotificationActionReceiver"
@@ -75,6 +90,13 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- 应用名单：列出设备上已安装的应用（侧载自用；上架应用商店会被审核拒） -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- 应用名单：读取使用时长（P3 越界提醒用，非运行时弹窗，需手动去「使用情况访问」开启） -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- 本地通知：定时提醒（Android 13+ 需运行时申请） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

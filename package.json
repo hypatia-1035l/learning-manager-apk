@@ -8,8 +8,9 @@
     "prebuild": "node scripts/writeBuildInfo.cjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host",
+    "verify": "node scripts/verify-fixes.mjs",
     "clean:android": "node -e \"require('fs').rmSync('android/app/src/main/assets/public',{recursive:true,force:true})\"",
-    "sync:android": "npm run clean:android && npx cap sync android",
+    "sync:android": "npm run clean:android && cap sync android",
     "build:android": "npm run build && npm run sync:android"
   },
   "dependencies": {
@@ -17,9 +18,11 @@
     "@capacitor/app": "^8.1.1",
     "@capacitor/cli": "^8.4.2",
     "@capacitor/core": "^8.4.2",
+    "@capacitor/filesystem": "^8.1.3",
     "@capacitor/local-notifications": "^8.2.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "swiper": "^14.1.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

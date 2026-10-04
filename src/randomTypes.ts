@@ -27,13 +27,33 @@ export interface WordBank {
   createdAt: number
 }
 
+// ===== 颜色随机 =====
+// 采样模式：rgb=R/G/B 三通道独立；gray=明度联动（R=G=B）；hsl=色相/饱和度/明度
+export type ColorMode = 'rgb' | 'gray' | 'hsl'
+
+// 颜色范围：三通道 min/max，按 mode 解释
+//   rgb:  c1=R(0-255)  c2=G(0-255)  c3=B(0-255)
+//   gray: c1=明度(0-255)，c2/c3 忽略
+//   hsl:  c1=H(0-360)  c2=S(0-100)  c3=L(0-100)
+export interface ColorRange {
+  id: string
+  name: string
+  mode: ColorMode
+  c1Min: number
+  c1Max: number
+  c2Min: number
+  c2Max: number
+  c3Min: number
+  c3Max: number
+}
+
 // ===== 随机记录：单次点击随机按钮的快照 =====
-// type=number: 数字随机；type=wordbank: 词库随机
+// type=number: 数字随机；type=wordbank: 词库随机；type=color: 颜色随机
 // result 为本次抽取结果的可读文本（多个结果合并展示）
 export interface RandomRecord {
   id: string
-  type: 'number' | 'wordbank'
-  summary: string // 简短描述，如「1-100 整数 ×3」「水果+颜色」
+  type: 'number' | 'wordbank' | 'color'
+  summary: string // 简短描述，如「1-100 整数 ×3」「水果+颜色」「全彩 ×3」
   result: string // 完整结果文本（多行用 \n 分隔）
   createdAt: number
 }
@@ -41,6 +61,7 @@ export interface RandomRecord {
 // 整体数据形态
 export interface RandomData {
   ranges: NumberRange[]
+  colorRanges: ColorRange[] // 颜色随机常用范围
   banks: WordBank[] // 统一词库
   presets: Preset[] // 随机预设
   records: RandomRecord[] // 随机记录

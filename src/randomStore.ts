@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import type {
   RandomData,
   NumberRange,
+  ColorRange,
   WordBank,
   WordEntry,
   Preset,
@@ -24,8 +25,7 @@ const SEED_BANKS: Array<{
   category: string
   tags: string[]
   words: Array<{ text: string; weight?: number }>
-}> = [
-  {
+}> = [  {
     name: '今天吃啥',
     category: '日常',
     tags: ['吃货'],
@@ -100,6 +100,17 @@ const SEED_BANKS: Array<{
   },
 ]
 
+// ---------- 内置预设颜色范围 ----------
+// 首次使用自动填充，用户可自由编辑/删除，不会被重复填充
+const SEED_COLOR_RANGES: Array<Omit<ColorRange, 'id'>> = [
+  { name: '全彩', mode: 'rgb', c1Min: 0, c1Max: 255, c2Min: 0, c2Max: 255, c3Min: 0, c3Max: 255 },
+  { name: '灰阶', mode: 'gray', c1Min: 0, c1Max: 255, c2Min: 0, c2Max: 255, c3Min: 0, c3Max: 255 },
+  { name: '暖色', mode: 'rgb', c1Min: 160, c1Max: 255, c2Min: 40, c2Max: 160, c3Min: 20, c3Max: 110 },
+  { name: '冷色', mode: 'rgb', c1Min: 20, c1Max: 110, c2Min: 90, c2Max: 190, c3Min: 160, c3Max: 255 },
+  { name: '莫兰迪', mode: 'hsl', c1Min: 0, c1Max: 360, c2Min: 15, c2Max: 40, c3Min: 55, c3Max: 80 },
+  { name: '鲜艳', mode: 'hsl', c1Min: 0, c1Max: 360, c2Min: 75, c2Max: 100, c3Min: 45, c3Max: 65 },
+]
+
 const uid = (): string =>
   (typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -125,6 +136,7 @@ function normalizeWord(w: WordEntry | string): WordEntry {
 // ---------- 旧数据迁移 ----------
 interface LegacyData {
   ranges?: NumberRange[]
+  colorRanges?: ColorRange[]
   textLists?: { id: string; name: string; items: string[]; createdAt: number }[]
   comboTemplates?: {
     id: string
@@ -145,6 +157,10 @@ interface LegacyData {
 
 function migrateLegacy(raw: LegacyData): RandomData {
   const ranges = raw.ranges ?? []
+  const colorRanges = (raw.colorRanges ?? []).map((r) => ({
+    ...r,
+    id: r.id ?? uid(),
+  }))
   const banks: WordBank[] = []
 
   // 如果已有 banks 字段（新格式），补全缺失字段
@@ -230,7 +246,7 @@ function migrateLegacy(raw: LegacyData): RandomData {
     )
   }
 
-  return { ranges, banks, presets, records: [] }
+  return { ranges, colorRanges, banks, presets, records: [] }
 }
 
 function load(): RandomData {
@@ -255,12 +271,12 @@ function load(): RandomData {
     /* ignore */
   }
   // 全新用户：填充内置预设词库
-  const fresh: RandomData = { ranges: [], banks: [], presets: [], records: [] }
+  const fresh: RandomData = { ranges: [], colorRanges: [], banks: [], presets: [], records: [] }
   seedDefaults(fresh)
   return fresh
 }
 
-// 首次使用时填充内置预设词库（仅执行一次，由 SEED_KEY 标记）
+// 首次使用时填充内置预设（词库 + 颜色范围，仅执行一次，由 SEED_KEY 标记）
 // 用户可自由编辑/删除，不会被重复填充
 function seedDefaults(data: RandomData): void {
   try {
@@ -278,6 +294,7 @@ function seedDefaults(data: RandomData): void {
     createdAt: Date.now(),
   }))
   data.banks = [...data.banks, ...newBanks]
+  data.colorRanges = [...data.colorRanges, ...SEED_COLOR_RANGES.map((s) => ({ ...s, id: uid() }))]
   try {
     localStorage.setItem(SEED_KEY, '1')
   } catch {
@@ -406,6 +423,75 @@ export function deleteRange(id: string) {
   setState((p) => ({ ...p, ranges: p.ranges.filter((r) => r.id !== id) }))
 }
 
+// ---------- 颜色随机 ----------
+const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.round(v)))
+
+// HSL → RGB（h 0-360，s/l 0-100），返回 0-255 整数三元组
+export function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const S = Math.max(0, Math.min(100, s)) / 100
+  const L = Math.max(0, Math.min(100, l)) / 100
+  const c = (1 - Math.abs(2 * L - 1)) * S
+  const hp = ((h % 360) + 360) % 360 / 60
+  const x = c * (1 - Math.abs((hp % 2) - 1))
+  let r = 0, g = 0, b = 0
+  if (hp < 1) { r = c; g = x }
+  else if (hp < 2) { r = x; g = c }
+  else if (hp < 3) { g = c; b = x }
+  else if (hp < 4) { g = x; b = c }
+  else if (hp < 5) { r = x; b = c }
+  else { r = c; b = x }
+  const m = L - c / 2
+  return [clamp255((r + m) * 255), clamp255((g + m) * 255), clamp255((b + m) * 255)]
+}
+
+// RGB → 十六进制色码（大写，如 #A3F2C1）
+export function rgbToHex(r: number, g: number, b: number): string {
+  const h = (v: number) => clamp255(v).toString(16).padStart(2, '0')
+  return `#${h(r)}${h(g)}${h(b)}`.toUpperCase()
+}
+
+// 在颜色范围内随机一色：按 mode 解释三通道；gray 模式三通道联动
+export function randColorInRange(
+  range: Omit<ColorRange, 'id' | 'name'>,
+): { r: number; g: number; b: number; hex: string } {
+  if (range.mode === 'gray') {
+    const v = randInt(clamp255(range.c1Min), clamp255(range.c1Max))
+    return { r: v, g: v, b: v, hex: rgbToHex(v, v, v) }
+  }
+  if (range.mode === 'hsl') {
+    const h = randInt(
+      Math.max(0, Math.min(360, range.c1Min)),
+      Math.max(0, Math.min(360, range.c1Max)),
+    )
+    const s = randInt(Math.max(0, Math.min(100, range.c2Min)), Math.max(0, Math.min(100, range.c2Max)))
+    const l = randInt(Math.max(0, Math.min(100, range.c3Min)), Math.max(0, Math.min(100, range.c3Max)))
+    const [r, g, b] = hslToRgb(h, s, l)
+    return { r, g, b, hex: rgbToHex(r, g, b) }
+  }
+  const r = randInt(clamp255(range.c1Min), clamp255(range.c1Max))
+  const g = randInt(clamp255(range.c2Min), clamp255(range.c2Max))
+  const b = randInt(clamp255(range.c3Min), clamp255(range.c3Max))
+  return { r, g, b, hex: rgbToHex(r, g, b) }
+}
+
+// ---------- 颜色范围 CRUD ----------
+export function addColorRange(input: Omit<ColorRange, 'id'>): ColorRange {
+  const r: ColorRange = { ...input, id: uid(), name: input.name.trim() || '未命名范围' }
+  setState((p) => ({ ...p, colorRanges: [...p.colorRanges, r] }))
+  return r
+}
+
+export function updateColorRange(id: string, patch: Partial<Omit<ColorRange, 'id'>>) {
+  setState((p) => ({
+    ...p,
+    colorRanges: p.colorRanges.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+  }))
+}
+
+export function deleteColorRange(id: string) {
+  setState((p) => ({ ...p, colorRanges: p.colorRanges.filter((r) => r.id !== id) }))
+}
+
 // ---------- 词库 CRUD ----------
 export function addBank(input: {
   name: string
@@ -448,6 +534,37 @@ export function deleteBank(id: string) {
 }
 
 // ---------- 词条 CRUD ----------
+// 用文本行批量覆写/追加词库词条（文本工具「存回词库」用）
+// 追加模式跳过与现有词条同名的行；覆写模式整库替换（权重归 1，不保留）
+export function writeBankWords(
+  bankId: string,
+  texts: string[],
+  mode: 'overwrite' | 'append',
+): { written: number; skipped: number } {
+  const bank = state.banks.find((b) => b.id === bankId)
+  if (!bank) return { written: 0, skipped: 0 }
+  const existing = new Set(mode === 'append' ? bank.words.map((w) => w.text) : [])
+  const out = mode === 'append' ? [...bank.words] : []
+  let written = 0
+  let skipped = 0
+  for (const t of texts) {
+    const text = t.trim()
+    if (!text) continue
+    if (existing.has(text)) {
+      skipped++
+      continue
+    }
+    existing.add(text)
+    out.push(mkWord(text, 1))
+    written++
+  }
+  setState((p) => ({
+    ...p,
+    banks: p.banks.map((b) => (b.id === bankId ? { ...b, words: out } : b)),
+  }))
+  return { written, skipped }
+}
+
 export function addWord(bankId: string, text: string, weight = 1) {
   if (!text.trim()) return
   setState((p) => ({
@@ -487,6 +604,18 @@ export function deleteWord(bankId: string, wordId: string) {
       b.id === bankId
         ? { ...b, words: b.words.filter((w) => w.id !== wordId) }
         : b,
+    ),
+  }))
+}
+
+// 批量删除词条（一次落盘，避免逐个 deleteWord 造成 N 次持久化）
+export function deleteWords(bankId: string, wordIds: string[]) {
+  if (!wordIds.length) return
+  const del = new Set(wordIds)
+  setState((p) => ({
+    ...p,
+    banks: p.banks.map((b) =>
+      b.id === bankId ? { ...b, words: b.words.filter((w) => !del.has(w.id)) } : b,
     ),
   }))
 }
@@ -604,7 +733,7 @@ export function deletePreset(id: string) {
 // ---------- 随机记录 CRUD ----------
 // 新增随机记录；默认只保留最近 MAX_RANDOM_RECORDS 条，超出自动截断
 export function addRandomRecord(input: {
-  type: 'number' | 'wordbank'
+  type: 'number' | 'wordbank' | 'color'
   summary: string
   result: string
 }): RandomRecord {
@@ -624,7 +753,7 @@ export function addRandomRecord(input: {
 }
 
 // 清空记录；type 为空时清空全部
-export function clearRandomRecords(type?: 'number' | 'wordbank') {
+export function clearRandomRecords(type?: 'number' | 'wordbank' | 'color') {
   setState((p) => ({
     ...p,
     records: type ? p.records.filter((r) => r.type !== type) : [],
@@ -673,7 +802,9 @@ export interface ExportedBank {
 export interface ExportedAll {
   ranges: NumberRange[]
   banks: ExportedBank[]
-  presets: { name: string; bankIds: string[] }[]
+  // bankNames：导出时附带词库名，导入端据此跨环境解析。
+  // bankIds 是本地 id，仅在原设备有效，保留以兼容旧导出文件。
+  presets: { name: string; bankIds: string[]; bankNames?: string[] }[]
 }
 
 // 导出单个词库 → JSON 字符串（含名称、分类、标签、词条+权重，不含 id）
@@ -702,6 +833,10 @@ export function exportAll(): string {
     presets: state.presets.map((p) => ({
       name: p.name,
       bankIds: p.bankIds,
+      // 只导 id 的话，换环境导入后预设的 bankIds 会静默丢空
+      bankNames: p.bankIds
+        .map((id) => state.banks.find((b) => b.id === id)?.name)
+        .filter((n): n is string => !!n),
     })),
   }
   return JSON.stringify(data, null, 2)
@@ -864,22 +999,19 @@ export function importAll(data: ExportedAll): ImportAllResult {
         continue
       }
       const bankIds: string[] = []
-      if (Array.isArray(pre.bankIds)) {
-        for (const bidOrName of pre.bankIds) {
-          // 先按 id 查，再按名称映射
-          const existing = state.banks.find((x) => x.id === bidOrName)
-          if (existing) {
-            bankIds.push(existing.id)
-            continue
-          }
-          const mapped = nameToId.get(bidOrName)
-          if (mapped) {
-            bankIds.push(mapped)
-            continue
-          }
-          const byName = state.banks.find((x) => x.name === bidOrName)
-          if (byName) bankIds.push(byName.id)
-        }
+      // 优先 bankNames（跨环境可靠）；旧文件只有 bankIds，按 id→名称 顺序兜底
+      const keys: string[] =
+        Array.isArray(pre.bankNames) && pre.bankNames.length
+          ? pre.bankNames
+          : Array.isArray(pre.bankIds)
+            ? pre.bankIds
+            : []
+      for (const key of keys) {
+        const resolved =
+          nameToId.get(key) ??
+          state.banks.find((x) => x.id === key)?.id ??
+          state.banks.find((x) => x.name === key)?.id
+        if (resolved && !bankIds.includes(resolved)) bankIds.push(resolved)
       }
       newPresets.push({
         id: uid(),

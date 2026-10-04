@@ -4,14 +4,14 @@ import { TaskPool } from './components/TaskPool'
 import { TaskDetail } from './components/TaskDetail'
 import { RandomToolbox } from './components/RandomToolbox'
 import { Settings } from './components/Settings'
-import { ReminderSettings } from './components/ReminderSettings'
 import { DataBackup } from './components/DataBackup'
-import { ReminderActionModal } from './components/ReminderActionModal'
+import { LearningSession } from './components/LearningSession'
 import { StatsView } from './components/StatsView'
-import { useAppData, pickRandomTask, getRandomPool } from './store'
+import { useAppData, pickRandomTask, carryOverManualPlanItems, dateKey, ensurePlansInStore } from './store'
 import { setCanExitAppNative } from './backNavigation'
 import {
   scheduleReminders,
+  scheduleReengageNudge,
   onNotificationClick,
   registerSessionEndCallback,
   endSessionAndReschedule,
@@ -31,7 +31,6 @@ type Tab = 'todos' | 'tools' | 'stats' | 'settings'
 // 子页面视图（叠加在当前工作区之上，返回时回到对应工作区）
 type View =
   | { name: 'task'; taskId: string; autoStartSession?: boolean }
-  | { name: 'reminder' }
   | { name: 'backup' }
 
 const PERM_REQUESTED_KEY = 'learning-manager:notif-perm-requested'
@@ -39,10 +38,12 @@ const PERM_REQUESTED_KEY = 'learning-manager:notif-perm-requested'
 export default function App() {
   // 当前工作区，默认进入「待办」
   const [tab, setTab] = useState<Tab>('todos')
+  // 待办页内标签：plan / tasks，返回时保持
+  const [todosTab, setTodosTab] = useState<'plan' | 'tasks'>('plan')
   // 子页面视图：null 时显示工作区主导航 + 当前 tab 内容
   const [view, setView] = useState<View | null>(null)
-  // 提醒通知点击后的操作弹窗
-  const [reminderAction, setReminderAction] = useState<Task | null>(null)
+  // 通知动作「开始/换一个」直接进入的全屏计时会话
+  const [sessionTask, setSessionTask] = useState<Task | null>(null)
   const data = useAppData()
   const studyTimerCheckedRef = useRef(false)
 
@@ -60,7 +61,25 @@ export default function App() {
     }
   }, [])
 
-  // 注册会话结束回调：学习会话结束时设置冷却并重新调度提醒
+  // 手动计划顺延：打开/切回前台时把过去日期仍待办的手动项并入今天（与提醒开关无关）。
+  // 声明在提醒调度 effect 之前，保证调度时已包含顺延项。
+  useEffect(() => {
+    const carry = () => {
+      try {
+        carryOverManualPlanItems()
+      } catch {
+        /* ignore */
+      }
+    }
+    carry()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') carry()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
+
+  // 注册会话结束回调：学习会话结束时记录结束时间并重新调度提醒
   useEffect(() => {
     const off = registerSessionEndCallback(() => {
       // 记录学习会话结束时间，用于「学习后 N 分钟不提醒」跳过逻辑
@@ -69,36 +88,38 @@ export default function App() {
         localStorage.setItem(key, String(Date.now()))
       } catch { /* ignore */ }
       if (data.reminder?.enabled) {
-        endSessionAndReschedule(data.tasks, data.reminder).catch(() => {})
+        endSessionAndReschedule().catch(() => {})
+        // 会话结束 = 最近活跃，回归提醒续命
+        scheduleReengageNudge().catch(() => {})
       }
     })
     return off
-  }, [data.tasks, data.reminder])
+  }, [data.reminder?.enabled])
 
-  // 提醒调度：启动时 + 切回前台时自动补充当天提醒
+  // 提醒调度：启动时 + 切回前台时自动补齐当天/次日计划
+  // 提醒开启，或存在固定任务时都运行（固定任务需进入每日计划）
   useEffect(() => {
-    if (!data.reminder?.enabled) return
+    if (!data.reminder?.enabled && !(data.pinnedTasks?.length)) return
 
-    const checkAndSchedule = () => {
+    const refresh = () => {
       try {
-        const lastDate = localStorage.getItem('learning-manager:last-scheduled-date')
-        const today = new Date().toISOString().slice(0, 10)
-        if (lastDate !== today) {
-          scheduleReminders(data.tasks, data.reminder!).catch(() => {})
-          localStorage.setItem('learning-manager:last-scheduled-date', today)
-        }
+        // 保证计划存在（含固定任务注入），即便提醒关闭
+        ensurePlansInStore()
       } catch {
         /* ignore */
       }
+      scheduleReminders().catch(() => {})
+      // 回归提醒：每次打开/切回前台都续命（不受每日守卫限制，日常打开永不触发）
+      scheduleReengageNudge().catch(() => {})
     }
 
     // 启动时检查
-    checkAndSchedule()
+    refresh()
 
     // 切回前台时检查（用户可能隔夜后切回）
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        checkAndSchedule()
+        refresh()
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -106,7 +127,7 @@ export default function App() {
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [data.reminder?.enabled])
+  }, [data.reminder?.enabled, data.pinnedTasks?.length])
 
   // 启动时检查 StudyTimer Service 状态 + 消费 pending action
   useEffect(() => {
@@ -169,33 +190,43 @@ export default function App() {
     reroll?: boolean
     cancelled?: boolean
   }) => {
-    // 取消：不弹窗，停留在待办
+    // 取消：不打开会话，停留在待办
     if (action.cancelled) {
-      setReminderAction(null)
       setTab('todos')
       setView(null)
       return
     }
-    // 换一个：重新随机抽一个任务
-    if (action.reroll) {
-      const picked = pickRandomTask(data.tasks)
-      if (picked) {
-        setReminderAction(picked)
-      } else {
+    // 开始 / 换一个 / 点击通知本体
+    // 仅提醒（或手动）项：不进计时/不换内容，只回到计划页处理
+    const todayStr = dateKey(new Date())
+    const today = (data.plans ?? []).find((p) => p.date === todayStr)
+    const planItem = action.taskId
+      ? today?.items
+          .filter((it) => it.status === 'pending' && it.taskId === action.taskId)
+          .sort((a, b) => a.minuteOfDay - b.minuteOfDay)[0] ?? null
+      : null
+    if (planItem?.manual && (action.reroll || !planItem.remindOnly)) {
+      // 手动项：换一个无意义（内容是自输的）；计时型手动项正常进计时
+      if (action.reroll) {
         setTab('todos')
         setView(null)
+        return
       }
+    }
+    if (planItem?.remindOnly) {
+      setTab('todos')
+      setView(null)
       return
     }
-    // 开始（或点击通知本体）：直接进入 TaskDetail + 自动打开会话开始计时
-    if (action.taskId) {
-      const matchedTask = data.tasks.find((t) => t.id === action.taskId)
-      if (matchedTask) {
-        setView({ name: 'task', taskId: matchedTask.id, autoStartSession: true })
-      } else {
-        setTab('todos')
-        setView(null)
-      }
+    let target = action.taskId
+      ? data.tasks.find((t) => t.id === action.taskId)
+      : null
+    // reroll 或通知本体无 taskId 时，随机抽一个
+    if (!target) {
+      target = pickRandomTask(data.tasks)
+    }
+    if (target) {
+      setSessionTask(target)
     } else {
       setTab('todos')
       setView(null)
@@ -210,12 +241,12 @@ export default function App() {
   }, [data.tasks])
 
   // 同步「是否允许退桌面」标志位给原生层：
-  //   - 子页面或有弹窗 → false，原生层不得 moveTaskToBack
-  //   - 顶层 Tab        → true，原生层可把 App 退到桌面
+  //   - 子页面或有计时会话 → false，原生层不得 moveTaskToBack
+  //   - 顶层 Tab            → true，原生层可把 App 退到桌面
   useEffect(() => {
-    const canExitApp = !view && !reminderAction
+    const canExitApp = !view && !sessionTask
     setCanExitAppNative(canExitApp).catch(() => { /* ignore */ })
-  }, [view, reminderAction])
+  }, [view, sessionTask])
 
   // 监听系统返回键/边缘滑动返回（Android 手势导航）：
   //   有子页面（任务详情/提醒设置/备份）或弹窗时先回上一层，不直接退出应用
@@ -225,8 +256,6 @@ export default function App() {
     ;(async () => {
       try {
         const l = await CapApp.addListener('backButton', ({ canGoBack }) => {
-          // 优先关操作弹窗
-          if (reminderAction) { setReminderAction(null); return }
           // 子页面回到对应 tab 顶层
           if (view) {
             if (view.name === 'task') setTab('todos')
@@ -234,6 +263,9 @@ export default function App() {
             setView(null)
             return
           }
+          // 计时会话中：返回交给页面内的按钮，系统返回不响应
+          // （原生侧此时同样禁用了 moveTaskToBack，返回键不会退桌面）
+          if (sessionTask) return
           // 到了顶层 Tab：交给原生 finish / moveTaskToBack
           if (!canGoBack) {
             CapApp.exitApp().catch(() => { /* ignore */ })
@@ -249,20 +281,7 @@ export default function App() {
       cancelled = true
       if (listener) listener.remove().catch(() => {})
     }
-  }, [view, reminderAction])
-
-  // 提醒操作弹窗回调
-  const handleReminderStart = (task: Task) => {
-    setReminderAction(null)
-    setView({ name: 'task', taskId: task.id, autoStartSession: true })
-  }
-
-  const handleReminderReroll = () => {
-    const picked = pickRandomTask(data.tasks)
-    if (picked) {
-      setReminderAction(picked)
-    }
-  }
+  }, [view, sessionTask])
 
   // ===== 子页面（全屏，叠加在工作区之上）=====
   if (view) {
@@ -274,18 +293,6 @@ export default function App() {
             autoStartSession={view.autoStartSession ?? false}
             onBack={() => {
               setTab('todos')
-              setView(null)
-            }}
-          />
-        </div>
-      )
-    }
-    if (view.name === 'reminder') {
-      return (
-        <div className="app">
-          <ReminderSettings
-            onBack={() => {
-              setTab('settings')
               setView(null)
             }}
           />
@@ -309,14 +316,17 @@ export default function App() {
   // ===== 工作区 Shell：顶部标题 + 内容区 + 底部 TabBar =====
   return (
     <div className="app app-shell">
-      <header className="shell-header">
-        <h1 className="app-title">今天摸啥鱼</h1>
-      </header>
-
       <main className="shell-main">
         {tab === 'todos' && (
           <TaskPool
-            onOpenTask={(task: Task) => setView({ name: 'task', taskId: task.id })}
+            defaultTab={todosTab}
+            onTabChange={setTodosTab}
+            onOpenTask={(task: Task, autoStart?: boolean) =>
+              setView({ name: 'task', taskId: task.id, autoStartSession: autoStart })
+            }
+            onStartSession={(task: Task) => {
+              setSessionTask(task)
+            }}
           />
         )}
         {tab === 'tools' && <RandomToolbox />}
@@ -329,7 +339,6 @@ export default function App() {
         )}
         {tab === 'settings' && (
           <Settings
-            onOpenReminder={() => setView({ name: 'reminder' })}
             onOpenBackup={() => setView({ name: 'backup' })}
           />
         )}
@@ -340,7 +349,7 @@ export default function App() {
           className={`tabbar-item ${tab === 'todos' ? 'active' : ''}`}
           onClick={() => setTab('todos')}
         >
-          <span className="tb-name">方向</span>
+          <span className="tb-name">待办</span>
         </button>
         <button
           className={`tabbar-item ${tab === 'tools' ? 'active' : ''}`}
@@ -362,14 +371,11 @@ export default function App() {
         </button>
       </nav>
 
-      {reminderAction && data.reminder && (
-        <ReminderActionModal
-          task={reminderAction}
-          cooldownMinutes={data.reminder.cooldownMinutes}
-          randomPoolSize={getRandomPool(data.tasks).length}
-          onStart={handleReminderStart}
-          onReroll={handleReminderReroll}
-          onClose={() => setReminderAction(null)}
+      {sessionTask && (
+        <LearningSession
+          task={sessionTask}
+          onClose={() => setSessionTask(null)}
+          onTaskMutated={() => {}}
         />
       )}
     </div>

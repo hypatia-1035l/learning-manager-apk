@@ -6,12 +6,15 @@ import { registerPlugin, Capacitor } from '@capacitor/core'
  *   - Snooze/Ignore 动作按钮使用 Broadcast PendingIntent，<b>不启动 App</b>
  *   - 定时使用 AlarmManager.setAndAllowWhileIdle，保证后台准时
  */
+export type NotifChannel = 'reminders_strong' | 'reminders_weak' | 'reminders_silent'
+
 export interface NotifItem {
   id: number
   title: string
   body: string
   taskId?: string
   atMs?: number // 0 或空 = 立即
+  channel?: NotifChannel // Android channel id，不传则使用默认 reminders_strong
 }
 
 export interface PendingNotifAction {
@@ -21,9 +24,18 @@ export interface PendingNotifAction {
 
 export interface StudyNotificationsPlugin {
   ensureChannel(): Promise<void>
-  fireNow(o: { id: number; title: string; body: string; taskId?: string }): Promise<void>
+  ensureChannels(): Promise<void>
+  fireNow(o: {
+    id: number
+    title: string
+    body: string
+    taskId?: string
+    channel?: NotifChannel
+  }): Promise<void>
   schedule(o: { items: NotifItem[] }): Promise<{ scheduled: number }>
-  cancelAll(): Promise<void>
+  // 传 ids 时只取消这些 id；不传/空则退回"取消全部"（旧行为）。
+  // 精确取消是为了不误伤计时常驻通知（2000）与越界提醒（3001）。
+  cancelAll(o?: { ids?: number[] }): Promise<void>
   // 查询是否被授予精确闹钟权限（Android 12+；其他平台恒为 true）
   canScheduleExactAlarms(): Promise<{ granted: boolean }>
   // 跳转到系统"精确闹钟"授权设置页（Android 12+）
@@ -51,6 +63,10 @@ export async function ensureChannelNative(): Promise<void> {
   try { if (isNativeNotificationsAvailable()) await StudyNotifications.ensureChannel() } catch { /* ignore */ }
 }
 
+export async function ensureChannelsNative(): Promise<void> {
+  try { if (isNativeNotificationsAvailable()) await StudyNotifications.ensureChannels() } catch { /* ignore */ }
+}
+
 export async function fireNowNative(o: { id: number; title: string; body: string; taskId?: string }): Promise<void> {
   try { if (isNativeNotificationsAvailable()) await StudyNotifications.fireNow(o) } catch { /* ignore */ }
 }
@@ -65,8 +81,11 @@ export async function scheduleNative(items: NotifItem[]): Promise<number> {
   return 0
 }
 
-export async function cancelAllNative(): Promise<void> {
-  try { if (isNativeNotificationsAvailable()) await StudyNotifications.cancelAll() } catch { /* ignore */ }
+export async function cancelAllNative(ids?: number[]): Promise<void> {
+  try {
+    if (!isNativeNotificationsAvailable()) return
+    await StudyNotifications.cancelAll(ids && ids.length ? { ids } : undefined)
+  } catch { /* ignore */ }
 }
 
 /**

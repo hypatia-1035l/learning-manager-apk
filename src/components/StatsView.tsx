@@ -43,7 +43,7 @@ function TrendChart({
       viewBox={`0 0 ${W} ${H}`}
       style={{ width: '100%', height: 'auto', display: 'block' }}
       role="img"
-      aria-label="每日学习时长趋势"
+      aria-label="每日时长趋势"
     >
       <line
         x1={padX}
@@ -119,18 +119,12 @@ export function StatsView({ onOpenTask }: Props) {
   // 趋势图时间范围：7 天 / 30 天
   const [range, setRange] = useState(7)
 
-  // taskId → Task 查找表，避免 map 内 O(n) 的 find
-  const taskMap = useMemo(
-    () => new Map(data.tasks.map((t) => [t.id, t])),
-    [data.tasks],
-  )
-
   // 今日进度条：以 4 小时为"满格"参考，超出也显示满
   const REF_DAILY = 4 * 60 * 60
   const todayPct = Math.min(100, Math.round((todaySec / REF_DAILY) * 100))
 
   return (
-    <div className="stats-view">
+    <div className="pool-compact stats-view">
       {/* ===== 汇总卡片 ===== */}
       <section className="stats-overview">
         <div className="stats-summary-card">
@@ -183,7 +177,7 @@ export function StatsView({ onOpenTask }: Props) {
       {/* ===== 学习趋势 ===== */}
       <section className="section">
         <div className="section-title">
-          学习趋势
+          时长趋势
           <span
             style={{
               marginLeft: 8,
@@ -251,8 +245,6 @@ export function StatsView({ onOpenTask }: Props) {
             {(() => {
               const max = byTask[0]?.totalDuration || 1
               return byTask.map((item) => {
-                const task = taskMap.get(item.taskId)
-                const icon = task?.icon ?? ''
                 const pct = Math.round((item.totalDuration / max) * 100)
                 return (
                   <button
@@ -262,7 +254,6 @@ export function StatsView({ onOpenTask }: Props) {
                     type="button"
                   >
                     <div className="bt-head">
-                      <span className="bt-icon">{icon}</span>
                       <span className="bt-name">{item.taskName}</span>
                       <span className="bt-dur">
                         {formatDuration(item.totalDuration)}
@@ -300,15 +291,12 @@ export function StatsView({ onOpenTask }: Props) {
         ) : (
           <div className="record-list">
             {recent.map((r) => {
-              const task = taskMap.get(r.taskId)
-              const icon = task?.icon ?? ''
               return (
                 <div
                   key={r.id}
                   className="record-item record-item-stack"
                 >
                   <div className="record-row">
-                    <span className="bt-icon">{icon}</span>
                     <span className="obj">{r.taskName}</span>
                     <span className="change">
                       {r.sequenceName ?? r.objectName}

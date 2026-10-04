@@ -1,47 +1,22 @@
 import { useState } from 'react'
 import { Modal } from './Modal'
 import { createTask } from '../store'
+import { WeekdayPicker } from './WeekdayPicker'
+import { parseSeqBlock, parseCountdownMin } from '../seqInput'
+import { SeqGenerator } from './SeqGenerator'
+import { ProgressNodesEditor } from './ProgressNodesEditor'
 import type { ProgressNode } from '../types'
 
 interface Props {
   onClose: () => void
 }
 
-function parseCountdownMin(text: string): number | null {
-  const t = text.trim()
-  if (!t) return null
-  const n = Number(t)
-  if (!Number.isFinite(n) || n <= 0) return null
-  return Math.floor(n) * 60
-}
-
-// 每行可支持 "序列名 | 目标 | 单位 | 倒计时分钟"，| 换成中文也可识别
-//  例：左传 | 500  | 篇 | 25
-function parseSeqLine(line: string): {
-  name: string
-  target?: string
-  unit?: string
-  countdownMin?: string
-} {
-  const parts = line.split(/[|｜]/).map((p) => p.trim())
-  const [name, target, unit, countdownMin] = parts
-  return { name: name || '', target, unit, countdownMin }
-}
-
-function parseNodesText(text: string): ProgressNode[] {
-  const lines = text.split('\n')
-  const nodes: ProgressNode[] = []
-  for (const l of lines) {
-    const t = l.trim()
-    if (!t) continue
-    const m = t.match(/^(\d+(?:\.\d+)?)\s*[,，\s|、]\s*(.+)$/)
-    if (m) nodes.push({ at: Math.floor(Number(m[1])), label: m[2].trim() })
-  }
-  return nodes.sort((a, b) => a.at - b.at)
-}
-
 export function TaskForm({ onClose }: Props) {
   const [name, setName] = useState('')
+  // 插入位置：默认顶部（顺序即权重，新建通常想排前面）
+  const [insertAt, setInsertAt] = useState<'top' | 'bottom'>('top')
+  // 提醒星期（空 = 每天）
+  const [weekdays, setWeekdays] = useState<number[]>([])
 
   // 序列输入：每行一条，"名称 | 目标 | 单位 | 倒计时分钟" 竖线可选
   const [seqInput, setSeqInput] = useState('')
@@ -50,21 +25,16 @@ export function TaskForm({ onClose }: Props) {
   const [globalTarget, setGlobalTarget] = useState('')
   const [globalUnit, setGlobalUnit] = useState('')
   const [globalCountdown, setGlobalCountdown] = useState('')
-  const [globalNodes, setGlobalNodes] = useState('')
+  const [globalNodes, setGlobalNodes] = useState<ProgressNode[]>([])
 
   const submit = () => {
     if (!name.trim()) return
     const names: string[] = []
     const templates: NonNullable<Parameters<typeof createTask>[0]['sequenceTemplates']> = []
 
-    const parsedLines = seqInput
-      .split('\n')
-      .map((l) => l.trimEnd())
-      .map(parseSeqLine)
-      .filter((x) => x.name)
+    const parsedLines = parseSeqBlock(seqInput)
 
     if (parsedLines.length > 0) {
-      const nodes = parseNodesText(globalNodes)
       const gCountdown = parseCountdownMin(globalCountdown)
       for (const p of parsedLines) {
         names.push(p.name)
@@ -73,7 +43,7 @@ export function TaskForm({ onClose }: Props) {
           progressUnit: p.unit || globalUnit || undefined,
           countdownSeconds:
             parseCountdownMin(p.countdownMin ?? '') ?? gCountdown ?? undefined,
-          progressNodes: nodes.length ? nodes : undefined,
+          progressNodes: globalNodes.length ? globalNodes : undefined,
           progress: (p.target || globalTarget) ? '0' : undefined,
         })
       }
@@ -82,6 +52,8 @@ export function TaskForm({ onClose }: Props) {
     createTask({
       name: name.trim(),
       icon: '',
+      insertAt,
+      weekdays,
       sequenceNames: names.length > 0 ? names : undefined,
       sequenceTemplates: templates.length > 0 ? templates : undefined,
       templateDefault:
@@ -110,6 +82,8 @@ export function TaskForm({ onClose }: Props) {
       }
     >
       <div className="form-stack" style={{ gap: 10 }}>
+        <div className="form-group-title">方向</div>
+
         <div className="field" style={{ marginBottom: 4 }}>
           <label>名称</label>
           <input
@@ -117,25 +91,61 @@ export function TaskForm({ onClose }: Props) {
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="如：历史、英语、Blender"
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
         </div>
 
         <div className="field" style={{ marginBottom: 4 }}>
+          <label>插入位置</label>
+          <div className="seg-row">
+            <button
+              type="button"
+              className={`seg-item ${insertAt === 'top' ? 'active' : ''}`}
+              onClick={() => setInsertAt('top')}
+            >
+              顶部
+            </button>
+            <button
+              type="button"
+              className={`seg-item ${insertAt === 'bottom' ? 'active' : ''}`}
+              onClick={() => setInsertAt('bottom')}
+            >
+              底部
+            </button>
+          </div>
+        </div>
+
+        <div className="field" style={{ marginBottom: 4 }}>
+          <label>提醒星期</label>
+          <WeekdayPicker value={weekdays} onChange={setWeekdays} />
+        </div>
+
+        <div className="form-group-title">初始序列</div>
+
+        <div className="field" style={{ marginBottom: 4 }}>
           <label>序列名</label>
           <textarea
             className="textarea"
-            placeholder={'每行一条，可带：名称 | 目标 | 单位 | 分钟\n竖线后可不填，空则用下方默认'}
+            placeholder={'每行一条：名称｜目标｜单位｜分钟\n也支持空格分隔（卷三 80 篇 25）、逗号拆分（卷一，卷二）'}
             value={seqInput}
             onChange={(e) => setSeqInput(e.target.value)}
             rows={4}
           />
+          <SeqGenerator
+            onGenerate={(lines) => {
+              setSeqInput((prev) =>
+                prev.trim() ? prev.replace(/\s+$/, '') + '\n' + lines.join('\n') : lines.join('\n'),
+              )
+            }}
+          />
         </div>
 
-        <div className="row wrap" style={{ gap: 8, marginTop: 2 }}>
-          <div className="field" style={{ flex: '1 1 90px', marginBottom: 0 }}>
-            <label className="faint" style={{ fontSize: 12 }}>目标</label>
+        <div className="faint" style={{ fontSize: 12 }}>
+          序列行未写的参数，取以下默认值
+        </div>
+        <div className="grid-3">
+          <div className="mini-field">
+            <label>目标</label>
             <input
               className="input"
               type="number"
@@ -144,16 +154,16 @@ export function TaskForm({ onClose }: Props) {
               onChange={(e) => setGlobalTarget(e.target.value)}
             />
           </div>
-          <div className="field" style={{ flex: '1 1 70px', marginBottom: 0 }}>
-            <label className="faint" style={{ fontSize: 12 }}>单位</label>
+          <div className="mini-field">
+            <label>单位</label>
             <input
               className="input"
               value={globalUnit}
               onChange={(e) => setGlobalUnit(e.target.value)}
             />
           </div>
-          <div className="field" style={{ flex: '1 1 90px', marginBottom: 0 }}>
-            <label className="faint" style={{ fontSize: 12 }}>倒计时(分)</label>
+          <div className="mini-field">
+            <label>倒计时·分</label>
             <input
               className="input"
               type="number"
@@ -165,16 +175,13 @@ export function TaskForm({ onClose }: Props) {
         </div>
 
         <div className="field" style={{ marginBottom: 0 }}>
-          <label className="faint" style={{ fontSize: 12 }}>
-            进度节点（每行 <code style={{ fontSize: 11 }}>数字 名称</code>）
-          </label>
-          <textarea
-            className="input"
-            rows={2}
-            placeholder={'0 入门\n100 进阶\n200 大师'}
+          <label className="faint" style={{ fontSize: 12 }}>进度节点</label>
+          <ProgressNodesEditor
             value={globalNodes}
-            onChange={(e) => setGlobalNodes(e.target.value)}
-            style={{ width: '100%', resize: 'vertical', fontSize: 13, padding: 8 }}
+            onChange={setGlobalNodes}
+            previewProgress={globalTarget ? '0' : ''}
+            unit={globalUnit}
+            target={globalTarget}
           />
         </div>
       </div>
