@@ -33,6 +33,7 @@ final class NotifScheduleStore {
         String taskId;
         long atMs;
         String channel;
+        int cooldownMinutes;
     }
 
     private NotifScheduleStore() {}
@@ -46,7 +47,7 @@ final class NotifScheduleStore {
     }
 
     static synchronized void put(Context ctx, int id, String title, String body,
-                                 String taskId, long atMs, String channel) {
+                                 String taskId, long atMs, String channel, int cooldownMinutes) {
         if (id <= 0 || atMs <= 0) return;
         try {
             JSONObject o = new JSONObject();
@@ -56,6 +57,7 @@ final class NotifScheduleStore {
             o.put("taskId", taskId == null ? JSONObject.NULL : taskId);
             o.put("atMs", atMs);
             o.put("channel", channel == null ? "" : channel);
+            o.put("cooldownMinutes", cooldownMinutes);
             prefs(ctx).edit().putString(keyOf(id), o.toString()).apply();
         } catch (Throwable ignored) {
         }
@@ -100,6 +102,7 @@ final class NotifScheduleStore {
                     en.taskId = o.isNull("taskId") ? null : o.optString("taskId", null);
                     en.atMs = o.optLong("atMs", 0L);
                     en.channel = o.optString("channel", "");
+                    en.cooldownMinutes = o.optInt("cooldownMinutes", 0);
                     if (en.id > 0 && en.atMs > 0) out.add(en);
                 } catch (Throwable ignored) {
                 }

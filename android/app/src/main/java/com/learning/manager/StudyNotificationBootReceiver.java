@@ -34,7 +34,7 @@ public class StudyNotificationBootReceiver extends BroadcastReceiver {
             }
             try {
                 StudyNotificationPlugin.scheduleExact(
-                        context, e.id, e.title, e.body, e.taskId, e.atMs, e.channel);
+                        context, e.id, e.title, e.body, e.taskId, e.atMs, e.channel, e.cooldownMinutes);
             } catch (Throwable ignored) {
             }
         }

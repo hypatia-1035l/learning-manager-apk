@@ -13,6 +13,7 @@ import android.os.Build;
 import android.provider.Settings;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import com.getcapacitor.Bridge;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -43,8 +44,14 @@ public class StudyNotificationPlugin extends Plugin {
     private static volatile String sPendingAction = null;
     private static volatile String sPendingTaskId = null;
 
+    // App 已在前台时：直接派发 JS 事件，不必等下一次 visibilitychange
+    private static final String EVT_NOTIF_ACTION = "notifAction";
+    private static volatile Bridge staticBridge;
+
     @Override
     public void load() {
+        super.load();
+        staticBridge = getBridge();
         ensureChannels(getContext());
     }
 
@@ -52,6 +59,28 @@ public class StudyNotificationPlugin extends Plugin {
     public static void setPendingNotifAction(String action, String taskId) {
         sPendingAction = action;
         sPendingTaskId = taskId;
+    }
+
+    /**
+     * Bridge 存活时立即把通知动作派发给 JS（返回是否派发成功）。
+     * 派发成功时 MainActivity 不再写 pending，避免「事件 + pending」重复处理同一动作。
+     */
+    public static boolean notifyActionIfReady(String action, String taskId) {
+        Bridge bridge = staticBridge;
+        if (bridge == null) return false;
+        try {
+            com.getcapacitor.PluginHandle handle = bridge.getPlugin("StudyNotifications");
+            if (handle == null) return false;
+            StudyNotificationPlugin plugin = (StudyNotificationPlugin) handle.getInstance();
+            if (plugin == null) return false;
+            JSObject data = new JSObject();
+            data.put("action", action == null ? "" : action);
+            data.put("taskId", taskId == null ? "" : taskId);
+            plugin.notifyListeners(EVT_NOTIF_ACTION, data);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     @PluginMethod
@@ -89,12 +118,12 @@ public class StudyNotificationPlugin extends Plugin {
         String taskId   = call.getString("taskId");
         String channel  = call.getString("channel", StudyNotificationActionReceiver.CHANNEL_ID_STRONG);
 
-        fireImpl(getContext(), id, title, body, taskId, channel);
+        fireImpl(getContext(), id, title, body, taskId, channel, 0);
         call.resolve();
     }
 
     /**
-     * 批量发布：[{id,title,body,taskId?,atMs?}]
+     * 批量发布：[{id,title,body,taskId?,atMs?,cooldownMinutes?}]
      *   atMs 为空 → 立即发
      *   atMs 有值 → 用 AlarmManager.setAndAllowWhileIdle 精确安排
      */
@@ -108,19 +137,20 @@ public class StudyNotificationPlugin extends Plugin {
                 Object raw = list.get(i);
                 if (!(raw instanceof JSONObject)) continue;
                 JSONObject o = (JSONObject) raw;
-                int    id       = o.has("id")    ? o.getInt("id") : (i + 1);
-                String title    = o.optString("title", "今天摸啥鱼");
-                String body     = o.optString("body",  "该摸一条鱼了。");
-                String taskId   = o.isNull("taskId") ? null : o.optString("taskId", null);
-                long   atMs     = o.has("atMs")  ? o.getLong("atMs") : 0L;
-                String channel  = o.optString("channel", StudyNotificationActionReceiver.CHANNEL_ID_STRONG);
+                int    id        = o.has("id")    ? o.getInt("id") : (i + 1);
+                String title     = o.optString("title", "今天摸啥鱼");
+                String body      = o.optString("body",  "该摸一条鱼了。");
+                String taskId    = o.isNull("taskId") ? null : o.optString("taskId", null);
+                long   atMs      = o.has("atMs")  ? o.getLong("atMs") : 0L;
+                String channel   = o.optString("channel", StudyNotificationActionReceiver.CHANNEL_ID_STRONG);
+                int    cooldown  = o.optInt("cooldownMinutes", 0);
                 if (atMs <= 0 || atMs <= System.currentTimeMillis()) {
-                    fireImpl(ctx, id, title, body, taskId, channel);
+                    fireImpl(ctx, id, title, body, taskId, channel, cooldown);
                 } else {
-                    scheduleExact(ctx, id, title, body, taskId, atMs, channel);
+                    scheduleExact(ctx, id, title, body, taskId, atMs, channel, cooldown);
                     // 镜像到本地存储：设备重启会清空 AlarmManager，届时由
                     // StudyNotificationBootReceiver 据此原样重排
-                    NotifScheduleStore.put(ctx, id, title, body, taskId, atMs, channel);
+                    NotifScheduleStore.put(ctx, id, title, body, taskId, atMs, channel, cooldown);
                 }
                 ok++;
             } catch (JSONException ignored) {}
@@ -135,6 +165,7 @@ public class StudyNotificationPlugin extends Plugin {
         try {
             JSArray ids = call.getArray("ids");
             NotificationManagerCompat nm = NotificationManagerCompat.from(getContext());
+            Context ctx = getContext();
             if (ids != null && ids.length() > 0) {
                 // 只取消 JS 指定的提醒 id：cancelAll() 会连带清掉
                 // 计时常驻通知（2000）与越界提醒（3001）。
@@ -144,6 +175,10 @@ public class StudyNotificationPlugin extends Plugin {
                         Integer id = ids.getInt(i);
                         if (id != null && id >= 0) {
                             nm.cancel(id);
+                            // 关键：通知只是「已弹出的那条」，真正让它到点触发的是
+                            // AlarmManager 里的闹钟。只 cancel 通知会导致关提醒/会话抑制/
+                            // 重排后旧闹钟照样在后台触发（同一计划项重复提醒）。
+                            cancelAlarm(ctx, id);
                             idList.add(id);
                         }
                     } catch (Exception ignored) {}
@@ -152,10 +187,36 @@ public class StudyNotificationPlugin extends Plugin {
                 NotifScheduleStore.removeAll(getContext(), idList);
             } else {
                 nm.cancelAll();
+                // 无 ids 时按镜像逐个取消闹钟，再清镜像
+                for (NotifScheduleStore.Entry e : NotifScheduleStore.all(ctx)) {
+                    cancelAlarm(ctx, e.id);
+                }
                 NotifScheduleStore.clear(getContext());
             }
         } catch (Throwable ignored) {}
         call.resolve();
+    }
+
+    /** 取消某个 id 已排的 AlarmManager 闹钟（与 scheduleExact 的 requestCode 一致） */
+    private static void cancelAlarm(Context ctx, int id) {
+        try {
+            AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Intent fire = new Intent(ctx, StudyNotificationActionReceiver.class);
+            fire.setAction("com.learning.manager.NOTIF_REFIRE");
+            PendingIntent pi = PendingIntent.getBroadcast(
+                    ctx,
+                    70000 + id,
+                    fire,
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                            ? PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE
+                            : PendingIntent.FLAG_NO_CREATE)
+            );
+            if (pi != null) {
+                am.cancel(pi);
+                pi.cancel();
+            }
+        } catch (Throwable ignored) {}
     }
 
     /**
@@ -195,13 +256,14 @@ public class StudyNotificationPlugin extends Plugin {
 
     // ---------------------- internal ----------------------
 
-    static void scheduleExact(Context ctx, int id, String title, String body, String taskId, long atMs, String channel) {
+    static void scheduleExact(Context ctx, int id, String title, String body, String taskId, long atMs, String channel, int cooldownMinutes) {
         Intent fire = new Intent(ctx, StudyNotificationActionReceiver.class);
         fire.setAction("com.learning.manager.NOTIF_REFIRE");
         fire.putExtra(StudyNotificationActionReceiver.EXTRA_TITLE, title);
         fire.putExtra(StudyNotificationActionReceiver.EXTRA_BODY, body);
         fire.putExtra(StudyNotificationActionReceiver.EXTRA_NOTIF_ID, id);
         fire.putExtra(StudyNotificationActionReceiver.EXTRA_CHANNEL, channel);
+        fire.putExtra(StudyNotificationActionReceiver.EXTRA_COOLDOWN_MINUTES, cooldownMinutes);
         if (taskId != null) fire.putExtra(StudyNotificationActionReceiver.EXTRA_TASK_ID, taskId);
 
         PendingIntent pi = PendingIntent.getBroadcast(
@@ -216,8 +278,9 @@ public class StudyNotificationPlugin extends Plugin {
         if (am != null) {
             try {
                 if (canScheduleExactAlarms(ctx)) {
-                    // 已获精确闹钟权限：准时触发
-                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi);
+                    // 已获精确闹钟权限：真正精确触发（setAndAllowWhileIdle 是
+                    // WINDOW_HEURISTIC，Doze 下仍会被系统批量延后）。
+                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi);
                 } else {
                     // 未获精确闹钟权限：降级为「宽松但允许打盹触发」。
                     // 这里刻意不用 am.set()：set() 在 Doze 下会被推迟到维护窗口（可能几小时），
@@ -225,12 +288,13 @@ public class StudyNotificationPlugin extends Plugin {
                     am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi);
                 }
             } catch (Throwable t) {
+                // 精确闹钟被系统拒绝（SecurityException）时退回宽松排程
                 try { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi); } catch (Throwable ignored) {}
             }
         }
     }
 
-    static void fireImpl(Context ctx, int id, String title, String body, String taskId, String channel) {
+    static void fireImpl(Context ctx, int id, String title, String body, String taskId, String channel, int cooldownMinutes) {
         ensureChannels(ctx);
 
         // 点击通知本体时打开 MainActivity，带 action=start
@@ -254,10 +318,10 @@ public class StudyNotificationPlugin extends Plugin {
         NotificationCompat.Action aReroll =
                 StudyNotificationActionReceiver.buildActivityAction(ctx, id, taskId,
                         "reroll", "换一个", 40000 + id);
-        // 取消：广播，不打开 App
+        // 取消：广播，不打开 App；携带冷却分钟数，接收器据此写入通知冷却
         NotificationCompat.Action aCancel =
                 StudyNotificationActionReceiver.buildBroadcastAction(ctx, id, title, body, taskId,
-                        "com.learning.manager.NOTIF_CANCEL", "取消", 50000 + id);
+                        "com.learning.manager.NOTIF_CANCEL", "取消", 50000 + id, cooldownMinutes);
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, channel)
                 .setSmallIcon(R.drawable.ic_stat_notify)

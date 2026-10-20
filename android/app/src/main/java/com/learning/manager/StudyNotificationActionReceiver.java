@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -36,6 +37,29 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
     public static final String EXTRA_NOTIF_ID = "extra_notif_id";
     public static final String EXTRA_TASK_ID  = "extra_task_id";
     public static final String EXTRA_CHANNEL  = "extra_channel";
+    // 冷却分钟数：点「取消」后 N 分钟内不再推送下一条提醒
+    public static final String EXTRA_COOLDOWN_MINUTES = "extra_cooldown_minutes";
+
+    // 通知冷却的持久化（与 JS 侧的 cooldownUntil 独立：Android 上「取消」是纯广播，
+    // 不进 JS，所以冷却必须原生自己落一份，并在到点触发前拦截）
+    private static final String PREF_COOLDOWN = "study_notif_cooldown";
+    private static final String KEY_COOLDOWN_UNTIL = "cooldownUntil";
+
+    static void setCooldownUntil(Context ctx, long untilMs) {
+        try {
+            ctx.getSharedPreferences(PREF_COOLDOWN, Context.MODE_PRIVATE)
+                    .edit().putLong(KEY_COOLDOWN_UNTIL, untilMs).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    static long getCooldownUntil(Context ctx) {
+        try {
+            return ctx.getSharedPreferences(PREF_COOLDOWN, Context.MODE_PRIVATE)
+                    .getLong(KEY_COOLDOWN_UNTIL, 0L);
+        } catch (Throwable ignored) {
+            return 0L;
+        }
+    }
 
     public static final String CHANNEL_ID_STRONG  = "reminders_strong";
     public static final String CHANNEL_ID_WEAK    = "reminders_weak";
@@ -66,13 +90,32 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
                 // 仅取消，不再提醒（今日窗口内不重新安排，也不跳 App）
                 // 同步清掉本地镜像：用户已明确取消，开机后不该再恢复
                 NotifScheduleStore.remove(context, notifId);
+                // 写入通知冷却：之后 cooldownMinutes 内到点的提醒会被拦截并顺延
+                int cd = intent.getIntExtra(EXTRA_COOLDOWN_MINUTES, 0);
+                if (cd > 0) {
+                    setCooldownUntil(context, System.currentTimeMillis() + cd * 60_000L);
+                }
                 break;
-            case "com.learning.manager.NOTIF_REFIRE":
+            case "com.learning.manager.NOTIF_REFIRE": {
+                long now = System.currentTimeMillis();
+                long cooldownUntil = getCooldownUntil(context);
+                if (now < cooldownUntil) {
+                    // 冷却期内：不弹通知，把同一条闹钟顺延到冷却结束（+1 秒）后，
+                    // 镜像同步更新，避免用户手动重排前这条提醒被彻底丢掉
+                    int cdRefresh = intent.getIntExtra(EXTRA_COOLDOWN_MINUTES, 0);
+                    long nextAt = cooldownUntil + 1000L;
+                    StudyNotificationPlugin.scheduleExact(
+                            context, notifId, title, body, taskId, nextAt, channel, cdRefresh);
+                    NotifScheduleStore.put(context, notifId, title, body, taskId, nextAt, channel, cdRefresh);
+                    break;
+                }
                 // 定时到点了，直接在后台弹出一条新通知（不启动 App）
-                fireNotification(context, title, body, notifId, taskId, channel);
+                int cdFire = intent.getIntExtra(EXTRA_COOLDOWN_MINUTES, 0);
+                fireNotification(context, title, body, notifId, taskId, channel, cdFire);
                 // 已触发：从本地镜像移除，避免重启后被重复恢复
                 NotifScheduleStore.remove(context, notifId);
                 break;
+            }
             default:
                 break;
         }
@@ -81,7 +124,7 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
     /**
      * 由 AlarmManager 回调：直接发 Notification（不启动 App）。
      */
-    public static void fireNotification(Context context, String title, String body, int notifId, String taskId, String channel) {
+    public static void fireNotification(Context context, String title, String body, int notifId, String taskId, String channel, int cooldownMinutes) {
         ensureChannels(context);
         if (channel == null) channel = CHANNEL_ID_STRONG;
 
@@ -107,7 +150,7 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
                 "reroll", "换一个", notifId + 40000);
         // 取消：broadcast（不打开 App）
         NotificationCompat.Action aCancel = buildBroadcastAction(context, notifId, title, body, taskId,
-                "com.learning.manager.NOTIF_CANCEL", "取消", notifId + 50000);
+                "com.learning.manager.NOTIF_CANCEL", "取消", notifId + 50000, cooldownMinutes);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channel)
                 .setSmallIcon(R.drawable.ic_stat_notify)
@@ -152,13 +195,14 @@ public class StudyNotificationActionReceiver extends BroadcastReceiver {
      */
     public static NotificationCompat.Action buildBroadcastAction(
             Context context, int srcNotifId, String title, String body, String taskId,
-            String action, String label, int reqCode
+            String action, String label, int reqCode, int cooldownMinutes
     ) {
         Intent i = new Intent(context, StudyNotificationActionReceiver.class);
         i.setAction(action);
         i.putExtra(EXTRA_TITLE, title);
         i.putExtra(EXTRA_BODY, body);
         i.putExtra(EXTRA_NOTIF_ID, srcNotifId);
+        i.putExtra(EXTRA_COOLDOWN_MINUTES, cooldownMinutes);
         if (taskId != null) i.putExtra(EXTRA_TASK_ID, taskId);
         PendingIntent pi = PendingIntent.getBroadcast(
                 context, reqCode, i,

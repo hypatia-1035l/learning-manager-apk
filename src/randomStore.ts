@@ -3,6 +3,7 @@ import type {
   RandomData,
   NumberRange,
   ColorRange,
+  ColorMode,
   WordBank,
   WordEntry,
   Preset,
@@ -284,7 +285,12 @@ function seedDefaults(data: RandomData): void {
   } catch {
     return
   }
-  const newBanks: WordBank[] = SEED_BANKS.map((s) => ({
+  // 幂等：按名称跳过已存在的词库/颜色范围（防止「数据写成功、标记写失败」后重复种入）
+  const bankNames = new Set(data.banks.map((b) => b.name))
+  const colorRangeKeys = new Set(
+    data.colorRanges.map((r) => `${r.name}|${r.mode}|${r.c1Min}-${r.c1Max}|${r.c2Min}-${r.c2Max}|${r.c3Min}-${r.c3Max}`),
+  )
+  const newBanks: WordBank[] = SEED_BANKS.filter((s) => !bankNames.has(s.name)).map((s) => ({
     id: uid(),
     name: s.name,
     category: s.category,
@@ -293,12 +299,19 @@ function seedDefaults(data: RandomData): void {
     words: s.words.map((w) => mkWord(w.text, w.weight ?? 1)),
     createdAt: Date.now(),
   }))
+  const newColorRanges = SEED_COLOR_RANGES.filter(
+    (r) => !colorRangeKeys.has(`${r.name}|${r.mode}|${r.c1Min}-${r.c1Max}|${r.c2Min}-${r.c2Max}|${r.c3Min}-${r.c3Max}`),
+  ).map((s) => ({ ...s, id: uid() }))
   data.banks = [...data.banks, ...newBanks]
-  data.colorRanges = [...data.colorRanges, ...SEED_COLOR_RANGES.map((s) => ({ ...s, id: uid() }))]
+  data.colorRanges = [...data.colorRanges, ...newColorRanges]
+  // 先落盘数据、再写 seed 标记：旧实现只写标记不落盘，导致
+  // 「首次启动看到内置词库 → 不操作直接退出 → 下次启动内置内容永久消失」。
+  // 数据写失败时不写标记，下次启动会重试（幂等过滤保证不重复）。
   try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
     localStorage.setItem(SEED_KEY, '1')
   } catch {
-    /* ignore */
+    /* ignore: 落盘失败则保留未标记状态，下次启动重试 */
   }
 }
 
@@ -349,10 +362,21 @@ export function randInt(min: number, max: number): number {
 
 export function randNum(min: number, max: number, decimals: number): number {
   if (max < min) [min, max] = [max, min]
-  const v = Math.random() * (max - min) + min
-  if (decimals <= 0) return Math.floor(v)
+  // 整数模式：复用 randInt（它用 max-min+1 保证上界可取）。
+  // 旧实现 Math.floor(Math.random()*(max-min)+min) 的值域是 [min,max)，
+  // 导致 max 永远抽不到（如 1-6 骰子永远没有 6、硬币 1-2 恒为 1）。
+  if (decimals <= 0) {
+    const lo = Math.ceil(min)
+    const hi = Math.floor(max)
+    // 区间内没有整数：返回区间内中点（调用方应预先拒绝这种区间，这里只保证不越界）
+    if (hi < lo) return Math.min(max, Math.max(min, (min + max) / 2))
+    return randInt(lo, hi)
+  }
   const factor = Math.pow(10, decimals)
-  return Math.round(v * factor) / factor
+  // 先随机再 round：round 会把结果带到半格之外（如 0~1.06 保留 1 位会出 1.1），
+  // 这里夹回 [min,max]，保证结果永不越出用户设定的范围。
+  const v = Math.random() * (max - min) + min
+  return Math.min(max, Math.max(min, Math.round(v * factor) / factor))
 }
 
 export function pickOne<T>(arr: T[]): T | null {
@@ -752,11 +776,16 @@ export function addRandomRecord(input: {
   return rec
 }
 
-// 清空记录；type 为空时清空全部
-export function clearRandomRecords(type?: 'number' | 'wordbank' | 'color') {
+// 清空记录；type 为空时清空全部。
+// sinceTs 给定时只清掉 createdAt >= sinceTs 的记录（与记录页的日期筛选范围保持一致，避免误删筛选外历史）
+export function clearRandomRecords(type?: 'number' | 'wordbank' | 'color', sinceTs?: number) {
   setState((p) => ({
     ...p,
-    records: type ? p.records.filter((r) => r.type !== type) : [],
+    records: p.records.filter((r) => {
+      if (type && r.type !== type) return true
+      if (sinceTs && sinceTs > 0 && r.createdAt < sinceTs) return true
+      return false
+    }),
   }))
 }
 
@@ -798,6 +827,18 @@ export interface ExportedBank {
   words: { text: string; weight: number }[]
 }
 
+// 颜色常用范围导出格式（不含本地 id）
+export interface ExportedColorRange {
+  name: string
+  mode: ColorMode
+  c1Min: number
+  c1Max: number
+  c2Min: number
+  c2Max: number
+  c3Min: number
+  c3Max: number
+}
+
 // 全量导出格式
 export interface ExportedAll {
   ranges: NumberRange[]
@@ -805,6 +846,94 @@ export interface ExportedAll {
   // bankNames：导出时附带词库名，导入端据此跨环境解析。
   // bankIds 是本地 id，仅在原设备有效，保留以兼容旧导出文件。
   presets: { name: string; bankIds: string[]; bankNames?: string[] }[]
+  // 颜色常用范围：旧版本导出文件没有该字段，导入端按缺省 [] 兼容
+  colorRanges?: ExportedColorRange[]
+}
+
+// 导入结构校验的公共小工具：挡掉 null/非对象/字段类型错误，
+// 保证后续逐条处理不会在中途抛异常（具体数值合法性在 importAll 里逐条丢弃并计数）。
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v)
+}
+
+// 导入时的权重规整：非有限数 / <=0 一律回退 1
+function normalizeWeight(v: unknown): number {
+  return isFiniteNumber(v) && v > 0 ? v : 1
+}
+
+// 校验一个词库条目的形态；返回中文错误描述（null = 通过）
+function validateBankShape(bank: unknown, where: string): string | null {
+  if (!isPlainObject(bank)) return `${where}不是对象`
+  if (bank.name !== undefined && typeof bank.name !== 'string') return `${where}的 name 不是字符串`
+  if (bank.category !== undefined && typeof bank.category !== 'string') return `${where}的 category 不是字符串`
+  if (
+    bank.tags !== undefined &&
+    (!Array.isArray(bank.tags) || bank.tags.some((t) => typeof t !== 'string'))
+  ) {
+    return `${where}的 tags 不是字符串数组`
+  }
+  if (bank.words !== undefined) {
+    if (!Array.isArray(bank.words)) return `${where}的 words 不是数组`
+    for (let i = 0; i < bank.words.length; i++) {
+      const w = bank.words[i]
+      if (!isPlainObject(w)) return `${where}第 ${i + 1} 个词条不是对象`
+      if (w.text !== undefined && typeof w.text !== 'string') return `${where}第 ${i + 1} 个词条的 text 不是字符串`
+      if (w.weight !== undefined && !isFiniteNumber(w.weight)) return `${where}第 ${i + 1} 个词条的 weight 不是有效数字`
+    }
+  }
+  return null
+}
+
+// 校验「全量导入」文件的条目形态；只做不会崩的强校验，数值非法条目交给 importAll 丢弃计数
+function validateAllShape(d: ExportedAll): string | null {
+  if (!Array.isArray(d.banks)) return 'banks 不是数组'
+  for (let i = 0; i < d.banks.length; i++) {
+    const err = validateBankShape(d.banks[i], `第 ${i + 1} 个词库`)
+    if (err) return err
+  }
+  if (d.ranges !== undefined) {
+    if (!Array.isArray(d.ranges)) return 'ranges 不是数组'
+    for (let i = 0; i < d.ranges.length; i++) {
+      const r = d.ranges[i]
+      if (!isPlainObject(r)) return `第 ${i + 1} 个数字范围不是对象`
+      if (r.name !== undefined && typeof r.name !== 'string') return `第 ${i + 1} 个数字范围的 name 不是字符串`
+    }
+  }
+  if (d.presets !== undefined) {
+    if (!Array.isArray(d.presets)) return 'presets 不是数组'
+    for (let i = 0; i < d.presets.length; i++) {
+      const pre = d.presets[i]
+      if (!isPlainObject(pre)) return `第 ${i + 1} 个预设不是对象`
+      if (pre.name !== undefined && typeof pre.name !== 'string') return `第 ${i + 1} 个预设的 name 不是字符串`
+      if (pre.bankIds !== undefined && !Array.isArray(pre.bankIds)) return `第 ${i + 1} 个预设的 bankIds 不是数组`
+      if (pre.bankNames !== undefined && !Array.isArray(pre.bankNames)) return `第 ${i + 1} 个预设的 bankNames 不是数组`
+    }
+  }
+  if (d.colorRanges !== undefined) {
+    if (!Array.isArray(d.colorRanges)) return 'colorRanges 不是数组'
+    for (let i = 0; i < d.colorRanges.length; i++) {
+      if (!isPlainObject(d.colorRanges[i])) return `第 ${i + 1} 个颜色范围不是对象`
+    }
+  }
+  return null
+}
+
+// 颜色范围去重键（名称+模式+六通道）
+function colorRangeKey(r: {
+  name: string
+  mode: ColorMode
+  c1Min: number
+  c1Max: number
+  c2Min: number
+  c2Max: number
+  c3Min: number
+  c3Max: number
+}): string {
+  return `${r.name}|${r.mode}|${r.c1Min}-${r.c1Max}|${r.c2Min}-${r.c2Max}|${r.c3Min}-${r.c3Max}`
 }
 
 // 导出单个词库 → JSON 字符串（含名称、分类、标签、词条+权重，不含 id）
@@ -838,6 +967,17 @@ export function exportAll(): string {
         .map((id) => state.banks.find((b) => b.id === id)?.name)
         .filter((n): n is string => !!n),
     })),
+    // 颜色常用范围与数字范围同为「用户配置」，一并导出（旧文件缺该字段时导入端按 [] 兼容）
+    colorRanges: state.colorRanges.map((r) => ({
+      name: r.name,
+      mode: r.mode,
+      c1Min: r.c1Min,
+      c1Max: r.c1Max,
+      c2Min: r.c2Min,
+      c2Max: r.c2Max,
+      c3Min: r.c3Min,
+      c3Max: r.c3Max,
+    })),
   }
   return JSON.stringify(data, null, 2)
 }
@@ -855,13 +995,17 @@ export function detectImportFormat(raw: string): ImportedFormat {
       return { type: 'invalid', error: '不是有效的 JSON 对象' }
     }
     if ('banks' in obj && Array.isArray(obj.banks)) {
-      // 全量备份
+      // 全量备份：先做结构校验，非法文件不允许进入「确认导入」（否则会在导入途中抛异常、界面无反应）
       const d = obj as ExportedAll
+      const err = validateAllShape(d)
+      if (err) return { type: 'invalid', error: '导入文件格式错误：' + err }
       return { type: 'all', data: d }
     }
     if ('words' in obj && Array.isArray(obj.words)) {
       // 单词库
       const d = obj as ExportedBank
+      const err = validateBankShape(d, '词库')
+      if (err) return { type: 'invalid', error: '导入文件格式错误：' + err }
       return { type: 'bank', data: d }
     }
     return { type: 'invalid', error: '未识别的 JSON 格式：缺少 banks 或 words 字段' }
@@ -870,20 +1014,28 @@ export function detectImportFormat(raw: string): ImportedFormat {
   }
 }
 
-// 导入单个词库（按名称去重，同名称不覆盖，创建新库）
+// 导入单个词库（同名称不覆盖：始终创建新库；字段类型做了防御，非法输入不抛异常）
 export function importBank(data: ExportedBank): WordBank {
-  const newName = data.name?.trim() || '导入的词库'
-  const category = data.category?.trim() ?? ''
-  const tags = Array.isArray(data.tags)
-    ? data.tags.map((t) => String(t).trim()).filter(Boolean)
+  const raw = (data ?? {}) as Partial<ExportedBank>
+  const newName = typeof raw.name === 'string' ? raw.name.trim() || '导入的词库' : '导入的词库'
+  const category = typeof raw.category === 'string' ? raw.category.trim() : ''
+  const tags = Array.isArray(raw.tags)
+    ? raw.tags
+        .filter((t): t is string => typeof t === 'string')
+        .map((t) => t.trim())
+        .filter(Boolean)
     : []
-  const words: WordEntry[] = Array.isArray(data.words)
-    ? data.words
-        .map((w) => ({
-          id: typeof (w as WordEntry)?.id === 'string' && (w as WordEntry).id ? (w as WordEntry).id : uid(),
-          text: String(w?.text ?? '').trim(),
-          weight: typeof w?.weight === 'number' && w.weight > 0 ? w.weight : 1,
-        }))
+  const words: WordEntry[] = Array.isArray(raw.words)
+    ? raw.words
+        .filter((w) => isPlainObject(w))
+        .map((w) => {
+          const rec = w as unknown as Record<string, unknown>
+          return {
+            id: typeof rec.id === 'string' && rec.id ? rec.id : uid(),
+            text: typeof rec.text === 'string' ? rec.text.trim() : '',
+            weight: normalizeWeight(rec.weight),
+          }
+        })
         .filter((w) => w.text)
     : []
   const b: WordBank = {
@@ -907,6 +1059,10 @@ export interface ImportAllResult {
   skippedPresets: number
   addedRanges: number
   skippedRanges: number
+  addedColorRanges: number
+  skippedColorRanges: number
+  // 逐条校验被丢弃的非法条目数（非对象 / 字段类型错误 / ranges 的 min、max 不是有限数等）
+  invalidItems: number
   bankIds: string[] // 新增的词库 id（供后续勾选）
 }
 
@@ -918,20 +1074,30 @@ export function importAll(data: ExportedAll): ImportAllResult {
     skippedPresets: 0,
     addedRanges: 0,
     skippedRanges: 0,
+    addedColorRanges: 0,
+    skippedColorRanges: 0,
+    invalidItems: 0,
     bankIds: [],
   }
 
   const existingBankNames = new Set(state.banks.map((b) => b.name))
   const existingRangeKeys = new Set(
-    state.ranges.map((r) => `${r.name}|${r.min}|${r.max}`),
+    state.ranges.map((r) => `${r.name.trim()}|${r.min}|${r.max}`),
   )
+  const existingColorRangeKeys = new Set(state.colorRanges.map((r) => colorRangeKey(r)))
 
   // 1. 导入词库（名称去重，记录名→新 id 映射）
   const nameToId = new Map<string, string>()
   const newBanks: WordBank[] = []
   if (Array.isArray(data.banks)) {
-    for (const bk of data.banks) {
-      const name = bk.name?.trim() || '导入的词库'
+    for (const rawBank of data.banks) {
+      // 防御：非对象条目直接丢弃并计数，避免 bk.name?.trim() 之类的调用抛异常
+      if (!isPlainObject(rawBank)) {
+        result.invalidItems++
+        continue
+      }
+      const bk = rawBank as Partial<ExportedBank>
+      const name = typeof bk.name === 'string' ? bk.name.trim() || '导入的词库' : '导入的词库'
       if (existingBankNames.has(name)) {
         result.skippedBanks++
         // 仍然记录现有库的 id 用于预设映射
@@ -939,20 +1105,30 @@ export function importAll(data: ExportedAll): ImportAllResult {
         if (exist) nameToId.set(name, exist.id)
         continue
       }
-      const category = bk.category?.trim() ?? ''
+      const category = typeof bk.category === 'string' ? bk.category.trim() : ''
       const tags = Array.isArray(bk.tags)
-        ? bk.tags.map((t) => String(t).trim()).filter(Boolean)
+        ? bk.tags
+            .filter((t): t is string => typeof t === 'string')
+            .map((t) => t.trim())
+            .filter(Boolean)
         : []
-      const words: WordEntry[] = Array.isArray(bk.words)
-        ? bk.words
-            .map((w) => ({
-              id: typeof (w as WordEntry)?.id === 'string' && (w as WordEntry).id ? (w as WordEntry).id : uid(),
-              text: String(w?.text ?? '').trim(),
-              weight:
-                typeof w?.weight === 'number' && w.weight > 0 ? w.weight : 1,
-            }))
-            .filter((w) => w.text)
-        : []
+      const words: WordEntry[] = []
+      if (Array.isArray(bk.words)) {
+        for (const rawWord of bk.words) {
+          if (!isPlainObject(rawWord)) {
+            result.invalidItems++
+            continue
+          }
+          const word = rawWord as unknown as Record<string, unknown>
+          const text = typeof word.text === 'string' ? word.text.trim() : ''
+          if (!text) continue
+          words.push({
+            id: typeof word.id === 'string' && word.id ? word.id : uid(),
+            text,
+            weight: normalizeWeight(word.weight),
+          })
+        }
+      }
       const newId = uid()
       nameToId.set(name, newId)
       newBanks.push({
@@ -969,22 +1145,73 @@ export function importAll(data: ExportedAll): ImportAllResult {
     }
   }
 
-  // 2. 导入 ranges（按 name+min+max 去重）
+  // 2. 导入 ranges（按 name+min+max 去重；min/max 不是有限数的条目丢弃并计数）
   const newRanges: NumberRange[] = []
   if (Array.isArray(data.ranges)) {
-    for (const r of data.ranges) {
-      const key = `${r.name?.trim() || '未命名范围'}|${r.min}|${r.max}`
+    for (const rawRange of data.ranges) {
+      if (!isPlainObject(rawRange)) {
+        result.invalidItems++
+        continue
+      }
+      const r = rawRange as Partial<NumberRange>
+      // 缺 min/max 或非有限数（undefined/NaN/Infinity/字符串）的范围无法用于随机，直接丢弃
+      if (!isFiniteNumber(r.min) || !isFiniteNumber(r.max)) {
+        result.invalidItems++
+        continue
+      }
+      const name = typeof r.name === 'string' ? r.name.trim() || '未命名范围' : '未命名范围'
+      const key = `${name}|${r.min}|${r.max}`
       if (existingRangeKeys.has(key)) {
         result.skippedRanges++
         continue
       }
-      newRanges.push({
-        id: uid(),
-        name: r.name?.trim() || '未命名范围',
-        min: r.min,
-        max: r.max,
-      })
+      existingRangeKeys.add(key) // 同一文件内重复的范围也跳过
+      newRanges.push({ id: uid(), name, min: r.min, max: r.max })
       result.addedRanges++
+    }
+  }
+
+  // 2.1 导入颜色常用范围（旧导出文件无该字段 → 跳过；按名称+模式+六通道去重）
+  const newColorRanges: ColorRange[] = []
+  if (Array.isArray(data.colorRanges)) {
+    for (const rawColor of data.colorRanges) {
+      if (!isPlainObject(rawColor)) {
+        result.invalidItems++
+        continue
+      }
+      const c = rawColor as Partial<ExportedColorRange>
+      const mode = c.mode
+      if (mode !== 'rgb' && mode !== 'gray' && mode !== 'hsl') {
+        result.invalidItems++
+        continue
+      }
+      if (
+        !isFiniteNumber(c.c1Min) || !isFiniteNumber(c.c1Max) ||
+        !isFiniteNumber(c.c2Min) || !isFiniteNumber(c.c2Max) ||
+        !isFiniteNumber(c.c3Min) || !isFiniteNumber(c.c3Max)
+      ) {
+        result.invalidItems++
+        continue
+      }
+      const range: ColorRange = {
+        id: uid(),
+        name: typeof c.name === 'string' ? c.name.trim() || '未命名范围' : '未命名范围',
+        mode,
+        c1Min: c.c1Min,
+        c1Max: c.c1Max,
+        c2Min: c.c2Min,
+        c2Max: c.c2Max,
+        c3Min: c.c3Min,
+        c3Max: c.c3Max,
+      }
+      const key = colorRangeKey(range)
+      if (existingColorRangeKeys.has(key)) {
+        result.skippedColorRanges++
+        continue
+      }
+      existingColorRangeKeys.add(key)
+      newColorRanges.push(range)
+      result.addedColorRanges++
     }
   }
 
@@ -992,8 +1219,13 @@ export function importAll(data: ExportedAll): ImportAllResult {
   const existingPresetNames = new Set(state.presets.map((p) => p.name))
   const newPresets: Preset[] = []
   if (Array.isArray(data.presets)) {
-    for (const pre of data.presets) {
-      const name = pre.name?.trim() || '导入的预设'
+    for (const rawPreset of data.presets) {
+      if (!isPlainObject(rawPreset)) {
+        result.invalidItems++
+        continue
+      }
+      const pre = rawPreset as Partial<ExportedAll['presets'][number]>
+      const name = typeof pre.name === 'string' ? pre.name.trim() || '导入的预设' : '导入的预设'
       if (existingPresetNames.has(name)) {
         result.skippedPresets++
         continue
@@ -1002,9 +1234,9 @@ export function importAll(data: ExportedAll): ImportAllResult {
       // 优先 bankNames（跨环境可靠）；旧文件只有 bankIds，按 id→名称 顺序兜底
       const keys: string[] =
         Array.isArray(pre.bankNames) && pre.bankNames.length
-          ? pre.bankNames
+          ? pre.bankNames.filter((k): k is string => typeof k === 'string')
           : Array.isArray(pre.bankIds)
-            ? pre.bankIds
+            ? pre.bankIds.filter((k): k is string => typeof k === 'string')
             : []
       for (const key of keys) {
         const resolved =
@@ -1013,6 +1245,7 @@ export function importAll(data: ExportedAll): ImportAllResult {
           state.banks.find((x) => x.name === key)?.id
         if (resolved && !bankIds.includes(resolved)) bankIds.push(resolved)
       }
+      existingPresetNames.add(name) // 同一文件内重复名称只导入一次
       newPresets.push({
         id: uid(),
         name,
@@ -1029,6 +1262,7 @@ export function importAll(data: ExportedAll): ImportAllResult {
     ranges: [...p.ranges, ...newRanges],
     banks: [...p.banks, ...newBanks],
     presets: [...p.presets, ...newPresets],
+    colorRanges: [...p.colorRanges, ...newColorRanges],
   }))
 
   return result

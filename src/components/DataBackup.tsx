@@ -35,6 +35,8 @@ function keyLabel(key: string): string {
 export function DataBackup({ onBack }: Props) {
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
+  // 导入失败提示单独一份：error 在「导出」区渲染，导入失败显示在那里会误导
+  const [importError, setImportError] = useState('')
   const [pending, setPending] = useState<BackupFile | null>(null)
   const [validating, setValidating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -68,6 +70,7 @@ export function DataBackup({ onBack }: Props) {
     setValidating(true)
     setMsg('')
     setError('')
+    setImportError('')
     setPending(null)
 
     try {
@@ -104,12 +107,17 @@ export function DataBackup({ onBack }: Props) {
 
   const handleConfirmImport = () => {
     if (!pending) return
-    importBackup(pending)
-    // importBackup 内部会 reload，下面不会执行
+    setImportError('')
+    // importBackup 成功时内部会 reload（下面不会执行）；失败时返回错误，必须显示出来
+    const result = importBackup(pending)
+    if (!result.ok) {
+      setImportError(result.error ?? '导入失败，请重试')
+    }
   }
 
   const handleCancelImport = () => {
     setPending(null)
+    setImportError('')
     setMsg('已取消导入')
   }
 
@@ -208,6 +216,11 @@ export function DataBackup({ onBack }: Props) {
                 取消
               </button>
             </div>
+            {importError && (
+              <p style={{ marginTop: 10, fontSize: 13, color: 'var(--red)' }}>
+                {importError}
+              </p>
+            )}
           </div>
         )}
       </section>

@@ -10,6 +10,7 @@ import {
   togglePinnedTask,
   isTaskPinned,
   useAppData,
+  getAppData,
   appLabelOf,
 } from '../store'
 import { formatTimer } from '../utils'
@@ -46,8 +47,14 @@ function readPausedState(taskId: string): number | null {
   }
 }
 
-function clearPausedState() {
+// 只清理「本方向」的暂停标记：暂停标记是全局单槽（同一时刻只可能有一个方向处于暂停），
+// 别的方向结束会话时不能把这条记录清掉，否则用户回到原方向继续学习时已暂停的时长会丢。
+function clearPausedState(taskId?: string) {
   try {
+    if (taskId) {
+      const stored = localStorage.getItem(PAUSED_TASK_KEY)
+      if (stored && stored !== taskId) return
+    }
     localStorage.removeItem(PAUSED_TASK_KEY)
     localStorage.removeItem(PAUSED_ELAPSED_KEY)
   } catch {
@@ -86,6 +93,10 @@ export function LearningSession({ task, onClose }: Props) {
   // 结束幂等守卫：handleEnd 可被「倒计时归零 / 原生事件 / 卸载清理」多条路径触发，
   // 重复执行会把同一段计时重复累加进 accumulatedRef
   const endedRef = useRef(false)
+  // 结束表单的预填只做一次（会话开始时的当前序列）。
+  // 「完成当前项」会自动把 currentObjectId 切到下一条，若此时再预填数量型增量 1，
+  // 用户直接点保存就会把 +1 记到还没学的新序列上。
+  const prefillDoneRef = useRef(false)
   // 固定（标星）状态：当前方向/序列是否被固定到每日计划
   const [pinned, setPinned] = useState(false)
   // 应用启动失败提示（null = 不显示）
@@ -122,6 +133,13 @@ export function LearningSession({ task, onClose }: Props) {
 
   useEffect(() => {
     // 预填：count 型默认本次完成 1（一次学完立刻点保存只需一步）；position 型预填当前进度方便微调
+    if (prefillDoneRef.current) {
+      // 序列已被「完成当前项」自动切走：只清空输入，不预填增量，避免把 +1 记到新序列
+      setDeltaInput('')
+      setEndProgress(isCount ? '' : startProgress)
+      return
+    }
+    prefillDoneRef.current = true
     setDeltaInput(isCount ? '1' : '')
     setEndProgress(isCount ? '' : startProgress)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,7 +152,10 @@ export function LearningSession({ task, onClose }: Props) {
       const newElapsed =
         accumulatedRef.current +
         Math.floor((Date.now() - resumeAtRef.current) / 1000)
-      setElapsed(newElapsed)
+      // 倒计时模式：显示与记录都不允许超过设定时长。
+      // JS 定时器在锁屏/切后台时会被冻结，回前台第一次 tick 可能已远超 countdown，
+      // 若把整段墙钟时间写进记录，25 分钟倒计时会记成几小时。
+      setElapsed(isCountdown ? Math.min(newElapsed, countdownSec) : newElapsed)
       // 倒计时模式：到 0 自动结束
       if (isCountdown && newElapsed >= countdownSec) {
         handleEnd()
@@ -165,7 +186,35 @@ export function LearningSession({ task, onClose }: Props) {
     let cancelled = false
 
     async function bootstrap() {
-      // 1. 查询 Service 是否在运行（WebView 被杀后冷启动恢复）
+      // 1. 先消费 pending action：通知栏「完成/结束」是一次性动作，原生 Receiver 写入、
+      //    只有这里读取并清除。必须在启动计时之前判定——否则进程被杀后点「结束」，
+      //    冷启动会先重新起一个计时器，把旧动作当成新会话。
+      const pending = await consumePendingAction()
+      if (cancelled) return
+      // 丢弃过期 / 不属于本方向的动作，避免把别的会话的旧动作重放到这次会话上
+      const pendingValid =
+        !!pending &&
+        (!pending.taskName || pending.taskName === task.name) &&
+        (!pending.savedAt || Date.now() - pending.savedAt < 10 * 60 * 1000)
+
+      if (pendingValid && pending!.action === 'end') {
+        // 倒计时模式同样封顶，避免后台跨过的墙钟时间进入记录
+        const sec = isCountdown
+          ? Math.min(pending!.elapsedSeconds, countdownSec)
+          : pending!.elapsedSeconds
+        accumulatedRef.current = sec
+        resumeAtRef.current = Date.now()
+        setElapsed(sec)
+        setPhase('ending')
+        endedRef.current = true
+        // Receiver 只写 pending 并拉起 Activity，并不停 Service，这里补停
+        stopStudyTimer()
+        setSessionActive(false).catch(() => {})
+        clearPausedState(task.id)
+        return
+      }
+
+      // 2. 查询 Service 是否在运行（WebView 被杀后冷启动恢复）
       const status = await getStudyTimerStatus()
       if (cancelled) return
 
@@ -196,17 +245,17 @@ export function LearningSession({ task, onClose }: Props) {
         }
       }
 
-      // 2. 消费 pending action（冷启动恢复的关键）
-      const pending = await consumePendingAction()
-      if (cancelled) return
-      if (pending?.action === 'complete') {
+      // 3. pending=complete：会话继续，只弹「确认完成」
+      if (pendingValid && pending!.action === 'complete') {
+        if (!status?.isRunning && !sessionFlaggedRef.current) {
+          // 计时已停（进程被回收后点了「完成」）：同步时长并等待用户确认，不重新开始计时
+          accumulatedRef.current = pending!.elapsedSeconds
+          resumeAtRef.current = Date.now()
+          setElapsed(pending!.elapsedSeconds)
+          setPhase('paused')
+          setSessionActive(true)
+        }
         handleCompleteObject()
-      } else if (pending?.action === 'end') {
-        // 同步 elapsed 到 pending 中记录的值
-        accumulatedRef.current = pending.elapsedSeconds
-        setElapsed(pending.elapsedSeconds)
-        setPhase('ending')
-        // pending=end 时 Service 已被停止（用户点了结束），无需再调 stop
       }
     }
 
@@ -214,6 +263,9 @@ export function LearningSession({ task, onClose }: Props) {
 
     // 3. 同时注册即时事件监听（Activity 在前台时）
     const off = onStudyTimerAction((action: StudyTimerAction) => {
+      // 即时路径也要消费一次 pending：否则原生暂存的动作会残留，
+      // 下次打开任意会话时被 bootstrap 重放（凭空多一条记录 / 误弹完成确认）
+      consumePendingAction().catch(() => {})
       if (action === 'complete') {
         handleCompleteObject()
       } else if (action === 'end') {
@@ -231,17 +283,24 @@ export function LearningSession({ task, onClose }: Props) {
   const handleEnd = () => {
     if (endedRef.current) return
     endedRef.current = true
-    // 立即停止计时，把本次计时阶段产生的时长并入累积，冻结本次学习时长
-    accumulatedRef.current += Math.floor(
-      (Date.now() - resumeAtRef.current) / 1000,
-    )
+    // 只并入「计时阶段」产生的时长：暂停时已并入过一次，且暂停期间的时间本就不算学习。
+    // （此前暂停后再点「结束」会把暂停前的整段时长再加一遍，记录时长翻倍）
+    if (phase === 'timing') {
+      accumulatedRef.current += Math.floor(
+        (Date.now() - resumeAtRef.current) / 1000,
+      )
+    }
+    // 倒计时模式：记录时长封顶在设定时长内（后台/休眠跨过的时间不算学习）
+    if (isCountdown) {
+      accumulatedRef.current = Math.min(accumulatedRef.current, countdownSec)
+    }
     setElapsed(accumulatedRef.current)
     setPhase('ending')
     // 结束学习时停止常驻通知，并解除会话活跃状态（触发冷却 + 重新调度提醒）
     stopStudyTimer()
     setSessionActive(false)
-    // 清除暂停标记（若存在）
-    clearPausedState()
+    // 清除暂停标记（若存在；只清本方向的）
+    clearPausedState(task.id)
   }
 
   const handlePause = () => {
@@ -250,6 +309,8 @@ export function LearningSession({ task, onClose }: Props) {
     accumulatedRef.current += Math.floor(
       (Date.now() - resumeAtRef.current) / 1000,
     )
+    // 重置计时起点：暂停期间不应计入，也让后续「结束」不会重复累加这一段
+    resumeAtRef.current = Date.now()
     setElapsed(accumulatedRef.current)
     setPhase('paused')
     stopStudyTimer()
@@ -266,17 +327,22 @@ export function LearningSession({ task, onClose }: Props) {
   const handleResumeFromPause = () => {
     // 从暂停恢复计时：清除标记，重启 Service
     endedRef.current = false
-    clearPausedState()
+    clearPausedState(task.id)
     resumeAtRef.current = Date.now()
     setPhase('timing')
     startStudyTimer(task.name, obj?.name ?? '', accumulatedRef.current, guard, nodeLabelOf(obj))
   }
 
   const handleResume = () => {
+    // 倒计时已经走完：继续也没有意义，下一个 tick 会立刻再次自动结束
+    if (isCountdown && elapsed >= countdownSec) return
     // 从进度填写界面返回计时阶段：重新开启计时
     endedRef.current = false
     resumeAtRef.current = Date.now()
     setPhase('timing')
+    // 「结束 → 继续」= 会话重新活跃：否则这段时间提醒不会被抑制，
+    // 冷却/学习后跳过也会按第一次「结束」的时刻起算
+    setSessionActive(true).catch(() => {})
     // 恢复计时，重新启动常驻通知
     startStudyTimer(task.name, obj?.name ?? '', accumulatedRef.current, guard, nodeLabelOf(obj))
   }
@@ -318,15 +384,18 @@ export function LearningSession({ task, onClose }: Props) {
       console.error('保存学习记录失败', e)
     } finally {
       // 无论保存结果如何，保存完成后必退出计时页
-      clearPausedState()
+      clearPausedState(task.id)
       onClose()
     }
   }
 
   const doCompleteObject = () => {
     completeCurrentObject(task.id)
-    // 完成后任务对象切换，同步新对象名到常驻通知
-    const newObj = getCurrentObject(task)
+    // 完成后任务对象切换，同步新对象名到常驻通知。
+    // 注意：必须从 store 重新读最新任务——本次渲染闭包里的 task 仍是旧快照，
+    // 用它取 currentObjectId 拿到的还是刚完成的那一条，常驻通知会停在旧序列。
+    const fresh = getAppData().tasks.find((t) => t.id === task.id)
+    const newObj = fresh ? getCurrentObject(fresh) : null
     updateStudyTimer(task.name, newObj?.name ?? '', accumulatedRef.current, nodeLabelOf(newObj))
   }
 
@@ -341,14 +410,16 @@ export function LearningSession({ task, onClose }: Props) {
       // 这里无条件 stop 作为兜底
       stopStudyTimer()
       setSessionActive(false)
-      // 兜底清除暂停标记（用户直接退出会话时）
-      clearPausedState()
+      // 兜底清除暂停标记（只清本方向的，别把别的方向暂停中的时长抹掉）
+      clearPausedState(task.id)
     }
   }, [])
 
   // 计时器显示：倒计时模式显示剩余时间，正向模式显示已用时间
   const timerDisplay = isCountdown ? formatTimer(remaining) : formatTimer(elapsed)
   const timerLabel = isCountdown ? '剩余时间' : '已用时间'
+  // 倒计时已用完：结束页不再提供「继续」，否则下一个 tick 会立刻再次自动结束
+  const countdownExhausted = isCountdown && elapsed >= countdownSec
 
   return (
     <div className="session-overlay">
@@ -525,9 +596,11 @@ export function LearningSession({ task, onClose }: Props) {
               />
           </div>
           <div className="row wrap" style={{ justifyContent: 'flex-end', gap: 6, marginTop: 4 }}>
-            <button className="btn sm" onClick={handleResume}>
-              继续
-            </button>
+            {!countdownExhausted && (
+              <button className="btn sm" onClick={handleResume}>
+                继续
+              </button>
+            )}
             <button className="btn primary" onClick={handleSave}>
               保存
             </button>
@@ -567,15 +640,17 @@ export function LearningSession({ task, onClose }: Props) {
               >
                 坚持退出
               </button>
-              <button
-                className="btn"
-                onClick={() => {
-                  setShortConfirm(false)
-                  handleResume()
-                }}
-              >
-                继续计时
-              </button>
+              {!countdownExhausted && (
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setShortConfirm(false)
+                    handleResume()
+                  }}
+                >
+                  继续计时
+                </button>
+              )}
             </>
           }
         >

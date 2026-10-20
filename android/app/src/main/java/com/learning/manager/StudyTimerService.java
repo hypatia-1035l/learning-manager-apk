@@ -67,6 +67,15 @@ public class StudyTimerService extends Service {
     // 当 true 时 onDestroy 会清除持久化状态；当 false（系统杀死）时保留状态用于恢复
     public static volatile boolean explicitlyStopped = false;
 
+    // Service 进程内的存活标志：区分「prefs 里还写着 isRunning」和「服务真的在跑」。
+    // 进程被系统/OEM 清理、覆盖安装时 onDestroy 不会执行，prefs 会残留 isRunning=true，
+    // 只读 prefs 会把它误判成仍在计时（并把 App 关闭期间的墙钟时间算进学习时长）。
+    private static volatile boolean sAlive = false;
+
+    public static boolean isAlive() {
+        return sAlive;
+    }
+
     // 运行时计时
     private Handler handler;
     private Runnable tickRunnable;
@@ -112,6 +121,7 @@ public class StudyTimerService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        sAlive = true;
         // 渠道在 onCreate 中创建，确保 startForeground 调用时渠道已就绪
         createNotificationChannel();
     }
@@ -122,7 +132,16 @@ public class StudyTimerService extends Service {
         if (intent != null && intent.hasExtra(EXTRA_TASK_NAME)) {
             boolean isUpdate = intent.getBooleanExtra(EXTRA_IS_UPDATE, false);
             if (isUpdate) {
-                // update：仅更新名称，不重置计时
+                // update：仅更新名称，不重置计时。
+                // 但若 Service 是被这次 update 新建出来的（进程/服务已被回收），
+                // 计时基准仍是 0，getElapsedMs() 会返回「开机时长」。
+                // 首次 update 必须按传入的 elapsedSeconds 初始化基准。
+                if (startedAtElapsedRealtime <= 0) {
+                    int elapsedSec = intent.getIntExtra(EXTRA_ELAPSED_SECONDS, 0);
+                    accumulatedMs = elapsedSec * 1000L;
+                    startedAtElapsedRealtime = SystemClock.elapsedRealtime();
+                    startedAtWallMs = System.currentTimeMillis();
+                }
                 taskName = intent.getStringExtra(EXTRA_TASK_NAME);
                 objectName = intent.getStringExtra(EXTRA_OBJECT_NAME);
                 nodeLabel = safeStr(intent.getStringExtra(EXTRA_NODE_LABEL));
@@ -331,6 +350,7 @@ public class StudyTimerService extends Service {
 
     @Override
     public void onDestroy() {
+        sAlive = false;
         if (handler != null && tickRunnable != null) {
             handler.removeCallbacks(tickRunnable);
         }
@@ -344,6 +364,11 @@ public class StudyTimerService extends Service {
             explicitlyStopped = false;
         }
         super.onDestroy();
+    }
+
+    /** 供 Plugin.stop 调用：无条件清掉持久化状态（不依赖 onDestroy 是否被调用） */
+    public static void clearPersistedState(Context ctx) {
+        prefsOf(ctx).edit().clear().apply();
     }
 
     // ---------- 工具 ----------
@@ -394,6 +419,17 @@ public class StudyTimerService extends Service {
         long elapsedMs = accumulated + (elapsedRealtime - startedAt);
         if (elapsedMs < 0) elapsedMs = 0; // 防御：时钟异常时不返回负时长
         return elapsedMs / 1000;
+    }
+
+    /**
+     * 服务已不在进程内时读取「冻结」的已存时长：
+     * 只返回最后一次落盘的 accumulatedMs，不再叠加 elapsedRealtime 差值，
+     * 避免把服务死亡后的时间算进学习时长。
+     */
+    public static long getFrozenElapsedSecondsFromPrefs(Context ctx) {
+        SharedPreferences sp = prefsOf(ctx);
+        if (isStaleAfterReboot(sp)) return 0;
+        return Math.max(0, sp.getLong(KEY_ACCUMULATED_MS, 0)) / 1000;
     }
 
     // ---------- 越界提醒（P3） ----------

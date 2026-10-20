@@ -1,4 +1,5 @@
 import { registerPlugin, Capacitor } from '@capacitor/core'
+import type { PluginListenerHandle } from '@capacitor/core'
 
 /**
  * 原生自定义通知发布插件。
@@ -15,6 +16,8 @@ export interface NotifItem {
   taskId?: string
   atMs?: number // 0 或空 = 立即
   channel?: NotifChannel // Android channel id，不传则使用默认 reminders_strong
+  // 原生「取消」动作要按这个分钟数进入冷却，并在冷却期内拦截已排的闹钟
+  cooldownMinutes?: number
 }
 
 export interface PendingNotifAction {
@@ -42,6 +45,11 @@ export interface StudyNotificationsPlugin {
   openExactAlarmSettings(): Promise<void>
   // 读取并清除由通知动作（开始/换一个）写入的 pending action
   consumePendingNotifAction(): Promise<PendingNotifAction>
+  // App 已在前台时点通知动作：原生直接派发事件，不必等前后台切换
+  addListener(
+    eventName: 'notifAction',
+    listener: (data: { action: string; taskId?: string }) => void,
+  ): Promise<PluginListenerHandle>
 }
 
 const StudyNotifications = registerPlugin<StudyNotificationsPlugin>('StudyNotifications')
@@ -116,4 +124,33 @@ export async function consumePendingNotifAction(): Promise<PendingNotifAction | 
     return { action: r.action, taskId: r.taskId || '' }
   } catch { /* ignore */ }
   return null
+}
+
+// App 在前台时点通知动作：原生端主动派发事件（不必等 visibilitychange）
+export function onNotifAction(
+  cb: (action: { action: string; taskId: string | null }) => void,
+): () => void {
+  let handle: PluginListenerHandle | null = null
+  let attached = false
+  try {
+    if (!isNativeNotificationsAvailable()) return () => {}
+    const p = StudyNotifications.addListener('notifAction', (data) => {
+      if (!data || !data.action) return
+      cb({ action: data.action, taskId: data.taskId || null })
+    })
+    if (p && typeof (p as Promise<PluginListenerHandle>).then === 'function') {
+      ;(p as Promise<PluginListenerHandle>).then((h) => {
+        handle = h
+        attached = true
+      })
+    } else {
+      handle = p as unknown as PluginListenerHandle
+      attached = true
+    }
+  } catch {
+    /* ignore */
+  }
+  return () => {
+    if (attached && handle) handle.remove().catch(() => {})
+  }
 }

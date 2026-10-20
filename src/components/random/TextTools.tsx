@@ -362,6 +362,18 @@ export function TextTools({ selectedBankIds = [], incoming }: Props) {
               title="清空原词条后写入（权重归 1，不保留）"
               onClick={() => {
                 if (!writeBackId) return
+                const target = randomData.banks.find((b) => b.id === writeBackId)
+                const targetName = target?.name ?? '目标词库'
+                // 覆盖 = 整库替换且权重不保留，属不可撤销的数据清空，必须先确认
+                if (
+                  !confirm(
+                    `覆盖写入「${targetName}」？\n\n会先清空该词库现有全部 ${
+                      target?.words.length ?? 0
+                    } 条词条（权重不保留），再写入当前文本。\n此操作不可撤销。`,
+                  )
+                ) {
+                  return
+                }
                 const r = writeBankWords(
                   writeBackId,
                   text.split('\n').map((l) => trimLine(l)),

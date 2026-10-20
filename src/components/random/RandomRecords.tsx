@@ -93,9 +93,16 @@ export function RandomRecords() {
   }, [data.records])
 
   const handleClear = () => {
+    // 清空范围必须与当前可见列表一致：带上日期筛选，避免「看着今天几条、删掉全部历史」
+    const startTs = dateFilterStartTs(dateFilter)
     const target = filter === 'all' ? '全部' : FILTER_LABELS[filter]
-    if (confirm(`确认清空${target}随机记录？此操作不可撤销。`)) {
-      clearRandomRecords(filter === 'all' ? undefined : filter)
+    const scope = dateFilter === 'all' ? '' : `（${DATE_FILTER_LABELS[dateFilter]}）`
+    if (
+      confirm(
+        `确认清空${target}随机记录${scope}？共 ${filtered.length} 条，此操作不可撤销。`,
+      )
+    ) {
+      clearRandomRecords(filter === 'all' ? undefined : filter, startTs || undefined)
     }
   }
 

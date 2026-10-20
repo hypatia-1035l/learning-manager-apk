@@ -35,15 +35,35 @@ export function GuardSettings({ onClose }: Props) {
     })
   }
 
+  // 解析输入框里的容忍分钟数：空白/非法回退 5，0 是合法值（= 未列出应用立即提醒）
+  const parseGrace = (s: string): number => {
+    const t = s.trim()
+    if (!t) return 5
+    const n = Number(t)
+    return Number.isFinite(n) ? clampInt(n, 0, 120) : 5
+  }
+
   const handleToggle = (v: boolean) => {
     setEnabled(v)
-    apply(v, Number(grace) || 5)
+    // 注意不能用 `Number(grace) || 5`：0 是合法值，falsy 会被静默改成 5
+    const g = parseGrace(grace)
+    setGrace(String(g))
+    apply(v, g)
   }
 
   const handleGrace = (s: string) => {
     setGrace(s)
+    // 输入过程允许暂时为空；只在能解析成数字时落盘，避免边打字边写入回退值
+    if (!s.trim()) return
     const n = Number(s)
-    if (!isNaN(n)) apply(enabled, n)
+    if (Number.isFinite(n)) apply(enabled, n)
+  }
+
+  // 失焦时把输入规整成最终落盘值，保证界面显示与实际持久化一致
+  const handleGraceBlur = () => {
+    const g = parseGrace(grace)
+    setGrace(String(g))
+    apply(enabled, g)
   }
 
   return (
@@ -73,6 +93,7 @@ export function GuardSettings({ onClose }: Props) {
             type="number" className="input" min={0} max={120} step={1}
             value={grace}
             onChange={(e) => handleGrace(e.target.value)}
+            onBlur={handleGraceBlur}
             disabled={!enabled}
           />
           <p className="faint" style={{ fontSize: 12, marginTop: 6 }}>

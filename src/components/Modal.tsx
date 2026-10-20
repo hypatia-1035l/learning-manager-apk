@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { pushBackBlocker } from '../backNavigation'
 
 interface ModalProps {
   title: string
@@ -42,6 +43,13 @@ export function Modal({ title, onClose, children, footer }: ModalProps) {
   const titleId = useId()
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
+  // 用 ref 保存最新的 onClose：拦截器只在挂载时压栈一次，
+  // 但每次渲染的 onClose 可能是新函数，派发时取最新的那个
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  // 弹窗打开时拦截系统返回键：先关弹窗，而不是直接退到桌面
+  useEffect(() => pushBackBlocker(() => onCloseRef.current()), [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -1,9 +1,10 @@
 // 设置页 —— 系统配置入口：说明 / 数据备份 / 版本信息
 // 提醒设置已移至「方向」页工具栏的「提醒」按钮弹窗
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BUILD_VERSION, BUILD_TIME } from '../buildInfo'
 import { useSwipeBack } from '../useSwipeBack'
 import { useAppData } from '../store'
+import { pushBackBlocker } from '../backNavigation'
 import { AppListSettings } from './AppListSettings'
 import { GuardSettings } from './GuardSettings'
 
@@ -21,6 +22,12 @@ export function Settings({ onOpenBackup }: Props) {
 
   // 子页右滑返回设置主页（在主列表页右滑为无操作，无副作用）
   useSwipeBack(() => setView('main'))
+
+  // 子页打开时拦截系统返回键：回到设置主页而不是退到桌面
+  useEffect(() => {
+    if (view === 'main') return
+    return pushBackBlocker(() => setView('main'))
+  }, [view])
 
   if (view === 'apps') {
     return <AppListSettings onBack={() => setView('main')} />

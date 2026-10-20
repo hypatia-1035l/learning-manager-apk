@@ -33,15 +33,22 @@ export function NumberRandomizer() {
   const [uniqueOn, setUniqueOn] = useState(loadUnique)
   // 复制按钮反馈
   const [copied, setCopied] = useState(false)
+  // 非法区间的提示（整数模式下区间内没有整数时不再产出空记录）
+  const [rollError, setRollError] = useState('')
 
   const minNum = Number(min)
   const maxNum = Number(max)
   const decimals = Math.min(10, Math.max(0, Math.floor(Number(decimalsInput) || 0)))
   const decimalsLabel = decimals === 0 ? '整数' : `${decimals} 位小数`
   const unique = uniqueOn && decimals === 0
+  // 整数模式把区间收拢到合法整数；收拢后为空说明区间内没有整数（如 1.2–1.8）
+  const intLo = Math.ceil(minNum)
+  const intHi = Math.floor(maxNum)
+  const invalidIntegerRange =
+    decimals === 0 && !isNaN(minNum) && !isNaN(maxNum) && intLo > intHi
   // 去重时的实际可抽条数（范围内整数不足时自动降）
   const uniqueN = Number.isFinite(minNum) && Number.isFinite(maxNum)
-    ? Math.min(drawCount, Math.floor(maxNum) - Math.ceil(minNum) + 1)
+    ? Math.min(drawCount, Math.max(0, intHi - intLo + 1))
     : drawCount
 
   const toggleUnique = () => {
@@ -58,20 +65,30 @@ export function NumberRandomizer() {
   const handleRoll = () => {
     if (isNaN(minNum) || isNaN(maxNum)) return
     if (minNum > maxNum) return
+    // 整数模式先收拢到合法整数区间：避免小数边界时抽到范围外的数字，
+    // 或「不重复」模式抽 0 个却仍写一条空结果的随机记录。
+    const lo = decimals === 0 ? intLo : minNum
+    const hi = decimals === 0 ? intHi : maxNum
+    if (lo > hi) {
+      setResults([])
+      setRollError(`当前区间 ${minNum}–${maxNum} 内没有整数，请调整最小/最大值或小数位`)
+      return
+    }
+    setRollError('')
     let picks: number[] = []
     if (unique) {
       // 去重抽取：整批不出现相同数字（实际条数不足时按可抽条数取）
-      const lo = Math.ceil(minNum)
-      const hi = Math.floor(maxNum)
       const n = Math.min(drawCount, hi - lo + 1)
       const s = new Set<number>()
       while (s.size < n) s.add(randInt(lo, hi))
       picks = [...s]
     } else {
       for (let i = 0; i < drawCount; i++) {
-        picks.push(randNum(minNum, maxNum, decimals))
+        picks.push(randNum(lo, hi, decimals))
       }
     }
+    // 兜底：没有抽到任何值时不写记录（避免空结果污染随机记录）
+    if (!picks.length) return
     setResults(picks)
     // 写入随机记录
     const resultText = picks.map((n) => formatNumber(n, decimals)).join('、')
@@ -125,12 +142,14 @@ export function NumberRandomizer() {
     setMin(String(lo))
     setMax(String(hi))
     setResults([])
+    setRollError('')
   }
 
   const handleLoadRange = (r: typeof data.ranges[0]) => {
     setMin(String(r.min))
     setMax(String(r.max))
     setResults([])
+    setRollError('')
   }
 
   const handleSave = () => {
@@ -156,6 +175,7 @@ export function NumberRandomizer() {
                 onChange={(e) => {
                   setMin(e.target.value)
                   setResults([])
+                  setRollError('')
                 }}
               />
             </div>
@@ -168,6 +188,7 @@ export function NumberRandomizer() {
                 onChange={(e) => {
                   setMax(e.target.value)
                   setResults([])
+                  setRollError('')
                 }}
               />
             </div>
@@ -200,6 +221,7 @@ export function NumberRandomizer() {
                 onChange={(e) => {
                   setDecimalsInput(e.target.value)
                   setResults([])
+                  setRollError('')
                 }}
                 onBlur={() => {
                   // 失焦时规整：清空或非法回退为 0；超过 10 截到 10
@@ -271,11 +293,23 @@ export function NumberRandomizer() {
           <button
             className="btn primary lg"
             onClick={handleRoll}
-            disabled={isNaN(minNum) || isNaN(maxNum) || minNum > maxNum}
-            title={unique && uniqueN < drawCount ? '范围内整数不够，实际抽取 ' + uniqueN + ' 个' : undefined}
+            disabled={isNaN(minNum) || isNaN(maxNum) || minNum > maxNum || invalidIntegerRange}
+            title={
+              invalidIntegerRange
+                ? '当前区间内没有整数，请调整最小/最大值或小数位'
+                : unique && uniqueN < drawCount
+                  ? '范围内整数不够，实际抽取 ' + uniqueN + ' 个'
+                  : undefined
+            }
           >
             随机 ×{unique ? Math.max(0, uniqueN) : drawCount}
           </button>
+
+          {(rollError || invalidIntegerRange) && (
+            <p className="muted" style={{ color: 'var(--red)', fontSize: 13, margin: 0 }}>
+              {rollError || '当前区间内没有整数，请调整最小/最大值或小数位'}
+            </p>
+          )}
 
           <div className="field">
             <label>名称</label>

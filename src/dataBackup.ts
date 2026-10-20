@@ -141,6 +141,15 @@ export function validateBackup(backup: BackupFile): ValidationResult {
       error: `发现 ${invalid.length} 个非本应用的数据项`,
     }
   }
+  // 值必须是字符串（localStorage 只存字符串）：非字符串说明文件被改坏，
+  // 直接写回会变成 "[object Object]" 之类的脏数据，后续解析失败等同丢数据
+  const invalidValues = entries.filter(([, v]) => typeof v !== 'string')
+  if (invalidValues.length > 0) {
+    return {
+      ok: false,
+      error: `发现 ${invalidValues.length} 项数据不是字符串（文件可能被改坏）`,
+    }
+  }
   return {
     ok: true,
     keyCount: entries.length,
@@ -148,24 +157,43 @@ export function validateBackup(backup: BackupFile): ValidationResult {
   }
 }
 
-// 导入备份：先清除现有“持久”数据键，再写回备份内容
-// 只清持久键（保留当前设备的瞬态运行态），避免误删正在进行的会话/冷却等状态；
-// 写回时再次跳过瞬态键（防御旧版备份里残留的瞬态键）。
-// 注意：会覆盖现有持久数据，调用方应先确认
-export function importBackup(backup: BackupFile): void {
-  // 1. 清除现有持久键（瞬态键原样保留，不破坏当前设备运行态）
+// 导入结果：失败时 UI 必须把 error 显示出来（旧实现静默吞掉写入错误）
+export interface ImportBackupResult {
+  ok: boolean
+  failedKeys: string[]
+  error?: string
+}
+
+// 导入备份：先收集现有“持久”数据键及原值 → 逐条写入并记录失败 →
+// 失败则回滚旧值并返回错误（绝不 reload）。成功才 reload。
+// - 只处理持久键（保留当前设备的瞬态运行态），避免误删正在进行的会话/冷却等状态；
+// - 写回时再次跳过瞬态键（防御旧版备份里残留的瞬态键）。
+// - 注意：会覆盖现有持久数据，调用方应先确认
+export function importBackup(backup: BackupFile): ImportBackupResult {
+  // 1. 先收集现有持久键及其原值（回滚用；瞬态键不参与）
   // 先收集再删除：边遍历边 removeItem 会让索引跳位，留下漏删的陈旧键
-  const staleKeys: string[] = []
+  const oldEntries: Array<[string, string]> = []
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
-      if (key && key.startsWith(KEY_PREFIX) && !TRANSIENT_KEYS.has(key)) {
-        staleKeys.push(key)
-      }
+      if (!key || !key.startsWith(KEY_PREFIX) || TRANSIENT_KEYS.has(key)) continue
+      const val = localStorage.getItem(key)
+      if (val !== null) oldEntries.push([key, val])
     }
   } catch {
     /* ignore */
   }
+  const staleKeys = oldEntries.map(([k]) => k)
+  // 2. 待写入项：只写本应用的持久键（跳过任何瞬态键，防御性）
+  const newEntries = Object.entries(backup.data).filter(
+    ([key]) => key.startsWith(KEY_PREFIX) && !TRANSIENT_KEYS.has(key),
+  )
+  // 备份里只有瞬态键（或没有可写项）时直接失败：否则会「删光现有数据后什么都不写、再 reload」
+  if (newEntries.length === 0) {
+    return { ok: false, failedKeys: [], error: '备份文件中没有可导入的数据' }
+  }
+
+  // 3. 清掉现有持久键后再写回（先释放空间，避免「旧数据占着配额导致新数据写不进」）
   for (const key of staleKeys) {
     try {
       localStorage.removeItem(key)
@@ -173,17 +201,48 @@ export function importBackup(backup: BackupFile): void {
       /* ignore */
     }
   }
-  // 2. 写回备份数据（跳过任何瞬态键，防御性）
-  for (const [key, value] of Object.entries(backup.data)) {
-    if (TRANSIENT_KEYS.has(key)) continue
+  const written: string[] = []
+  const failedKeys: string[] = []
+  for (const [key, value] of newEntries) {
     try {
-      localStorage.setItem(key, value)
+      localStorage.setItem(key, String(value))
+      written.push(key)
     } catch {
-      /* ignore */
+      failedKeys.push(key)
     }
   }
-  // 刷新页面，让所有 useSyncExternalStore 重新读取
+
+  // 4. 任一条写入失败：删掉已写入的新键、恢复旧值，返回错误（不 reload）
+  // 旧实现忽略 setItem 失败直接 reload，会出现「旧数据已删、新数据只写一半、还提示成功」
+  if (failedKeys.length > 0) {
+    for (const key of written) {
+      try {
+        localStorage.removeItem(key)
+      } catch {
+        /* ignore */
+      }
+    }
+    const rollbackFailed: string[] = []
+    for (const [key, value] of oldEntries) {
+      try {
+        localStorage.setItem(key, value)
+      } catch {
+        rollbackFailed.push(key)
+      }
+    }
+    return {
+      ok: false,
+      failedKeys,
+      error:
+        rollbackFailed.length > 0
+          ? `写入本地存储失败（可能空间不足）：${failedKeys.length} 项未写入；回滚也未完全成功（${rollbackFailed.length} 项），请勿关闭应用并重试，或换一个备份文件恢复`
+          : `写入本地存储失败（可能空间不足）：${failedKeys.length} 项未写入，已回滚到导入前的数据`,
+    }
+  }
+
+  // 5. 全部成功：刷新页面，让所有 useSyncExternalStore 重新读取
   window.location.reload()
+  return { ok: true, failedKeys: [] }
 }
 
 // 读取文件内容（Promise 版）

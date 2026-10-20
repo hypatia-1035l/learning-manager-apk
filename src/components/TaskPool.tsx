@@ -6,6 +6,7 @@ import {
   useAppData,
   getCurrentObject,
   setTaskEnabled,
+  setCurrentObject,
   reorderTask,
   moveTaskToEdge,
   pickRandomTask,
@@ -74,9 +75,19 @@ export function TaskPool({
   const showPlan = !!todayPlan && planItems.length > 0
 
   // 计划项开始：交给 App 层打开全屏计时会话（方向被删则忽略）
+  // 计划项可能绑定了具体序列（固定到每日计划的序列）：先把当前序列切到它，
+  // 否则计划行写着「卷三」，会话实际学的是当前序列「卷五」。
   const startPlanItem = (item: PlanItem) => {
     const task = data.tasks.find((t) => t.id === item.taskId)
-    if (task && onStartSession) onStartSession(task)
+    if (!task || !onStartSession) return
+    if (item.sequenceId) {
+      const seq = task.group?.items.find((s) => s.id === item.sequenceId)
+      // 序列已删 / 已完成 / 已停用时不切换，回退到当前序列
+      if (seq && !seq.completed && seq.enabled) {
+        setCurrentObject(task.id, seq.id)
+      }
+    }
+    onStartSession(task)
   }
   // 换一个：同时刻换方向，然后重调度刷新通知内容
   const handleReroll = (item: PlanItem, dayKey: string) => {

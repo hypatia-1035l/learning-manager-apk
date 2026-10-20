@@ -304,6 +304,12 @@ export async function scheduleReminders(): Promise<void> {
   const nativeItems: NotifItem[] = []
   let id = NOTIF_ID_BASE
 
+  // 冷却门禁：会话刚结束 / 用户点过「取消」后，cooldownMinutes 内不该再打扰。
+  // 窗口内到点的项不直接丢弃（那会漏掉一次提醒），而是顺延到冷却结束并写回
+  // deferredAtMs，下次重排也能存活。
+  const cooldownGate = cooldownUntil
+  const deferredByDate = new Map<string, { id: string; at: number }[]>()
+
   const pushItem = (day: PlanDay, item: PlanItem) => {
     if (id >= NOTIF_ID_MAX) return
     if (item.status !== 'pending') return
@@ -313,6 +319,14 @@ export async function scheduleReminders(): Promise<void> {
     if (typeof item.deferredAtMs === 'number' && item.deferredAtMs > fireAt.getTime()) {
       fireAt = new Date(item.deferredAtMs)
       deferred = true
+    }
+    // 冷却门禁：顺延到冷却结束，逐项错开 1 分钟（与冲突延迟补发同一套写法）
+    if (cooldownGate > fireAt.getTime()) {
+      const list = deferredByDate.get(day.date) ?? []
+      fireAt = new Date(cooldownGate + 60 * 1000 + list.length * 60 * 1000)
+      deferred = true
+      list.push({ id: item.id, at: fireAt.getTime() })
+      deferredByDate.set(day.date, list)
     }
     // 已过期（含 30 秒缓冲）不再排：延迟项本应已触发；普通项直接丢弃（旧行为）
     if (fireAt.getTime() <= now.getTime() + 30 * 1000) return
@@ -348,8 +362,18 @@ export async function scheduleReminders(): Promise<void> {
       taskId: item.taskId,
       atMs: fireAt.getTime(),
       channel,
+      // 原生「取消」动作要据此写入冷却，并在到点时自行拦截
+      cooldownMinutes: reminder!.cooldownMinutes,
     })
     id++
+  }
+
+  // 窗口内到点的项应把顺延结果写回计划，否则下次重排又按原时刻算（冷却失效）
+  const flushDeferred = () => {
+    for (const [dateStr, updates] of deferredByDate) {
+      if (updates.length) setPlanItemsDeferred(dateStr, updates)
+    }
+    deferredByDate.clear()
   }
 
   const { tasks } = getAppData()
@@ -361,6 +385,8 @@ export async function scheduleReminders(): Promise<void> {
     }
     // 回归提醒已在上方统一处理
   }
+  // 冷却顺延结果写回计划
+  flushDeferred()
 
   if (notifications.length === 0) {
     // 无计划提醒项时（如提醒关闭但仍有固定任务），仍刷新「下一项」常驻通知
@@ -582,6 +608,8 @@ export async function sendTestReminder(): Promise<void> {
 // ---------- 通知点击 + 动作监听 ----------
 export interface NotificationAction {
   taskId: string | null
+  // 计划项绑定的序列：从通知「开始」进入时应切到该序列（否则会学成当前序列）
+  sequenceId?: string | null
   reroll?: boolean // "换一个"：重新随机抽任务
   cancelled?: boolean // "取消"：进入冷却，不弹窗
 }
@@ -598,21 +626,30 @@ export function onNotificationClick(
     }) => {
       const extra = event?.notification?.extra ?? {}
       const actionId = event?.actionId
+      const sequenceId =
+        typeof extra.sequenceId === 'string' ? extra.sequenceId : null
       // Android 原生通知的"取消"由广播处理，不进 App；
       // 这里仅兜底 Web 端 / 原生未接入场景。
       if (actionId === 'cancel') {
         const { reminder } = getAppData()
         setCooldown(reminder?.cooldownMinutes ?? 30)
-        cb({ taskId: (extra.taskId as string | null) ?? null, cancelled: true })
+        cb({
+          taskId: (extra.taskId as string | null) ?? null,
+          sequenceId,
+          cancelled: true,
+        })
+        // 已排的提醒要按冷却重新顺延（Android 原生端还会在到点时二次拦截）
+        scheduleReminders().catch(() => {})
         return
       }
       if (actionId === 'reroll') {
-        cb({ taskId: (extra.taskId as string | null) ?? null, reroll: true })
+        cb({ taskId: (extra.taskId as string | null) ?? null, sequenceId, reroll: true })
         return
       }
       // start 或点击通知本体
       cb({
         taskId: (extra.taskId as string | null) ?? null,
+        sequenceId,
       })
     }
     // 同时监听点击通知本体和点击动作按钮

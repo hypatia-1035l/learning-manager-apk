@@ -152,26 +152,36 @@ export function BankManager({ selectedIds, onSelectChange, onOpenInTextTools }: 
 
   const handleConfirmImport = () => {
     if (!importPreview || importPreview.type === 'invalid') return
-    if (importPreview.type === 'bank') {
-      const b = importBank(importPreview.data)
-      onSelectChange([...selectedIds, b.id])
-    } else {
-      const res = importAll(importPreview.data)
-      if (res.bankIds.length > 0) {
-        onSelectChange([...new Set([...selectedIds, ...res.bankIds])])
+    // 导入可能因文件内容异常抛错：捕获后给出明确提示，不能「点了没反应」
+    try {
+      if (importPreview.type === 'bank') {
+        const b = importBank(importPreview.data)
+        onSelectChange([...selectedIds, b.id])
+        alert(`导入完成：词库「${b.name}」+${b.words.length} 词条`)
+      } else {
+        const res = importAll(importPreview.data)
+        if (res.bankIds.length > 0) {
+          onSelectChange([...new Set([...selectedIds, ...res.bankIds])])
+        }
+        const parts: string[] = []
+        if (res.addedBanks) parts.push(`词库 +${res.addedBanks}`)
+        if (res.skippedBanks) parts.push(`词库跳过 ${res.skippedBanks}`)
+        if (res.addedPresets) parts.push(`预设 +${res.addedPresets}`)
+        if (res.skippedPresets) parts.push(`预设跳过 ${res.skippedPresets}`)
+        if (res.addedRanges) parts.push(`范围 +${res.addedRanges}`)
+        if (res.skippedRanges) parts.push(`范围跳过 ${res.skippedRanges}`)
+        if (res.addedColorRanges) parts.push(`颜色范围 +${res.addedColorRanges}`)
+        if (res.skippedColorRanges) parts.push(`颜色范围跳过 ${res.skippedColorRanges}`)
+        if (res.invalidItems) parts.push(`非法条目跳过 ${res.invalidItems}`)
+        if (parts.length) alert('导入完成：' + parts.join('，'))
+        else alert('文件中没有可导入的数据（没有新增词库/预设/范围）')
       }
-      const parts: string[] = []
-      if (res.addedBanks) parts.push(`词库 +${res.addedBanks}`)
-      if (res.skippedBanks) parts.push(`词库跳过 ${res.skippedBanks}`)
-      if (res.addedPresets) parts.push(`预设 +${res.addedPresets}`)
-      if (res.skippedPresets) parts.push(`预设跳过 ${res.skippedPresets}`)
-      if (res.addedRanges) parts.push(`范围 +${res.addedRanges}`)
-      if (res.skippedRanges) parts.push(`范围跳过 ${res.skippedRanges}`)
-      if (parts.length) alert('导入完成：' + parts.join('，'))
+      setImportText('')
+      setImportPreview(null)
+      setShowImport(false)
+    } catch (e) {
+      alert('导入失败：' + (e instanceof Error ? e.message : String(e)))
     }
-    setImportText('')
-    setImportPreview(null)
-    setShowImport(false)
   }
 
   // 编辑模式 → 全屏编辑器
@@ -300,6 +310,10 @@ export function BankManager({ selectedIds, onSelectChange, onOpenInTextTools }: 
                   全量备份：{importPreview.data.banks?.length ?? 0} 词库，
                   {importPreview.data.ranges?.length ?? 0} 范围，
                   {importPreview.data.presets?.length ?? 0} 预设
+                  {Array.isArray(importPreview.data.colorRanges) &&
+                  importPreview.data.colorRanges.length
+                    ? `，${importPreview.data.colorRanges.length} 颜色范围`
+                    : ''}
                 </span>
               )}
             </div>

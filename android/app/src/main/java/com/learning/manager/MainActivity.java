@@ -87,14 +87,18 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
-     * 从通知 Intent 中读取 notif_action / taskId，转发给 StudyNotificationPlugin 暂存。
-     * JS 启动/切前台时通过 consumePendingNotifAction 读取并处理。
+     * 从通知 Intent 中读取 notif_action / taskId，转发给 StudyNotificationPlugin。
+     * Bridge 存活（App 已在前台）时直接派发 JS 事件，避免「点了没反应、要等切前后台」；
+     * 派发不成功（冷启动、JS 还没挂载）才写 pending，由 JS 启动后消费。
      */
     private void captureNotifAction(Intent intent) {
         if (intent == null) return;
         String action = intent.getStringExtra("notif_action");
         if (action == null || action.isEmpty()) return;
         String taskId = intent.getStringExtra("taskId");
-        StudyNotificationPlugin.setPendingNotifAction(action, taskId);
+        boolean delivered = StudyNotificationPlugin.notifyActionIfReady(action, taskId);
+        if (!delivered) {
+            StudyNotificationPlugin.setPendingNotifAction(action, taskId);
+        }
     }
 }

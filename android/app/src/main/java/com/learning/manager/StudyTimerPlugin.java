@@ -119,6 +119,9 @@ public class StudyTimerPlugin extends Plugin {
             ctx.stopService(new Intent(ctx, StudyTimerService.class));
         } catch (Exception ignored) {
         }
+        // 兜底：Service 已经不在进程内时 stopService 不会触发 onDestroy，
+        // 残留的 isRunning 会让下次启动误判「还在计时」，这里直接清持久化状态。
+        StudyTimerService.clearPersistedState(ctx);
         call.resolve();
     }
 
@@ -134,6 +137,8 @@ public class StudyTimerPlugin extends Plugin {
                 r.put("taskName", j.optString("taskName"));
                 r.put("objectName", j.optString("objectName"));
                 r.put("elapsedSeconds", j.optLong("elapsedSeconds"));
+                // 写入时刻：JS 侧据此丢弃过期动作（旧 APK 无此字段，JS 按未知处理）
+                r.put("savedAt", j.optLong("savedAt"));
             } catch (Exception ignored) {
             }
             // 读取后立即清除
@@ -142,14 +147,39 @@ public class StudyTimerPlugin extends Plugin {
         call.resolve(r);
     }
 
+    // 只读不清：启动时判断是否要直接恢复到「结束/完成」界面
+    @PluginMethod
+    public void peekPendingAction(PluginCall call) {
+        Context ctx = getContext();
+        String raw = StudyTimerReceiver.readPendingAction(ctx);
+        JSObject r = new JSObject();
+        if (raw != null) {
+            try {
+                JSONObject j = new JSONObject(raw);
+                r.put("action", j.optString("action"));
+                r.put("taskName", j.optString("taskName"));
+                r.put("objectName", j.optString("objectName"));
+                r.put("elapsedSeconds", j.optLong("elapsedSeconds"));
+                r.put("savedAt", j.optLong("savedAt"));
+            } catch (Exception ignored) {
+            }
+        }
+        call.resolve(r);
+    }
+
     @PluginMethod
     public void getStatus(PluginCall call) {
         Context ctx = getContext();
         JSObject r = new JSObject();
-        r.put("isRunning", StudyTimerService.isRunningFromPrefs(ctx));
+        // 只有「Service 真的活在当前进程」才算运行中：仅看 prefs 会把被系统杀死后
+        // 残留的 isRunning 当成仍在计时，并把 App 关闭期间的时间算进学习时长。
+        boolean running = StudyTimerService.isAlive() && StudyTimerService.isRunningFromPrefs(ctx);
+        r.put("isRunning", running);
         r.put("taskName", StudyTimerService.getTaskNameFromPrefs(ctx));
         r.put("objectName", StudyTimerService.getObjectNameFromPrefs(ctx));
-        r.put("elapsedSeconds", StudyTimerService.getElapsedSecondsFromPrefs(ctx));
+        r.put("elapsedSeconds", running
+                ? StudyTimerService.getElapsedSecondsFromPrefs(ctx)
+                : StudyTimerService.getFrozenElapsedSecondsFromPrefs(ctx));
         call.resolve(r);
     }
 

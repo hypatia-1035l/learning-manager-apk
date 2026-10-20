@@ -10,6 +10,8 @@ export interface StudyTimerPendingAction {
   taskName: string
   objectName: string
   elapsedSeconds: number
+  // 写入时刻（ms）：用于丢弃过期动作。旧版本原生端不返回，视为未知（不过期）
+  savedAt?: number
 }
 
 // Service 当前运行状态
@@ -49,6 +51,8 @@ export interface StudyTimerPlugin {
   }): Promise<void>
   stop(): Promise<void>
   consumePendingAction(): Promise<StudyTimerPendingAction | null>
+  // 只读取不清除：启动时判断能否直接恢复到结束页（真正消费仍在 LearningSession）
+  peekPendingAction(): Promise<StudyTimerPendingAction | null>
   getStatus(): Promise<StudyTimerStatus>
   addListener(
     eventName: 'studyTimerAction',
@@ -110,6 +114,17 @@ export async function stopStudyTimer(): Promise<void> {
 export async function consumePendingAction(): Promise<StudyTimerPendingAction | null> {
   try {
     const r = await StudyTimer.consumePendingAction()
+    if (r && r.action) return r
+    return null
+  } catch {
+    return null
+  }
+}
+
+// 读取 Native 侧暂存的 pending action（不清除）；仅用于启动时决定是否直接进会话
+export async function peekPendingAction(): Promise<StudyTimerPendingAction | null> {
+  try {
+    const r = await StudyTimer.peekPendingAction()
     if (r && r.action) return r
     return null
   } catch {

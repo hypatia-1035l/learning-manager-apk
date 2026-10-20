@@ -60,8 +60,16 @@ public class StudyTimerReceiver extends BroadcastReceiver {
         // 2. 写 pending action（end 优先级高于 complete，已有 end 未消费时不覆盖）
         savePendingAction(context, timerAction, taskName, objectName, elapsedSeconds);
 
-        // 3. end 动作拉起 Activity（需要用户看到填写进度 UI）
+        // 3. end 动作：先停掉前台计时服务，再拉起 Activity。
+        //    停止服务不能依赖用户进到结束页：Android 12+ 对「通知 trampoline」启动
+        //    Activity 有限制，后台时 startActivity 可能被系统静默拦截，
+        //    若此时不停服务，用户点了「结束学习」通知还在继续走秒。
         if ("end".equals(timerAction)) {
+            try {
+                StudyTimerService.explicitlyStopped = true;
+                context.stopService(new Intent(context, StudyTimerService.class));
+            } catch (Exception ignored) {
+            }
             launchMainActivity(context, "end");
         }
         // complete 不拉起 Activity：依赖 JS 回前台后 consumePendingAction

@@ -257,10 +257,16 @@ export function createTask(input: {
     updatedAt: now,
     weekdays: input.weekdays ?? [],
   }
-  setState((prev) => ({
-    ...prev,
-    tasks: input.insertAt === 'bottom' ? [...prev.tasks, task] : [task, ...prev.tasks],
-  }))
+  setState((prev) => {
+    const arr =
+      input.insertAt === 'bottom' ? [...prev.tasks, task] : [task, ...prev.tasks]
+    // 顺序即权重（reorderTask / moveTaskToEdge 同口径）：插入后必须重排 weight，
+    // 否则「新建到顶部」的任务仍是 weight=1，会被加权随机当成最低优先级。
+    return {
+      ...prev,
+      tasks: arr.map((t, idx) => ({ ...t, weight: arr.length - idx })),
+    }
+  })
   return task
 }
 
@@ -334,6 +340,9 @@ export function deleteTask(id: string) {
     ...prev,
     tasks: prev.tasks.filter((t) => t.id !== id),
     records: prev.records.filter((r) => r.taskId !== id),
+    // 同步清理固定引用：残留的 pinnedTasks 会让 App 误判「还有固定任务」，
+    // 从而在提醒关闭时继续生成计划/调度「下一项」通知。
+    pinnedTasks: (prev.pinnedTasks ?? []).filter((p) => p.taskId !== id),
   }))
 }
 
@@ -497,7 +506,12 @@ export function addLearningObject(
         ...t,
         group: { ...group, items },
         currentObjectId,
-        status: t.status === 'not_started' ? 'in_progress' : t.status,
+        // 已完成的方向新增序列后必须回到进行中：getRandomPool 会排除 status=completed
+        // 的方向，不恢复的话新序列永远不会进入每日计划/随机开始。
+        status:
+          t.status === 'completed' || t.status === 'not_started'
+            ? 'in_progress'
+            : t.status,
         updatedAt: Date.now(),
       }
     }),
@@ -635,7 +649,9 @@ export function pickNextObject(
   if (currentId) {
     const curIdx = items.findIndex((i) => i.id === currentId)
     for (let k = curIdx + 1; k < items.length; k++) {
-      if (!items[k].completed) return items[k].id
+      // 与上方 remaining 过滤保持一致：停用（暂停）的序列不参与接续，
+      // 否则完成当前项会跳到用户明确关闭的序列上。
+      if (!items[k].completed && items[k].enabled) return items[k].id
     }
   }
   // 回退：首个未完成项
@@ -676,7 +692,8 @@ function isProgressReached(current: string, target: string): boolean {
   if (!target.trim()) return false
   const cur = parseProgressNumber(current)
   const tgt = parseProgressNumber(target)
-  if (isNaN(cur) || isNaN(tgt)) return false
+  // tgt > 0：目标写成 "0" 时 0 >= 0 恒成立，会导致首次保存即自动完成。
+  if (isNaN(cur) || isNaN(tgt) || tgt <= 0) return false
   return cur >= tgt
 }
 
@@ -843,7 +860,7 @@ export function updateStudyRecordNote(recordId: string, note: string | undefined
   })
 }
 
-// 删除单条学习记录（并重算关联方向的累计时长，保持 totalStudyTime 一致）
+// 删除单条学习记录（按该条 duration 扣减关联方向的累计时长）
 export function deleteStudyRecord(recordId: string) {
   setState((prev) => {
     const target = prev.records.find((r) => r.id === recordId)
@@ -853,9 +870,12 @@ export function deleteStudyRecord(recordId: string) {
       t.id === target.taskId
         ? {
             ...t,
-            totalStudyTime: records
-              .filter((r) => r.taskId === t.id)
-              .reduce((s, r) => s + (r.duration || 0), 0),
+            // 只扣减这一条的时长，不从 records 反推：records 有 2000 条滚动上限，
+            // 求和会丢掉更早的历史（表现为删一条记录累计时长暴跌）。
+            totalStudyTime: Math.max(
+              0,
+              (t.totalStudyTime || 0) - (target.duration || 0),
+            ),
           }
         : t,
     )
@@ -1234,7 +1254,16 @@ export function ensurePlans(
   for (let d = 0; d <= lookahead; d++) {
     const dayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d)
     const dayStr = dateKey(dayDate)
-    if (next.some((p) => p.date === dayStr)) continue
+    const existingIdx = next.findIndex((p) => p.date === dayStr)
+    const existing = existingIdx >= 0 ? next[existingIdx] : undefined
+    // 已存在的日期默认不重排；例外：当天只有用户手动项。手动项会把这一天留在 plans 里
+    // （例如提醒关着时先手动建了一条），但自动项/固定项其实从未生成过，需要补上。
+    const onlyManual =
+      !!existing &&
+      existing.items.length > 0 &&
+      existing.items.every((it) => it.manual === true)
+    if (existing && !onlyManual) continue
+    let generated: PlanDay | null = null
     if (d === 0) {
       // 今日补齐：从 max(now+5, 学习后跳过结束点) 起排剩余项
       let fromMinute = now.getHours() * 60 + now.getMinutes() + 5
@@ -1246,19 +1275,24 @@ export function ensurePlans(
           if (skipUntilMin > fromMinute) fromMinute = skipUntilMin
         }
       }
-      const day = generatePlanDay(tasks, reminder, dayDate, { fromMinute })
-      if (day && day.items.length > 0) {
-        next.push(day)
-        changed = true
-      }
+      generated = generatePlanDay(tasks, reminder, dayDate, { fromMinute })
     } else {
       // 未来天：整窗排程（不受 fromMinute 约束）
-      const day = generatePlanDay(tasks, reminder, dayDate)
-      if (day && day.items.length > 0) {
-        next.push(day)
-        changed = true
-      }
+      generated = generatePlanDay(tasks, reminder, dayDate)
     }
+    // 生成结果为空时不落空日（保持原行为：没有可排项就留空）
+    if (!generated || generated.items.length === 0) continue
+    if (existing && existingIdx >= 0) {
+      const have = new Set(existing.items.map((it) => it.id))
+      next[existingIdx] = {
+        ...existing,
+        items: [...existing.items, ...generated.items.filter((it) => !have.has(it.id))],
+        generatedAt: generated.generatedAt,
+      }
+    } else {
+      next.push(generated)
+    }
+    changed = true
   }
 
   // 手动计划顺延：过去日期仍待办的手动项并入今天
@@ -1424,8 +1458,11 @@ function injectPinnedIntoExistingPlans(pinnedList?: PinnedTask[]): void {
   const plans = state.plans ?? []
   let changed = false
   const next = plans.map((d) => {
+    // 用「本地年月日」构造日期再算天数差：new Date('YYYY-MM-DD') 会按 UTC 解析，
+    // 在 UTC+12:30 以东时区会被四舍五入成 1，把今天误判成未来日（注入时刻错位）。
+    const [dy, dm, dd] = d.date.split('-').map(Number)
     const dIdx = Math.round(
-      (new Date(d.date).getTime() -
+      (new Date(dy, dm - 1, dd).getTime() -
         new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
         86400000,
     )
@@ -1592,16 +1629,32 @@ export function regeneratePlanDayInStore(dateStr: string): void {
   const d = new Date(`${dateStr}T00:00:00`)
   const keep = day.items.filter((it) => it.status === 'pending')
   if (!keep.length) return
+  // 手动项（manual）的内容是用户自己填的，generatePlanDay 无法重建；重排时若把它
+  // 当作「待办项」整体替换掉，等于静默删除用户数据。这里把它原样保留。
+  const manualPending = keep.filter((it) => it.manual)
   const now = new Date()
   const fromMinute =
     dateStr === dateKey(now) ? now.getHours() * 60 + now.getMinutes() + 5 : 0
   const fresh = generatePlanDay(state.tasks, reminder, d, { fromMinute })
   if (!fresh || !fresh.items.length) return
   const done = day.items.filter((it) => it.status !== 'pending')
+  // 防御性去重：保留项与新生项理论上 id 不同；同一方向同一时刻已有手动项时
+  // 也不再补自动项（用户已显式指定那一刻）。
+  const haveIds = new Set([...done, ...manualPending].map((it) => it.id))
+  const manualKeys = new Set(manualPending.map((it) => `${it.taskId}|${it.minuteOfDay}`))
+  const freshItems = fresh.items.filter(
+    (it) => !haveIds.has(it.id) && !manualKeys.has(`${it.taskId}|${it.minuteOfDay}`),
+  )
   setState((prev) => ({
     ...prev,
     plans: (prev.plans ?? []).map((p) =>
-      p.date === dateStr ? { ...p, items: [...done, ...fresh.items], generatedAt: Date.now() } : p,
+      p.date === dateStr
+        ? {
+            ...p,
+            items: [...done, ...manualPending, ...freshItems],
+            generatedAt: Date.now(),
+          }
+        : p,
     ),
   }))
 }

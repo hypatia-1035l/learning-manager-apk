@@ -7,8 +7,8 @@ import { Settings } from './components/Settings'
 import { DataBackup } from './components/DataBackup'
 import { LearningSession } from './components/LearningSession'
 import { StatsView } from './components/StatsView'
-import { useAppData, pickRandomTask, carryOverManualPlanItems, dateKey, ensurePlansInStore } from './store'
-import { setCanExitAppNative } from './backNavigation'
+import { useAppData, pickRandomTask, carryOverManualPlanItems, dateKey, ensurePlansInStore, setCurrentObject } from './store'
+import { setAppLevelCanExit, runTopBackBlocker } from './backNavigation'
 import {
   scheduleReminders,
   onNotificationClick,
@@ -20,8 +20,9 @@ import {
 } from './reminderService'
 import {
   getStudyTimerStatus,
+  peekPendingAction,
 } from './studyTimer'
-import { consumePendingNotifAction } from './studyNotifications'
+import { consumePendingNotifAction, onNotifAction } from './studyNotifications'
 import type { Task } from './types'
 
 // 四个平级工作区（主导航）
@@ -143,19 +144,24 @@ export default function App() {
     studyTimerCheckedRef.current = true
     ;(async () => {
       const status = await getStudyTimerStatus()
-      if (!status?.isRunning) {
+      // 只读 pending（不清除）：真正消费在 LearningSession，避免这里清掉后会话拿不到动作
+      const pending = await peekPendingAction()
+      const running = !!status?.isRunning
+      if (!running && !pending) {
         // Service 未在跑但 sessionActive 标志残留（App 被杀后重启）：清理脏状态
         if (isSessionActive()) {
           await setSessionActive(false)
         }
         return
       }
-      const taskName = status.taskName
+      const taskName = (running ? status?.taskName : '') || pending?.taskName || ''
       if (!taskName) return
       const matchedTask = data.tasks.find((t) => t.name === taskName)
       if (!matchedTask) return
-      // 跳转到任务详情页；LearningSession 会从 Service 状态恢复计时 + 消费 pending action
-      setView({ name: 'task', taskId: matchedTask.id })
+      // 有 pending 动作（通知栏点了「完成/结束」）：直接进全屏会话，
+      // 由 LearningSession 的 bootstrap 消费并展示结束/确认页——否则用户点了结束
+      // 却停在详情页，看不到任何结束 UI，计时通知还在跑。
+      setView({ name: 'task', taskId: matchedTask.id, autoStartSession: !!pending })
     })().catch(() => {
       /* ignore */
     })
@@ -195,6 +201,7 @@ export default function App() {
   // 统一处理通知动作（开始/换一个/取消），供 JS 监听与原生 pending 两条路径复用
   const handleNotifAction = (action: {
     taskId: string | null
+    sequenceId?: string | null
     reroll?: boolean
     cancelled?: boolean
   }) => {
@@ -204,6 +211,8 @@ export default function App() {
       setView(null)
       return
     }
+    // 会话进行中：不静默替换当前会话（否则旧会话的时长/进度会记到新任务上）
+    if (sessionTaskId) return
     // 开始 / 换一个 / 点击通知本体
     // 仅提醒（或手动）项：不进计时/不换内容，只回到计划页处理
     const todayStr = dateKey(new Date())
@@ -226,14 +235,24 @@ export default function App() {
       setView(null)
       return
     }
-    let target = action.taskId
-      ? data.tasks.find((t) => t.id === action.taskId)
-      : null
-    // reroll 或通知本体无 taskId 时，随机抽一个
-    if (!target) {
-      target = pickRandomTask(data.tasks)
+    // 「换一个」要真的换：排除通知原本指向的方向再抽，否则与「开始」等价
+    let target: Task | null
+    if (action.reroll) {
+      const pool = action.taskId
+        ? data.tasks.filter((t) => t.id !== action.taskId)
+        : data.tasks
+      target = pickRandomTask(pool.length ? pool : data.tasks)
+    } else {
+      target = action.taskId ? data.tasks.find((t) => t.id === action.taskId) ?? null : null
     }
+    if (!target) target = pickRandomTask(data.tasks)
     if (target) {
+      // 计划项/通知绑定的序列优先：切换当前序列后再进会话
+      const seqId = action.sequenceId ?? planItem?.sequenceId
+      if (seqId && target.id === (action.taskId ?? planItem?.taskId)) {
+        const seq = target.group?.items.find((s) => s.id === seqId)
+        if (seq && !seq.completed && seq.enabled) setCurrentObject(target.id, seq.id)
+      }
       setSessionTaskId(target.id)
     } else {
       setTab('todos')
@@ -246,14 +265,27 @@ export default function App() {
     const off = onNotificationClick(handleNotifAction)
     return off
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.tasks])
+  }, [data.tasks, sessionTaskId])
+
+  // App 已在前台时点通知动作：原生端直接派发事件（无需等前后台切换）。
+  // 原生派发成功时不会再写 pending，因此不会与下面的 drain 重复处理。
+  useEffect(() => {
+    const off = onNotifAction((a) => {
+      handleNotifAction({
+        taskId: a.taskId,
+        reroll: a.action === 'reroll',
+      })
+    })
+    return off
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.tasks, sessionTaskId])
 
   // 同步「是否允许退桌面」标志位给原生层：
   //   - 子页面或有计时会话 → false，原生层不得 moveTaskToBack
   //   - 顶层 Tab            → true，原生层可把 App 退到桌面
+  // 弹窗/设置子页通过 pushBackBlocker 叠加拦截（App 层看不到它们的局部状态）
   useEffect(() => {
-    const canExitApp = !view && !sessionTaskId
-    setCanExitAppNative(canExitApp).catch(() => { /* ignore */ })
+    setAppLevelCanExit(!view && !sessionTaskId)
   }, [view, sessionTaskId])
 
   // 监听系统返回键/边缘滑动返回（Android 手势导航）：
@@ -264,6 +296,8 @@ export default function App() {
     ;(async () => {
       try {
         const l = await CapApp.addListener('backButton', ({ canGoBack }) => {
+          // 弹窗/局部子页优先：先关掉它，不直接退桌面
+          if (runTopBackBlocker()) return
           // 子页面回到对应 tab 顶层
           if (view) {
             if (view.name === 'task') setTab('todos')
@@ -380,7 +414,12 @@ export default function App() {
       </nav>
 
       {sessionTask && (
-        <LearningSession task={sessionTask} onClose={() => setSessionTaskId(null)} />
+        // key：换方向时强制重建会话，避免复用旧计时状态把旧会话时长记到新任务
+        <LearningSession
+          key={sessionTask.id}
+          task={sessionTask}
+          onClose={() => setSessionTaskId(null)}
+        />
       )}
     </div>
   )
