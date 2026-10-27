@@ -16,8 +16,8 @@
 1. **中文路径**：改为镜像构建 —— `scripts/build-apk.sh` 用 robocopy 把源码镜像到纯 ASCII 目录再 build（无需 `overridePathCheck`，但保留无害）。
 2. **JDK 版本**：Capacitor 8.4 的安卓库要求 **target 21**，必须用 **JDK 21** 编译。
    - 已用 winget 安装 Temurin JDK 21：`C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot`
-   - 构建以 **JDK 17 启动**（其 cacerts 已导入 Windows CA，SSL 正常），Gradle 自动探测到 JDK 21 仅用于 Capacitor 库编译（该步无网络）。
-   - 保持 JDK 17 为活动 JDK即可，无需把 JAVA_HOME 切到 21（切到 21 会改用 JDK21 的 cacerts，届时需另行导入 Windows CA）。
+   - **必须用 JDK 21 启动 Gradle**：Capacitor 只写了 `sourceCompatibility JavaVersion.VERSION_21`、**没有声明 toolchain**，Gradle 就直接用「启动它的那个 JVM」编译；用 JDK 17 会报 `无效的源发行版：21`（`:capacitor-android:compileReleaseJavaWithJavac FAILED`）。
+   - JDK 17 只作备用：万一 JDK 21 拉依赖时报 SSL（JDK 21 的 cacerts 未导入 Windows CA），可临时用 17 预热 Gradle 缓存，或往 JDK 21 的 cacerts 导入 CA。依赖已在 `~/.gradle` 缓存时，21 出包全程不需要联网。
 
 ## 已验证产出
 
@@ -33,7 +33,8 @@ bash scripts/build-apk.sh
 ```
 
 脚本会依次：校验构建目录为纯 ASCII → robocopy 镜像源码（排除 `.git` / `node_modules` / `dist` / 各 build 产物）
-→ 首次 `npm ci`（之后复用）→ 补齐 `android/local.properties` → `JAVA_HOME` 指向 JDK 17 →
+→ 首次从源码仓镜像 `node_modules`（离线；源码仓也没有才退回 `npm ci`）、清空 cap 生成的
+`android/capacitor-cordova-android-plugins` → 补齐 `android/local.properties` → `JAVA_HOME` 指向 JDK 21 →
 `npm run build:android` → `gradlew assembleRelease` → 把 APK 与 `buildInfo.ts` 回填源码仓。
 
 - 可选环境变量：`BUILD_DIR`（默认 `H:/dev/learning-manager-build`）、`JDK17`、`SKIP_SYNC=1`（只重跑构建不动镜像）。
@@ -44,8 +45,8 @@ bash scripts/build-apk.sh
 
 ## 环境现状（确认清单）
 
-- JDK 17（活动，cacerts 已修）→ `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.8-hotspot`
-- JDK 21（已装，供 Capacitor 编译）→ `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot`
+- JDK 17（备用；cacerts 已导入 Windows CA）→ `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.8-hotspot`
+- JDK 21（**构建用**，脚本自动指向）→ `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot`
 - Android SDK → `C:\Users\Hypatia\AppData\Local\Android\Sdk`（android-36 / build-tools 36.0.0 / platform-tools）
 - `android/local.properties` 的 `sdk.dir` 已指向上述 Studio SDK 路径（该文件不入库，镜像时从源码仓带过去，缺失则由脚本生成）
 
