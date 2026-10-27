@@ -175,14 +175,15 @@ export function onStudyTimerAction(
 }
 
 // ---------- 判定日志（B2） ----------
-// 原生只在这两个时机写一条，避免 3 秒一条把日志变成噪声：
+// 原生只在这三个时机写一条，避免 3 秒一条把日志变成噪声：
 //   away    = 刚发现前台不在放行集合（本轮越界的起点）
 //   trigger = 超过宽限、且真的发出了提醒
+//   pull    = 超过宽限、且真的把 App 拉回了前台（pull 档 + 有悬浮窗权限）
 // 用途：误报率要有数据可看，不靠感觉。
 export interface GuardLogEntry {
   ts: number
   pkg: string
-  verdict: 'away' | 'trigger'
+  verdict: 'away' | 'trigger' | 'pull'
   awayMs: number
 }
 
@@ -202,7 +203,8 @@ export async function readGuardLog(): Promise<GuardLogEntry[]> {
       out.push({
         ts: o.ts,
         pkg: o.pkg,
-        verdict: o.verdict === 'trigger' ? 'trigger' : 'away',
+        verdict:
+          o.verdict === 'trigger' ? 'trigger' : o.verdict === 'pull' ? 'pull' : 'away',
         awayMs: typeof o.awayMs === 'number' ? o.awayMs : 0,
       })
     }

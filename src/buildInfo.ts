@@ -1,3 +1,3 @@
 // 由 scripts/writeBuildInfo.js 预构建自动生成；请勿手工修改
-export const BUILD_VERSION = '0.6.0'
-export const BUILD_TIME = '2026-10-28 07:42'
+export const BUILD_VERSION = '0.7.0'
+export const BUILD_TIME = '2026-10-28 07:56'

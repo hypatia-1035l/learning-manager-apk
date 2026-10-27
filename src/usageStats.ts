@@ -1,13 +1,13 @@
 import { registerPlugin } from '@capacitor/core'
 
 // 应用使用统计插件 wrapper（接原生 UsageStatsPlugin）
-// 用途：
-//   - 越界提醒（P3）权限引导：检测「使用情况访问」权限、跳设置页
-//   - 统计页（后续）：今日各应用前台时长
-//   - getForegroundApp：取当前最近前台应用（设置页演示 / 调试用）
 //
-// 注意：UsageStats 的「实时性」有限（聚合/事件查询有秒~分钟级延迟），
-// 真正的学习期间越界检测在原生 StudyTimerService 内完成，本 wrapper 不负责轮询。
+// ⚠️ 边界（2026-10-28 B3 起）：**权限判定不要用这里的 getUsageStatsPermissionStatus**，
+// 统一走 src/nativePerm.ts 的 checkNativePerms()（AppOps 判定更准，且和悬浮窗放在同一处体检）。
+// 本文件保留给后续「统计页」用 —— queryTodayUsageStats（今日各应用前台时长）是它唯一还没被取代的价值。
+//
+// 越界检测本身不在这里：真正的轮询在原生 StudyTimerService 内完成（见 checkForeground），
+// 这里只做只读查询，不负责轮询。
 
 export interface UsageStatsTodayItem {
   packageName: string

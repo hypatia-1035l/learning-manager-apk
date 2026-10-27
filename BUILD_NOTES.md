@@ -116,3 +116,27 @@ bash scripts/build-apk.sh
   误报时把这块贴出来，比「好像老响」有用。
 
 未做：悬浮窗 + 真拉回（B3）、界面 §2 十项与安全区滚动改造（B4）。
+
+## 0.7.0（2026-10-28）B3：悬浮窗 + 真拉回 + 权限体检
+
+- Manifest 新增 `SYSTEM_ALERT_WINDOW`：Android 10+ 只有持该权限的应用才有资格从后台
+  `startActivity`，「拉回」全靠它。覆盖安装后请在体检区确认三项状态（授权本身会保留，但值得复一眼）。
+- **新原生插件 `NativePermPlugin`（名 `NativePerm`）**，在 `MainActivity.onCreate` 注册：
+  `check` / `openUsageAccess` / `openOverlay` / `openAppDetails` / `openAutoStart`。
+  另提供两个静态方法给 Service 复用：
+  - `hasUsageAccess()`：走 `AppOpsManager` 查 `OPSTR_GET_USAGE_STATS` 是否为 `MODE_ALLOWED`，
+    比“猜 Settings 值”准；
+  - `canDrawOverlays()`：`Settings.canDrawOverlays`。
+- **真拉回**：`pull` 档 + 有悬浮窗权限 → `bringToFront()`
+  （`NEW_TASK | SINGLE_TOP | REORDER_TO_FRONT`），**节流 10 秒**——不节流会每 3 秒抢一次屏，
+  人在别的应用里连一个字都打不完。`startActivity` 抛异常（ROM 拦后台启动）时落到通知，不静默。
+  拉回后下一轮看到前台是自己 → `firstOffListAt` 归零，不会自己拽自己。
+- **权限体检**（越界管控弹层内）：使用情况访问 / 悬浮窗 / 厂商自启动三行，逐项状态 + 一键跳转。
+  厂商自启动页是私有 Activity，依次试 MIUI / ColorOS / vivo / 华为 / 荣耀六个已知入口，
+  **全打不开就退到应用详情页，不谎报「已开启」**（状态根本读不到）。切回前台自动重新检测。
+- UI：强度里的「离开就拉回」**有权限才可点**，没权限时灰着并指向体检区——不给按了没反应的开关。
+- 判定日志新增第三种判定 `pull`（已拉回），与 `away` / `trigger` 并列显示。
+- `src/usageStats.ts` 顶部标注：权限判定统一走 `nativePerm.ts`，本文件保留给后续「统计页」
+  （`queryTodayUsageStats` 是它唯一还没被取代的价值），避免同一件事两处实现各说各话。
+
+未做：界面 §2 十项与安全区滚动改造（B4）。

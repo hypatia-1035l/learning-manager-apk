@@ -47,6 +47,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(StudyNotificationPlugin.class);
         registerPlugin(BackNavigationPlugin.class);
         registerPlugin(AppListPlugin.class);
+        registerPlugin(NativePermPlugin.class);
         super.onCreate(savedInstanceState);
 
         // 捕获通知动作（开始/换一个）：冷启动时从启动 Intent 读取

@@ -110,6 +110,7 @@ public class StudyTimerService extends Service {
     private String selfPackage = "";
     private long firstOffListAt = 0;        // 本次越界开始的时刻
     private long lastGuardWarnAt = 0;       // 上次越界提醒时刻（节流）
+    private long lastGuardPullAt = 0;       // 上次「拉回」时刻（节流，避免每 3 秒抢一次屏）
     private Handler guardHandler;
     private Runnable guardRunnable;
 
@@ -602,13 +603,44 @@ public class StudyTimerService extends Service {
         }
         long awayMs = now - firstOffListAt;
         if (awayMs < guardGraceMs) return;
-        // 超宽限才算越界。warn 档发通知；pull 档在 B1/B2 阶段同样只发通知
-        // （拉回要 SYSTEM_ALERT_WINDOW，B3 才落地，这里不做半截动作）
-        boolean warned = warnGuard("越界提醒", "你已离开「" + (taskName.isEmpty() ? "学习" : taskName)
-                + "」超过 " + (guardGraceMs / 1000) + " 秒，回来继续吧");
+        String body = "你已离开「" + (taskName.isEmpty() ? "学习" : taskName)
+                + "」超过 " + (guardGraceMs / 1000) + " 秒，回来继续吧";
+        // pull 档且拿到悬浮窗权限：真的把 App 拽回前台。
+        // 节流 10 秒——不节流的话每 3 秒抢一次屏，人在别的应用里连一个字都打不完。
+        if ("pull".equals(guardLevel)
+                && NativePermPlugin.canDrawOverlays(this)
+                && now - lastGuardPullAt >= GUARD_PULL_COOLDOWN_MS) {
+            lastGuardPullAt = now;
+            if (bringToFront()) {
+                appendGuardLog(fg, "pull", awayMs);
+                return;
+            }
+            // 拉不回来（ROM 拦了后台启动）→ 落到通知，不能让人毫无提示
+        }
         // 只有真的发出提醒才记 trigger：日志要和用户实际被响到的次数一致，
         // 否则拿它算误报率会偏高（节流期内的重复判定不算误报）
-        if (warned) appendGuardLog(fg, "trigger", awayMs);
+        if (warnGuard("越界提醒", body)) appendGuardLog(fg, "trigger", awayMs);
+    }
+
+    /** 拉回节流：两次拉回之间至少隔这么久 */
+    private static final long GUARD_PULL_COOLDOWN_MS = 10_000L;
+
+    /**
+     * 把本 App 拉回前台。返回是否成功发起。
+     * 只有持有 SYSTEM_ALERT_WINDOW 时才允许从后台 startActivity（Android 10+ 的硬限制），
+     * 调用方必须先判 canDrawOverlays。
+     */
+    private boolean bringToFront() {
+        try {
+            Intent i = new Intent(this, MainActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+            startActivity(i);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     // 节流后发送越界通知；返回是否真的发出（用于判定日志只记实际提醒）

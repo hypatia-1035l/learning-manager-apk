@@ -94,9 +94,13 @@
     <!-- 应用名单：列出设备上已安装的应用（侧载自用；上架应用商店会被审核拒） -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
-    <!-- 应用名单：读取使用时长（P3 越界提醒用，非运行时弹窗，需手动去「使用情况访问」开启） -->
+    <!-- 应用名单：读取使用时长（越界管控的判定数据源，非运行时弹窗，需手动去「使用情况访问」开启） -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+
+    <!-- 越界管控「离开就拉回」：Android 10+ 只有持悬浮窗权限的应用才有资格从后台 startActivity，
+         没有它就只能降级成通知。同样是手动授权，不是运行时弹窗。 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- 本地通知：定时提醒（Android 13+ 需运行时申请） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
