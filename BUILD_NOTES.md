@@ -72,3 +72,29 @@ bash scripts/build-apk.sh
 - `western.ts` 导出 `latinShapeOk`，供 magic / mythos 的音译支复用。
 - 容量（esbuild 实测）：咒语 946 / 场所 572 / 法器 375 / 魔药 1197 / 地牢 251 / 典籍 196 /
   称号 420 / 酒馆 179 / 街区 138 / 菜单 133 / 舰船 54 / 神祇 1121 / 龙 1995 / 怪物 169。
+
+## 0.5.0（2026-10-28）B1：越界管控三档 + 应用白名单收敛
+
+数据结构 **schema 1 → 2**（`migrate.ts` 有完整迁移，旧数据自动升级）：
+
+- `ReminderConfig.guardEnabled: boolean` → `guardLevel: 'off' | 'warn' | 'pull'`（旧 true 迁成 `'warn'`，不擅自升级成会拉回的 `'pull'`）。
+- `ReminderConfig.guardGraceMinutes` → `guardGraceSeconds`（旧值 ×60，上限 600）。
+- 新增 `AppData.globalAllowedApps`：全局白名单，所有方向共用；`Task.allowedApps` 语义改为**增量**。
+  最终放行 = 自动放行 ∪ 全局白名单 ∪ 方向额外放行，**只做加法不做减法**（`store.resolveAllowedApps()` 单点计算）。
+- **删除 `Task.blockedApps`**：黑名单与「默认禁止」语义重复。删前整体 dump 到
+  `localStorage['learning-manager:data:v1-blocked-backup']`，只写一次、不覆盖。
+
+原生（`StudyTimerService`）：
+
+- 轮询间隔 `GUARD_POLL_MS 60s` → 按档位：off 不启动 / warn 15s / pull 3s。
+- 新增 `buildAutoAllow()`：本 App、`systemui`、`android`、**桌面 launcher**、输入法、默认拨号。
+  桌面必须放行，否则按 Home 键会被判越界并来回拉。
+- 息屏不算离开：`PowerManager.isInteractive()` 为 false 时直接跳过。
+- 判定只剩一档判据：前台是否在放行集合内；「分心名单」分支已移除。
+
+界面：设置页「应用名单」→「应用白名单」（只管全局那一段 + 各方向额外放行的只读摘要）；
+「越界提醒」→「越界管控」（三档分段，宽限改秒，拉回档灰着）；方向编辑页拆成「继承全局（只读）」+「额外放行」；
+计时页**长按「结束」700ms → 确认 → 放弃本次计时**（紧急退出，不写记录）。
+
+尚未做（登记在此，别当成已完成）：`queryEvents` 精确判定（B2）、本地命中日志（B2）、
+悬浮窗权限 + 真拉回（B3）、界面 §2 的 10 项与安全区滚动改造（B4）。

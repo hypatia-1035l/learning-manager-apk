@@ -4,6 +4,7 @@ import {
   getCurrentObject,
   deleteTask,
   appLabelOf,
+  resolveAllowedApps,
 } from '../store'
 import { useSwipeBack } from '../useSwipeBack'
 import { LearningSession } from './LearningSession'
@@ -59,6 +60,7 @@ export function TaskDetail({ taskId, onBack, autoStartSession = false }: Props) 
   }
 
   const canStart = !!getCurrentObject(task)
+  const resolvedAllowed = resolveAllowedApps(task, data.globalAllowedApps).all
 
   return (
     <div>
@@ -88,10 +90,10 @@ export function TaskDetail({ taskId, onBack, autoStartSession = false }: Props) 
         </button>
       </div>
 
-      {/* 本方向允许的应用：点一下直接进入（与计时页同一份名单） */}
-      {(task.allowedApps ?? []).length > 0 && (
+      {/* 本方向最终放行集合（全局白名单 ∪ 额外放行）：点一下直接进入，与计时页同一份 */}
+      {resolvedAllowed.length > 0 && (
         <div className="app-chips" style={{ marginBottom: 14 }}>
-          {(task.allowedApps ?? []).map((pkg) => {
+          {resolvedAllowed.map((pkg) => {
             const label = appLabelOf(data.appPool, pkg)
             return (
               <button
@@ -112,12 +114,6 @@ export function TaskDetail({ taskId, onBack, autoStartSession = false }: Props) 
             )
           })}
         </div>
-      )}
-      {(task.blockedApps ?? []).length > 0 && (
-        <p className="muted" style={{ fontSize: 12, marginTop: -8, marginBottom: 14 }}>
-          分心：
-          {(task.blockedApps ?? []).map((pkg) => appLabelOf(data.appPool, pkg)).join('、')}
-        </p>
       )}
 
       {/* tabs */}

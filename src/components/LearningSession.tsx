@@ -12,6 +12,7 @@ import {
   useAppData,
   getAppData,
   appLabelOf,
+  resolveAllowedApps,
 } from '../store'
 import { formatTimer } from '../utils'
 import { ConfirmModal } from './ConfirmModal'
@@ -101,19 +102,24 @@ export function LearningSession({ task, onClose }: Props) {
   const [pinned, setPinned] = useState(false)
   // 应用启动失败提示（null = 不显示）
   const [appErr, setAppErr] = useState<string | null>(null)
+  // 紧急退出：长按「结束」→ 二次确认 → 放弃本次计时（不写记录）。
+  // 严格模式下万一桌面/输入法被漏放行把人困住，这是唯一的逃生门。
+  const [abandonOpen, setAbandonOpen] = useState(false)
+  const longPressTimer = useRef<number | null>(null)
 
   // 应用池：只是包名 → 应用名的缓存，供图标行显示名字
   const data = useAppData()
   const appPool = data.appPool ?? []
-  // 本方向允许进入的应用（默认策略=禁止：不在名单里的不给入口）
-  const allowedApps = task.allowedApps ?? []
-  // 越界提醒（P3）配置：仅在计时启动时随 start 一起传给原生前台服务
-  const blockedApps = task.blockedApps ?? []
-  const guardEnabled = data.reminder?.guardEnabled ?? false
-  const guardGraceMinutes = data.reminder?.guardGraceMinutes ?? 5
-  const guard: StudyTimerGuard | undefined = guardEnabled
-    ? { enabled: true, graceMinutes: guardGraceMinutes, allowedApps, blockedApps }
-    : undefined
+  // 本方向的最终放行集合：全局白名单 ∪ 方向额外放行（单点解析，见 store.resolveAllowedApps）。
+  // 自动放行项（本 App / 桌面 / 输入法 / 拨号 / 系统界面）JS 拿不到包名，由原生侧自行叠加。
+  const allowedApps = resolveAllowedApps(task, data.globalAllowedApps).all
+  // 越界管控档位：仅在计时启动时随 start 一起传给原生前台服务
+  const guardLevel = data.reminder?.guardLevel ?? 'off'
+  const guardGraceSeconds = data.reminder?.guardGraceSeconds ?? 5
+  const guard: StudyTimerGuard | undefined =
+    guardLevel === 'off'
+      ? undefined
+      : { level: guardLevel, graceSeconds: guardGraceSeconds, allowedApps }
 
   const obj = getCurrentObject(task)
   // 固定状态随当前方向/序列变化同步
@@ -301,6 +307,30 @@ export function LearningSession({ task, onClose }: Props) {
     setSessionActive(false)
     // 清除暂停标记（若存在；只清本方向的）
     clearPausedState(task.id)
+  }
+
+  // 紧急退出：不写记录、不计本次时长，直接停表退出。
+  // 与 handleEnd 的区别：不进结束页、不落记录，纯粹"放我出去"。
+  const handleAbandon = () => {
+    endedRef.current = true
+    stopStudyTimer()
+    setSessionActive(false)
+    clearPausedState(task.id)
+    setAbandonOpen(false)
+    onClose()
+  }
+
+  // 长按「结束」= 紧急退出入口（700ms）。触摸离开/取消都要清掉定时器，
+  // 否则一次轻点会被误判成长按。
+  const longPressCancel = () => {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+  const longPressStart = () => {
+    longPressCancel()
+    longPressTimer.current = window.setTimeout(() => setAbandonOpen(true), 700)
   }
 
   const handlePause = () => {
@@ -507,7 +537,16 @@ export function LearningSession({ task, onClose }: Props) {
           <button className="btn" onClick={handlePause}>
             暂停
           </button>
-          <button className="btn primary" onClick={handleEnd}>
+          <button
+            className="btn primary"
+            onClick={handleEnd}
+            title="轻点结束并保存；长按可紧急退出（不记录本次时长）"
+            onPointerDown={longPressStart}
+            onPointerUp={longPressCancel}
+            onPointerLeave={longPressCancel}
+            onPointerCancel={longPressCancel}
+            onContextMenu={(e) => e.preventDefault()}
+          >
             结束
           </button>
         </div>
@@ -516,7 +555,16 @@ export function LearningSession({ task, onClose }: Props) {
           <button className="btn primary" onClick={handleResumeFromPause}>
             继续
           </button>
-          <button className="btn" onClick={handleEnd}>
+          <button
+            className="btn"
+            onClick={handleEnd}
+            title="轻点结束并保存；长按可紧急退出（不记录本次时长）"
+            onPointerDown={longPressStart}
+            onPointerUp={longPressCancel}
+            onPointerLeave={longPressCancel}
+            onPointerCancel={longPressCancel}
+            onContextMenu={(e) => e.preventDefault()}
+          >
             结束
           </button>
         </div>
@@ -606,6 +654,19 @@ export function LearningSession({ task, onClose }: Props) {
             </button>
           </div>
         </div>
+      )}
+
+      {abandonOpen && (
+        <ConfirmModal
+          title="放弃本次计时"
+          message={
+            '本次计时不会保存，也不会计入学习时长。\n\n' +
+            '这是「紧急退出」——如果你只是正常结束，请点「取消」再轻点「结束」。'
+          }
+          confirmText="放弃并退出"
+          onConfirm={handleAbandon}
+          onCancel={() => setAbandonOpen(false)}
+        />
       )}
 
       {appErr && (

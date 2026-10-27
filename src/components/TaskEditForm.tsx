@@ -12,35 +12,28 @@ interface Props {
   onClose: () => void
 }
 
-type ListKind = 'allow' | 'block'
-
+// 方向编辑：名称 / 提醒星期 / 放行应用
+// v2 起只有**一份**名单语义：放行集合 = 全局白名单 ∪ 本方向额外放行。
+// 这里只编辑「额外」那部分；全局部分只读展示，避免同一个应用在两个地方各配一次。
 export function TaskEditForm({ task, onClose }: Props) {
   const data = useAppData()
   const pool = data.appPool ?? []
+  const globalAllowed = data.globalAllowedApps ?? []
 
   const [name, setName] = useState(task.name)
   const [weekdays, setWeekdays] = useState<number[]>(task.weekdays ?? [])
-  // 方向级应用名单：允许（给入口）/ 分心（不给入口，越界时提醒最重）
-  const [allowed, setAllowed] = useState<string[]>(task.allowedApps ?? [])
-  const [blocked, setBlocked] = useState<string[]>(task.blockedApps ?? [])
-  // 当前打开的选择视图：null = 主表单
-  const [picker, setPicker] = useState<ListKind | null>(null)
+  // 方向级：全局之外的额外放行
+  const [extra, setExtra] = useState<string[]>(
+    (task.allowedApps ?? []).filter((p) => !globalAllowed.includes(p)),
+  )
+  const [picking, setPicking] = useState(false)
 
-  const toggleIn = (kind: ListKind, app: InstalledApp) => {
-    const cur = kind === 'allow' ? allowed : blocked
-    const setCur = kind === 'allow' ? setAllowed : setBlocked
-    const other = kind === 'allow' ? blocked : allowed
-    const setOther = kind === 'allow' ? setBlocked : setAllowed
-
-    if (cur.includes(app.packageName)) {
-      setCur(cur.filter((p) => p !== app.packageName))
+  const toggleExtra = (app: InstalledApp) => {
+    if (extra.includes(app.packageName)) {
+      setExtra(extra.filter((p) => p !== app.packageName))
       return
     }
-    setCur([...cur, app.packageName])
-    // 互斥：选进这一侧就从另一侧移除（选择器里已置灰，这里是双保险）
-    if (other.includes(app.packageName)) {
-      setOther(other.filter((p) => p !== app.packageName))
-    }
+    setExtra([...extra, app.packageName])
     // 顺手把元数据写进池子，供别处显示应用名
     addAppsToPool([{ packageName: app.packageName, appName: app.appName }])
   }
@@ -50,13 +43,12 @@ export function TaskEditForm({ task, onClose }: Props) {
     updateTask(task.id, {
       name: name.trim(),
       weekdays,
-      allowedApps: allowed,
-      blockedApps: blocked,
+      allowedApps: extra,
     })
     onClose()
   }
 
-  const renderChips = (list: string[], kind: ListKind) => (
+  const renderChips = (list: string[]) => (
     <div className="app-chips">
       {list.length === 0 && (
         <span className="faint" style={{ fontSize: 12 }}>
@@ -71,45 +63,39 @@ export function TaskEditForm({ task, onClose }: Props) {
             type="button"
             className="app-chip-x"
             aria-label={`从名单移除 ${appLabelOf(pool, pkg)}`}
-            onClick={() =>
-              kind === 'allow'
-                ? setAllowed(allowed.filter((p) => p !== pkg))
-                : setBlocked(blocked.filter((p) => p !== pkg))
-            }
+            onClick={() => setExtra(extra.filter((p) => p !== pkg))}
           >
             ×
           </button>
         </span>
       ))}
-      <button type="button" className="app-chip add" onClick={() => setPicker(kind)}>
+      <button type="button" className="app-chip add" onClick={() => setPicking(true)}>
         ＋ 添加
       </button>
     </div>
   )
 
   // 选择视图：复用同一层 Modal，避免嵌套 Portal 导致 Esc 双关闭
-  if (picker) {
-    const isAllow = picker === 'allow'
+  if (picking) {
     return (
       <Modal
-        title={isAllow ? '允许的应用' : '分心的应用'}
-        onClose={() => setPicker(null)}
+        title="额外放行"
+        onClose={() => setPicking(false)}
         footer={
-          <button className="btn primary" onClick={() => setPicker(null)}>
+          <button className="btn primary" onClick={() => setPicking(false)}>
             完成
           </button>
         }
       >
         <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
-          {isAllow
-            ? '只有这里选中的应用，才会出现在计时页的图标行里，可点击直接进入。'
-            : '该方向明确的分心项：不给入口；开启「越界提醒」后命中它会被立刻提醒。'}
+          只列全局白名单之外的额外应用。已在全局白名单里的不在这里出现——
+          那些在「设置 → 应用白名单」里统一改。
         </p>
         <AppPicker
-          selected={isAllow ? allowed : blocked}
-          excluded={isAllow ? blocked : allowed}
+          selected={extra}
+          excluded={globalAllowed}
           pool={pool}
-          onToggle={(app) => toggleIn(picker, app)}
+          onToggle={toggleExtra}
         />
       </Modal>
     )
@@ -153,27 +139,37 @@ export function TaskEditForm({ task, onClose }: Props) {
 
         <div className="field">
           <label>
-            允许的应用
+            继承全局白名单
             <span className="faint" style={{ fontSize: 12, marginLeft: 6 }}>
-              计时页可直接点开
+              {globalAllowed.length} 个
             </span>
           </label>
-          {renderChips(allowed, 'allow')}
-          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            默认策略是「禁止」：不在这个列表里的应用，计时页不会给它入口。
-          </p>
+          {globalAllowed.length === 0 ? (
+            <p className="faint" style={{ fontSize: 12, margin: 0 }}>
+              还没有全局白名单。到「设置 → 应用白名单」里加一次，所有方向共用。
+            </p>
+          ) : (
+            <div className="app-chips">
+              {globalAllowed.map((pkg) => (
+                <span key={pkg} className="app-chip static" title={pkg}>
+                  <AppIcon packageName={pkg} appName={appLabelOf(pool, pkg)} size={18} />
+                  <span className="app-chip-name">{appLabelOf(pool, pkg)}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="field">
           <label>
-            分心的应用
+            本方向额外放行
             <span className="faint" style={{ fontSize: 12, marginLeft: 6 }}>
-              本方向明确要躲开的
+              只属于这个方向
             </span>
           </label>
-          {renderChips(blocked, 'block')}
+          {renderChips(extra)}
           <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            它们本来就不给入口；列在这里是为了让「越界提醒」逮到时更严厉。
+            最终放行 = 上面那份 + 这份，只加不减。不在其中的应用计时页不给入口，越界时按「越界管控」的强度处理。
           </p>
         </div>
       </div>

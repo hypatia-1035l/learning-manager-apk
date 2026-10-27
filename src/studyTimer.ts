@@ -22,12 +22,15 @@ export interface StudyTimerStatus {
   elapsedSeconds: number
 }
 
-// 越界提醒配置（P3）：随 start 一并传给原生前台服务，用于后台轮询检测跑偏
+// 越界管控配置：随 start 一并传给原生前台服务，用于后台轮询检测跑偏
+// level：off 不检测 / warn 只提醒 / pull 拉回（需悬浮窗权限，未授权原生侧降级为 warn）
 export interface StudyTimerGuard {
-  enabled: boolean
-  graceMinutes: number
+  level: 'off' | 'warn' | 'pull'
+  // 宽限时间（秒）：离开放行集合超过这么久才动作
+  graceSeconds: number
+  // 最终放行集合（全局白名单 ∪ 方向额外放行）。自动放行项由原生侧自行叠加：
+  // 本 App / 桌面 / 输入法 / 默认拨号 / systemui —— 这些 JS 侧拿不到，必须原生算。
   allowedApps: string[]
-  blockedApps: string[]
 }
 
 export interface StudyTimerPlugin {
@@ -37,11 +40,10 @@ export interface StudyTimerPlugin {
     elapsedSeconds: number
     // 当前进度节点名（序列配了 progressNodes 且为数量型时才有值；空则通知不显示节点）
     nodeLabel?: string
-    // P3 越界提醒配置（扁平传参，与原生 StudyTimerPlugin.start 读取一致）
-    guardEnabled?: boolean
-    guardGraceMinutes?: number
+    // 越界管控配置（扁平传参，与原生 StudyTimerPlugin.start 读取一致）
+    guardLevel?: 'off' | 'warn' | 'pull'
+    guardGraceSeconds?: number
     allowedApps?: string[]
-    blockedApps?: string[]
   }): Promise<void>
   update(o: {
     taskName: string
@@ -79,10 +81,9 @@ export async function startStudyTimer(
       objectName,
       elapsedSeconds,
       nodeLabel,
-      guardEnabled: guard?.enabled ?? false,
-      guardGraceMinutes: guard?.graceMinutes ?? 5,
+      guardLevel: guard?.level ?? 'off',
+      guardGraceSeconds: guard?.graceSeconds ?? 5,
       allowedApps: guard?.allowedApps ?? [],
-      blockedApps: guard?.blockedApps ?? [],
     })
   } catch {
     /* Web 端不支持，静默 */

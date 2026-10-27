@@ -280,7 +280,8 @@ export function updateTask(id: string, patch: Partial<Task>) {
 }
 
 // ---------- 应用池（纯元数据缓存，不带策略立场） ----------
-// 策略（允许 / 分心）一律存在 Task.allowedApps / Task.blockedApps 上。
+// 策略只有一个维度：**放行**。全局白名单存在 AppData.globalAllowedApps，
+// 方向级 Task.allowedApps 是它的增量。黑名单已废弃（v2），不再有第二个名单。
 
 /** 把选中的应用写入池子（按包名去重）；无变化时不做任何写入 */
 export function addAppsToPool(entries: AppEntry[]) {
@@ -299,20 +300,19 @@ export function addAppsToPool(entries: AppEntry[]) {
   })
 }
 
-/** 从池中移除应用，并同步清理所有方向名单里的引用（避免留下死引用） */
+/** 从池中移除应用，并同步清理全局白名单与所有方向里的引用（避免留下死引用） */
 export function removeAppFromPool(packageName: string) {
   if (!packageName) return
   setState((prev) => ({
     ...prev,
     appPool: (prev.appPool ?? []).filter((e) => e.packageName !== packageName),
+    globalAllowedApps: (prev.globalAllowedApps ?? []).filter((p) => p !== packageName),
     tasks: prev.tasks.map((t) => {
       const a = t.allowedApps ?? []
-      const b = t.blockedApps ?? []
-      if (!a.includes(packageName) && !b.includes(packageName)) return t
+      if (!a.includes(packageName)) return t
       return {
         ...t,
         allowedApps: a.filter((p) => p !== packageName),
-        blockedApps: b.filter((p) => p !== packageName),
         updatedAt: Date.now(),
       }
     }),
@@ -325,14 +325,59 @@ export function appLabelOf(pool: AppEntry[] | undefined, packageName: string): s
   return hit?.appName || packageName
 }
 
-/** 某方向的应用名单归类；同包名同时出现在两边时**以允许为准**（见文档 §3.1） */
+// ---------- 放行集合：唯一的策略判定入口 ----------
+// 全 App 只有这一处计算「某方向能进哪些应用」，其他组件一律调它，不再各自读 task.allowedApps。
+// 规则：全局白名单 ∪ 方向额外放行，**只做加法不做减法**
+//      （自动放行项 本App/桌面/输入法/拨号/系统界面 由原生侧统一叠加，见 StudyTimerService）。
+export function resolveAllowedApps(
+  task: Pick<Task, 'allowedApps'>,
+  globalAllowedApps: string[] | undefined,
+): { inherited: string[]; extra: string[]; all: string[] } {
+  const inherited = [...new Set(globalAllowedApps ?? [])]
+  const extra = (task.allowedApps ?? []).filter((p) => !inherited.includes(p))
+  return { inherited, extra, all: [...inherited, ...extra] }
+}
+
+/** 某应用在某方向下的身份。黑名单已废弃，只剩「放行」与「不在集合」两种。 */
 export function classifyAppForTask(
-  task: Pick<Task, 'allowedApps' | 'blockedApps'>,
+  task: Pick<Task, 'allowedApps'>,
+  globalAllowedApps: string[] | undefined,
   packageName: string,
-): 'allow' | 'block' | 'none' {
-  if ((task.allowedApps ?? []).includes(packageName)) return 'allow'
-  if ((task.blockedApps ?? []).includes(packageName)) return 'block'
-  return 'none'
+): 'allow' | 'none' {
+  return resolveAllowedApps(task, globalAllowedApps).all.includes(packageName)
+    ? 'allow'
+    : 'none'
+}
+
+/** 覆盖全局白名单（去重、去空白；顺序变化也算变化） */
+export function setGlobalAllowedApps(pkgs: string[]) {
+  const next = [...new Set(pkgs.map((p) => p.trim()).filter(Boolean))]
+  setState((prev) => {
+    const cur = prev.globalAllowedApps ?? []
+    if (cur.length === next.length && cur.every((p, i) => p === next[i])) return prev
+    return { ...prev, globalAllowedApps: next }
+  })
+}
+
+/** 往全局白名单加一个应用；顺带补进池子，保证显示名有处可查 */
+export function addAppToGlobalAllowed(packageName: string, appName?: string) {
+  const pkg = packageName?.trim()
+  if (!pkg) return
+  setState((prev) => {
+    const cur = prev.globalAllowedApps ?? []
+    if (cur.includes(pkg)) return prev
+    return { ...prev, globalAllowedApps: [...cur, pkg] }
+  })
+  if (appName) addAppsToPool([{ packageName: pkg, appName }])
+}
+
+/** 从全局白名单移除一个应用（方向级引用不动：那是各方向的额外放行） */
+export function removeAppFromGlobalAllowed(packageName: string) {
+  setState((prev) => {
+    const cur = prev.globalAllowedApps ?? []
+    if (!cur.includes(packageName)) return prev
+    return { ...prev, globalAllowedApps: cur.filter((p) => p !== packageName) }
+  })
 }
 
 export function deleteTask(id: string) {

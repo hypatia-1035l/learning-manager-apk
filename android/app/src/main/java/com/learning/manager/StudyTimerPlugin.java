@@ -67,21 +67,19 @@ public class StudyTimerPlugin extends Plugin {
         String objectName = call.getString("objectName", "");
         String nodeLabel = call.getString("nodeLabel", "");
         int elapsedSeconds = call.getInt("elapsedSeconds", 0);
-        boolean guardEnabled = call.getBoolean("guardEnabled", false);
-        int guardGraceMinutes = call.getInt("guardGraceMinutes", 5);
+        String guardLevel = call.getString("guardLevel", "off");
+        int guardGraceSeconds = call.getInt("guardGraceSeconds", 5);
         ArrayList<String> allowedApps = toStringList(call.getArray("allowedApps"));
-        ArrayList<String> blockedApps = toStringList(call.getArray("blockedApps"));
         Context ctx = getContext();
         Intent i = new Intent(ctx, StudyTimerService.class);
         i.putExtra(StudyTimerService.EXTRA_TASK_NAME, taskName);
         i.putExtra(StudyTimerService.EXTRA_OBJECT_NAME, objectName);
         i.putExtra(StudyTimerService.EXTRA_NODE_LABEL, nodeLabel);
         i.putExtra(StudyTimerService.EXTRA_ELAPSED_SECONDS, elapsedSeconds);
-        // P3 越界提醒配置：随 start 一并传给前台服务
-        i.putExtra(StudyTimerService.EXTRA_GUARD_ENABLED, guardEnabled);
-        i.putExtra(StudyTimerService.EXTRA_GUARD_GRACE, guardGraceMinutes);
+        // 越界管控配置：随 start 一并传给前台服务
+        i.putExtra(StudyTimerService.EXTRA_GUARD_LEVEL, guardLevel);
+        i.putExtra(StudyTimerService.EXTRA_GUARD_GRACE_SEC, guardGraceSeconds);
         i.putStringArrayListExtra(StudyTimerService.EXTRA_GUARD_ALLOWED, allowedApps);
-        i.putStringArrayListExtra(StudyTimerService.EXTRA_GUARD_BLOCKED, blockedApps);
         try {
             ContextCompat.startForegroundService(ctx, i);
         } catch (Exception ignored) {

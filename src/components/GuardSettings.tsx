@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Modal } from './Modal'
 import { useAppData, updateReminder } from '../store'
 import { getUsageStatsPermissionStatus, openUsageStatsSettings } from '../usageStats'
+import { GUARD_LEVEL_LABELS } from '../types'
+import type { GuardLevel, ReminderConfig } from '../types'
 
 interface Props {
   onClose: () => void
@@ -12,14 +14,18 @@ function clampInt(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.floor(v)))
 }
 
-// 越界提醒设置（P3）：总开关 + 容忍分钟数 + 权限引导
-// 仅在「学习计时进行中、本 App 在后台」时由原生前台服务轮询检测（见 StudyTimerService）。
+// 三档顺序：关闭 / 提醒 / 拉回
+const LEVELS: GuardLevel[] = ['off', 'warn', 'pull']
+
+// 越界管控设置：三档 + 宽限秒数 + 权限引导
+// 检测在原生 StudyTimerService 里做（仅学习计时进行中、本 App 在后台时轮询）。
+// 判定依据只有一个：当前前台应用是否在「放行集合」内（全局白名单 ∪ 方向额外放行 ∪ 自动放行）。
 export function GuardSettings({ onClose }: Props) {
   const data = useAppData()
   const reminder = data.reminder!
   const [permGranted, setPermGranted] = useState<boolean | null>(null)
-  const [grace, setGrace] = useState(String(reminder.guardGraceMinutes ?? 5))
-  const [enabled, setEnabled] = useState(reminder.guardEnabled ?? false)
+  const [grace, setGrace] = useState(String(reminder.guardGraceSeconds ?? 5))
+  const level: GuardLevel = reminder.guardLevel ?? 'off'
 
   useEffect(() => {
     getUsageStatsPermissionStatus()
@@ -27,28 +33,22 @@ export function GuardSettings({ onClose }: Props) {
       .catch(() => {})
   }, [])
 
-  const apply = (nextEnabled: boolean, nextGrace: number) => {
-    updateReminder({
-      ...reminder,
-      guardEnabled: nextEnabled,
-      guardGraceMinutes: clampInt(nextGrace, 0, 120),
-    })
-  }
+  const apply = (patch: Partial<ReminderConfig>) => updateReminder({ ...reminder, ...patch })
 
-  // 解析输入框里的容忍分钟数：空白/非法回退 5，0 是合法值（= 未列出应用立即提醒）
+  // 解析宽限秒数：空白/非法回退 5，0 是合法值（= 立刻算越界）
   const parseGrace = (s: string): number => {
     const t = s.trim()
     if (!t) return 5
     const n = Number(t)
-    return Number.isFinite(n) ? clampInt(n, 0, 120) : 5
+    return Number.isFinite(n) ? clampInt(n, 0, 600) : 5
   }
 
-  const handleToggle = (v: boolean) => {
-    setEnabled(v)
-    // 注意不能用 `Number(grace) || 5`：0 是合法值，falsy 会被静默改成 5
+  const handleLevel = (v: GuardLevel) => {
+    // 拉回档在 B1 不落地（原生仍按提醒执行），这里不允许选，避免给出按了没反应的开关
+    if (v === 'pull') return
     const g = parseGrace(grace)
     setGrace(String(g))
-    apply(v, g)
+    apply({ guardLevel: v, guardGraceSeconds: g })
   }
 
   const handleGrace = (s: string) => {
@@ -56,48 +56,65 @@ export function GuardSettings({ onClose }: Props) {
     // 输入过程允许暂时为空；只在能解析成数字时落盘，避免边打字边写入回退值
     if (!s.trim()) return
     const n = Number(s)
-    if (Number.isFinite(n)) apply(enabled, n)
+    if (Number.isFinite(n)) apply({ guardGraceSeconds: clampInt(n, 0, 600) })
   }
 
   // 失焦时把输入规整成最终落盘值，保证界面显示与实际持久化一致
   const handleGraceBlur = () => {
     const g = parseGrace(grace)
     setGrace(String(g))
-    apply(enabled, g)
+    apply({ guardGraceSeconds: g })
   }
 
   return (
     <Modal
-      title="越界提醒"
+      title="越界管控"
       onClose={onClose}
       footer={<button className="btn" onClick={onClose}>关闭</button>}
     >
       <div className="form-stack" style={{ gap: 12 }}>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label className="muted" style={{ fontSize: 14, display: 'flex', alignItems: 'center' }}>
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(e) => handleToggle(e.target.checked)}
-            />
-            <strong style={{ marginLeft: 6 }}>启用越界提醒</strong>
-          </label>
+          <label>强度</label>
+          <div className="seg-row">
+            {LEVELS.map((lv) => {
+              const isPull = lv === 'pull'
+              return (
+                <button
+                  key={lv}
+                  type="button"
+                  className={`seg-item ${level === lv ? 'active' : ''}`}
+                  disabled={isPull}
+                  title={isPull ? '需要悬浮窗权限，下一版提供；现在选它也只能提醒' : undefined}
+                  onClick={() => handleLevel(lv)}
+                >
+                  {GUARD_LEVEL_LABELS[lv]}
+                </button>
+              )
+            })}
+          </div>
           <p className="faint" style={{ fontSize: 12, marginTop: 6 }}>
-            学习计时进行中、你跑去打开别的 App 时，按方向名单提醒你回来。只提醒不拦截；关闭时零轮询、零耗电。
+            计时进行中跑去开别的 App，按这里的强度处理。
+            「离开就拉回」需要悬浮窗权限，要在下一版才落地，现在灰着；选它会按「只提醒」执行，不给你假开关。
           </p>
         </div>
 
         <div className="field" style={{ flex: '0 0 auto', marginBottom: 0 }}>
-          <label>未列出应用容忍分钟数</label>
+          <label>
+            宽限时间（秒）
+            <span className="faint" style={{ fontSize: 12, marginLeft: 6 }}>
+              离开后多久才算越界
+            </span>
+          </label>
           <input
-            type="number" className="input" min={0} max={120} step={1}
+            type="number" className="input" min={0} max={600} step={1}
             value={grace}
             onChange={(e) => handleGrace(e.target.value)}
             onBlur={handleGraceBlur}
-            disabled={!enabled}
+            disabled={level === 'off'}
           />
           <p className="faint" style={{ fontSize: 12, marginTop: 6 }}>
-            命中「分心名单」立即提醒；命中「未列出」的应用需停留超过该分钟数才提醒；命中「允许名单」不打扰。
+            默认 5 秒：切出去看一眼消息、按一下 Home 键不会立刻响。
+            只要前台不在放行集合里（全局白名单 + 方向额外放行 + 本 App/桌面/输入法/拨号/系统界面）就计时。
           </p>
         </div>
 
@@ -110,7 +127,7 @@ export function GuardSettings({ onClose }: Props) {
                 background: 'var(--bg-soft)', padding: '8px 10px', borderRadius: 8,
               }}
             >
-              未授予「使用情况访问」权限，越界检测无法读取前台应用。开启越界提醒后请点下方按钮去系统设置开启。
+              未授予「使用情况访问」权限，越界检测读不到前台应用，开了也不会生效。请点下方按钮去系统设置开启。
             </p>
           ) : (
             <p className="faint" style={{ fontSize: 12 }}>

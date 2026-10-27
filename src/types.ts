@@ -3,6 +3,12 @@
 // 任务状态
 export type TaskStatus = 'not_started' | 'in_progress' | 'completed' | 'paused'
 
+// 越界管控档位（原 guardEnabled 布尔的两态升级为三态）：
+//   off  = 不检测
+//   warn = 离开放行集合超过宽限时间就提醒
+//   pull = 同 warn，并尝试把 App 拉回前台（需悬浮窗权限，未授权自动降级为 warn）
+export type GuardLevel = 'off' | 'warn' | 'pull'
+
 // 任务组模式：顺序接续 / 随机选择 / 加权随机（预留）
 // 现语义：控制同一学习方向下「多个学习序列」之间如何接续
 export type GroupMode = 'sequential' | 'random' | 'weighted_random'
@@ -85,12 +91,11 @@ export interface Task {
   // 提醒星期（0=周日 … 6=周六）：该方向参与「次日计划」的星期；
   // 空数组或 undefined = 每天
   weekdays?: number[]
-  // 应用名单（方向级）：允许进入的应用包名。默认策略=禁止，
-  // 即不在本列表里的应用一律不给入口（计时页不显示图标）。
+  // 应用放行（方向级，**增量**）：全局白名单之外的额外放行。
+  // 最终放行集合 = 自动放行（本 App / 桌面 / 输入法 / 拨号 / 系统界面）
+  //               ∪ AppData.globalAllowedApps ∪ 本字段 —— **只做加法，不做减法**。
+  // 不在集合里的应用不提供入口（计时页不显示图标），越界时按 ReminderConfig.guardLevel 处理。
   allowedApps?: string[]
-  // 应用名单（方向级）：该方向明确的分心项包名。
-  // 不给入口，且 P3 越界提醒命中时立即提醒（不受容忍分钟数保护）。
-  blockedApps?: string[]
 }
 
 // 学习记录 —— 每次学习的快照
@@ -128,6 +133,10 @@ export interface AppData {
   // 注意：这里只存元数据，**不带策略立场**——允许/分心全部存在 Task 上，
   // 避免「池里有立场、方向里也有立场」的双份真相。
   appPool?: AppEntry[]
+  // 全局白名单：所有方向共用的放行应用（词典、识日这类「哪个方向都要用」的）。
+  // 方向级 Task.allowedApps 是它的**增量**：两者取并集，**不做减法**
+  // （一旦允许「方向级排除全局项」，就又出现「全局一份、方向一份」的双份真相）。
+  globalAllowedApps?: string[]
 }
 
 // 应用元数据（包名唯一）
@@ -211,12 +220,15 @@ export interface ReminderConfig {
   planLookaheadDays: number
   // ---- 提醒强度 ----
   intensity: NotificationIntensity // strong=声音+震动；weak=静默响铃；silent=仅通知栏
-  // ---- 越界提醒（P3，默认关）----
-  // 仅在学习计时进行中、本 App 在后台时，由原生前台服务轮询检测（见 StudyTimerService）：
-  // 前台应用命中「分心名单」立即提醒；命中「未列出」且停留超 guardGraceMinutes 才提醒；命中「允许名单」不打扰。
-  // 只提醒不拦截。guardEnabled=false 时整个轮询不启动（零耗电）。
-  guardEnabled?: boolean
-  guardGraceMinutes?: number
+  // ---- 越界管控（三档，默认关）----
+  // 仅在学习计时进行中、本 App 在后台时，由原生前台服务轮询检测（见 StudyTimerService）。
+  //   off  = 不检测（零轮询、零耗电）
+  //   warn = 离开放行集合超过 guardGraceSeconds 就提醒
+  //   pull = 同 warn，并尝试把 App 拉回前台（需悬浮窗权限；未授权时降级为 warn）
+  // 放行集合 = 自动放行 ∪ 全局白名单 ∪ 方向额外放行（见 store.resolveAllowedApps）
+  guardLevel?: GuardLevel
+  // 宽限时间（秒）。用秒而不是分钟，是因为「离开 5 秒内不算」这种需求按分钟表达不了
+  guardGraceSeconds?: number
 }
 
 export const DEFAULT_REMINDER: ReminderConfig = {
@@ -231,8 +243,8 @@ export const DEFAULT_REMINDER: ReminderConfig = {
   reengageDays: 2,
   planLookaheadDays: 3,
   intensity: 'weak',
-  guardEnabled: false,
-  guardGraceMinutes: 5,
+  guardLevel: 'off',
+  guardGraceSeconds: 5,
 }
 
 // 星期标签（0=周日 … 6=周六），供 UI 与计划池筛选共用
@@ -257,4 +269,10 @@ export const GROUP_MODE_LABELS: Record<GroupMode, string> = {
   sequential: '顺序接续',
   random: '随机选择',
   weighted_random: '加权随机',
+}
+
+export const GUARD_LEVEL_LABELS: Record<GuardLevel, string> = {
+  off: '关闭',
+  warn: '离开就提醒',
+  pull: '离开就拉回',
 }

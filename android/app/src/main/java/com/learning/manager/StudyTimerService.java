@@ -9,12 +9,17 @@ import android.app.usage.UsageStats;
 import android.app.usage.UsageStatsManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
+import android.provider.Settings;
+import android.telecom.TelecomManager;
 import androidx.core.app.NotificationCompat;
 
 import java.util.ArrayList;
@@ -48,11 +53,11 @@ public class StudyTimerService extends Service {
     public static final String EXTRA_IS_UPDATE = "isUpdate";
     public static final String EXTRA_NODE_LABEL = "nodeLabel";
 
-    // P3 越界提醒配置（随 start 传入）
-    public static final String EXTRA_GUARD_ENABLED = "guardEnabled";
-    public static final String EXTRA_GUARD_GRACE = "guardGrace";
+    // 越界管控配置（随 start 传入）
+    // level：off=不检测 / warn=只提醒 / pull=拉回（需悬浮窗权限；未授权时按 warn 执行）
+    public static final String EXTRA_GUARD_LEVEL = "guardLevel";
+    public static final String EXTRA_GUARD_GRACE_SEC = "guardGraceSec";
     public static final String EXTRA_GUARD_ALLOWED = "guardAllowed";
-    public static final String EXTRA_GUARD_BLOCKED = "guardBlocked";
 
     // 越界提醒独立通知
     // 通知 ID 命名空间（全应用共享）：2000=计时常驻、2001=「下一项」常驻（JS 侧
@@ -60,7 +65,10 @@ public class StudyTimerService extends Service {
     // 越界提醒原用 2001，会与「下一项」常驻通知互相覆盖，故移到 3001。
     public static final int GUARD_NOTIF_ID = 3001;
     public static final String GUARD_CHANNEL_ID = "study_guard";
-    private static final long GUARD_POLL_MS = 60_000L;                 // 轮询间隔 60s
+    // 轮询间隔：原来固定 60s，做不到「离开 5 秒」这种判定。
+    // warn 档 15s（省电优先）；pull 档 3s（要秒级判定，B2 会把 queryUsageStats 换成 queryEvents）。
+    private static final long GUARD_POLL_WARN_MS = 15_000L;
+    private static final long GUARD_POLL_PULL_MS = 3_000L;
     private static final long GUARD_WARN_COOLDOWN_MS = 5 * 60 * 1000L; // 同次越界至少隔 5 分钟再提醒
 
     // 标记是否为用户主动停止（用于 onDestroy 中区分主动停止 vs 系统杀死）
@@ -87,13 +95,16 @@ public class StudyTimerService extends Service {
     // 当前进度节点名（序列配了 progressNodes 且为数量型时才非空）
     private String nodeLabel = "";
 
-    // 越界提醒（P3）运行时配置
-    private boolean guardEnabled = false;
-    private long guardGraceMs = 5 * 60 * 1000L;
-    private final Set<String> allowedApps = new HashSet<>();
-    private final Set<String> blockedApps = new HashSet<>();
+    // 越界管控运行时配置
+    private String guardLevel = "off";      // off / warn / pull
+    private long guardGraceMs = 5_000L;     // 宽限（毫秒）：由 guardGraceSec × 1000
+    private long guardPollMs = GUARD_POLL_WARN_MS;
+    private final Set<String> allowedApps = new HashSet<>();   // 全局白名单 ∪ 方向额外放行
+    // 自动放行：本 App / 桌面 / 输入法 / 默认拨号 / systemui。
+    // 少放行一个就会满屏误报——尤其桌面：按 Home 后前台是 launcher，不放行会拉回死循环。
+    private final Set<String> autoAllow = new HashSet<>();
     private String selfPackage = "";
-    private long firstOffListAt = 0;        // 未列出应用首次越界时刻
+    private long firstOffListAt = 0;        // 本次越界开始的时刻
     private long lastGuardWarnAt = 0;       // 上次越界提醒时刻（节流）
     private Handler guardHandler;
     private Runnable guardRunnable;
@@ -106,10 +117,9 @@ public class StudyTimerService extends Service {
     private static final String KEY_NODE_LABEL = "nodeLabel";
     private static final String KEY_STARTED_AT = "startedAtElapsedRealtime";
     private static final String KEY_ACCUMULATED_MS = "accumulatedMs";
-    private static final String KEY_GUARD_ENABLED = "guardEnabled";
+    private static final String KEY_GUARD_LEVEL = "guardLevel";
     private static final String KEY_GUARD_GRACE_MS = "guardGraceMs";
     private static final String KEY_GUARD_ALLOWED = "guardAllowed";
-    private static final String KEY_GUARD_BLOCKED = "guardBlocked";
     // 会话开始的墙钟时刻：用于识别「设备重启」（elapsedRealtime 会归零）
     private static final String KEY_STARTED_AT_WALL = "startedAtWallMs";
 
@@ -154,16 +164,15 @@ public class StudyTimerService extends Service {
                 accumulatedMs = elapsedSec * 1000L;
                 startedAtElapsedRealtime = SystemClock.elapsedRealtime();
                 startedAtWallMs = System.currentTimeMillis();
-                // 越界提醒配置（仅 start 时更新；update 不改）
-                guardEnabled = intent.getBooleanExtra(EXTRA_GUARD_ENABLED, false);
-                guardGraceMs = intent.getIntExtra(EXTRA_GUARD_GRACE, 5) * 60_000L;
+                // 越界管控配置（仅 start 时更新；update 不改）
+                guardLevel = safeGuardLevel(intent.getStringExtra(EXTRA_GUARD_LEVEL));
+                guardGraceMs = Math.max(0, intent.getIntExtra(EXTRA_GUARD_GRACE_SEC, 5)) * 1000L;
+                guardPollMs = "pull".equals(guardLevel) ? GUARD_POLL_PULL_MS : GUARD_POLL_WARN_MS;
                 allowedApps.clear();
-                blockedApps.clear();
                 ArrayList<String> allow = intent.getStringArrayListExtra(EXTRA_GUARD_ALLOWED);
-                ArrayList<String> block = intent.getStringArrayListExtra(EXTRA_GUARD_BLOCKED);
                 if (allow != null) allowedApps.addAll(allow);
-                if (block != null) blockedApps.addAll(block);
                 selfPackage = getPackageName();
+                buildAutoAllow();
             }
         } else {
             // Service 被系统重建（START_STICKY），从 SharedPreferences 恢复
@@ -179,7 +188,7 @@ public class StudyTimerService extends Service {
 
         // 4. 启动计时 Handler（每秒刷新通知）
         startTicking();
-        // 5. 启动越界提醒轮询（guardEnabled=false 时轮询内部直接跳过，几乎零开销）
+        // 5. 启动越界管控轮询（level=off 时不启动，零开销）
         startGuardPolling();
 
         return START_STICKY;
@@ -304,10 +313,9 @@ public class StudyTimerService extends Service {
         ed.putLong(KEY_STARTED_AT, startedAtElapsedRealtime);
         ed.putLong(KEY_STARTED_AT_WALL, startedAtWallMs);
         ed.putLong(KEY_ACCUMULATED_MS, accumulatedMs);
-        ed.putBoolean(KEY_GUARD_ENABLED, guardEnabled);
+        ed.putString(KEY_GUARD_LEVEL, guardLevel);
         ed.putLong(KEY_GUARD_GRACE_MS, guardGraceMs);
         ed.putStringSet(KEY_GUARD_ALLOWED, new HashSet<>(allowedApps));
-        ed.putStringSet(KEY_GUARD_BLOCKED, new HashSet<>(blockedApps));
         ed.apply();
     }
 
@@ -326,10 +334,11 @@ public class StudyTimerService extends Service {
             accumulatedMs = 0;
             startedAtElapsedRealtime = SystemClock.elapsedRealtime();
             startedAtWallMs = System.currentTimeMillis();
-            guardEnabled = false;
-            guardGraceMs = 5 * 60 * 1000L;
+            guardLevel = "off";
+            guardGraceMs = 5_000L;
+            guardPollMs = GUARD_POLL_WARN_MS;
             allowedApps.clear();
-            blockedApps.clear();
+            autoAllow.clear();
             selfPackage = getPackageName();
             return;
         }
@@ -339,13 +348,56 @@ public class StudyTimerService extends Service {
         startedAtElapsedRealtime = sp.getLong(KEY_STARTED_AT, SystemClock.elapsedRealtime());
         startedAtWallMs = sp.getLong(KEY_STARTED_AT_WALL, 0L);
         accumulatedMs = sp.getLong(KEY_ACCUMULATED_MS, 0);
-        guardEnabled = sp.getBoolean(KEY_GUARD_ENABLED, false);
-        guardGraceMs = sp.getLong(KEY_GUARD_GRACE_MS, 5 * 60 * 1000L);
+        guardLevel = safeGuardLevel(sp.getString(KEY_GUARD_LEVEL, "off"));
+        guardGraceMs = sp.getLong(KEY_GUARD_GRACE_MS, 5_000L);
+        guardPollMs = "pull".equals(guardLevel) ? GUARD_POLL_PULL_MS : GUARD_POLL_WARN_MS;
         allowedApps.clear();
-        blockedApps.clear();
         allowedApps.addAll(sp.getStringSet(KEY_GUARD_ALLOWED, new HashSet<>()));
-        blockedApps.addAll(sp.getStringSet(KEY_GUARD_BLOCKED, new HashSet<>()));
         selfPackage = getPackageName();
+        buildAutoAllow();
+    }
+
+    // 档位白名单化：任何非法值一律按 off 处理，避免前端拼错字符串导致轮询常开
+    private static String safeGuardLevel(String raw) {
+        if ("warn".equals(raw) || "pull".equals(raw)) return raw;
+        return "off";
+    }
+
+    /**
+     * 组装「永远放行」集合。这些包名 JS 侧拿不到（要 PackageManager / 系统服务），必须原生算。
+     * 少一个就满屏误报，尤其 launcher：按 Home 后前台是桌面，不放行会把用户反复拉回。
+     */
+    private void buildAutoAllow() {
+        autoAllow.clear();
+        if (!selfPackage.isEmpty()) autoAllow.add(selfPackage);
+        // 系统界面：下拉通知栏、权限弹窗、音量条都会瞬时占据前台
+        autoAllow.add("com.android.systemui");
+        autoAllow.add("android");
+        PackageManager pm = getPackageManager();
+        // 桌面（HOME）：不解析它，按 Home 键必被判定为越界
+        try {
+            Intent home = new Intent(Intent.ACTION_MAIN);
+            home.addCategory(Intent.CATEGORY_HOME);
+            ResolveInfo ri = pm.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY);
+            if (ri != null && ri.activityInfo != null) autoAllow.add(ri.activityInfo.packageName);
+        } catch (Exception ignored) {
+        }
+        // 输入法：打字时前台是输入法窗口，不放行等于一输入就提醒
+        try {
+            String ime = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+            int slash = ime == null ? -1 : ime.indexOf('/');
+            if (slash > 0) autoAllow.add(ime.substring(0, slash));
+        } catch (Exception ignored) {
+        }
+        // 默认拨号：来电界面必须放行
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                TelecomManager tm = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
+                String dialer = tm == null ? null : tm.getDefaultDialerPackage();
+                if (dialer != null && !dialer.isEmpty()) autoAllow.add(dialer);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -432,25 +484,26 @@ public class StudyTimerService extends Service {
         return Math.max(0, sp.getLong(KEY_ACCUMULATED_MS, 0)) / 1000;
     }
 
-    // ---------- 越界提醒（P3） ----------
-    // 独立 Handler，每 GUARD_POLL_MS 检测一次前台应用是否跑偏
+    // ---------- 越界管控 ----------
+    // 独立 Handler，按档位间隔轮询前台应用。level=off 时**根本不启动**（零耗电）。
     private void startGuardPolling() {
         if (guardHandler == null) {
             guardHandler = new Handler(Looper.getMainLooper());
         } else if (guardRunnable != null) {
             guardHandler.removeCallbacks(guardRunnable);
         }
+        if ("off".equals(guardLevel)) return;
         guardRunnable = new Runnable() {
             @Override
             public void run() {
                 checkForeground();
                 if (guardHandler != null) {
-                    guardHandler.postDelayed(this, GUARD_POLL_MS);
+                    guardHandler.postDelayed(this, guardPollMs);
                 }
             }
         };
         if (guardHandler != null) {
-            guardHandler.postDelayed(guardRunnable, GUARD_POLL_MS);
+            guardHandler.postDelayed(guardRunnable, guardPollMs);
         }
     }
 
@@ -480,30 +533,31 @@ public class StudyTimerService extends Service {
         }
     }
 
-    // 越界检测：按三层身份判定是否提醒
+    // 越界检测：唯一判据 = 当前前台是否在放行集合内
+    // （自动放行 ∪ 全局白名单 ∪ 方向额外放行）。不再有「分心名单」这一档。
     private void checkForeground() {
-        if (!guardEnabled) return;
-        String fg = getRecentForegroundPackage();
-        if (fg == null || fg.equals(selfPackage)) {
-            firstOffListAt = 0; // 在本 App 内或无数据：重置未列出计时
+        if ("off".equals(guardLevel)) return;
+        // 息屏不算离开：锁屏后前台仍是上一次那个应用，继续判定会把「放下手机」当成跑偏
+        PowerManager power = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (power != null && !power.isInteractive()) {
+            firstOffListAt = 0;
             return;
         }
-        if (allowedApps.contains(fg)) {
-            firstOffListAt = 0; // 允许名单：不打扰
+        String fg = getRecentForegroundPackage();
+        if (fg == null
+                || fg.equals(selfPackage)
+                || autoAllow.contains(fg)
+                || allowedApps.contains(fg)) {
+            firstOffListAt = 0;
             return;
         }
         long now = System.currentTimeMillis();
-        if (blockedApps.contains(fg)) {
-            // 分心名单：立即提醒（仍受全局节流保护，避免刷屏）
-            warnGuard("分心提醒", "你正在打开分心应用，回去做：" + (taskName.isEmpty() ? "学习" : taskName));
-            return;
-        }
-        // 未列出：超容忍分钟数才提醒
         if (firstOffListAt == 0) firstOffListAt = now;
-        if (now - firstOffListAt >= guardGraceMs) {
-            warnGuard("越界提醒", "你已离开「" + (taskName.isEmpty() ? "学习" : taskName)
-                    + "」超过 " + (guardGraceMs / 60000) + " 分钟，回来继续吧");
-        }
+        if (now - firstOffListAt < guardGraceMs) return;
+        // 超宽限才算越界。warn 档发通知；pull 档在 B1 阶段同样只发通知
+        // （拉回要 SYSTEM_ALERT_WINDOW，B3 才落地，这里不做半截动作）
+        warnGuard("越界提醒", "你已离开「" + (taskName.isEmpty() ? "学习" : taskName)
+                + "」超过 " + (guardGraceMs / 1000) + " 秒，回来继续吧");
     }
 
     // 节流后发送越界通知

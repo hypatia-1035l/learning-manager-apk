@@ -25,7 +25,14 @@ import type {
 import { DEFAULT_REMINDER } from './types'
 
 // 当前数据结构版本：每次破坏性升级时 +1
-export const CURRENT_SCHEMA_VERSION = 1
+// v2（2026-10-28）：越界管控由两态布尔升为三档（guardEnabled → guardLevel），
+//   宽限时间改秒（guardGraceMinutes → guardGraceSeconds）；
+//   删除 Task.blockedApps（旧值先备份到 BLOCKED_BACKUP_KEY）；
+//   新增 AppData.globalAllowedApps（全局白名单，方向级 allowedApps 变为增量）。
+export const CURRENT_SCHEMA_VERSION = 2
+
+// 删除 blockedApps 前的整体备份键：不静默丢用户配置，需要时可从这里捞回
+export const BLOCKED_BACKUP_KEY = 'learning-manager:data:v1-blocked-backup'
 export const SCHEMA_VERSION_KEY = 'learning-manager:schema-version'
 
 // ---------- 进度解析（迁移与学习会话共用） ----------
@@ -130,7 +137,7 @@ function migrateTask(t: Task): Task {
         items: t.group.items.map(migrateLearningObject),
       } as TaskGroup)
     : t.group
-  return {
+  const next: Task & { blockedApps?: unknown } = {
     ...t,
     weight:
       typeof (t as Task & { weight?: number }).weight === 'number'
@@ -144,12 +151,14 @@ function migrateTask(t: Task): Task {
           (d) => typeof d === 'number' && d >= 0 && d <= 6,
         )
       : [],
-    // 迁移：方向应用名单（允许 / 分心）。旧数据无此字段 → 空数组。
-    // 注意：允许名单为空 = 全部禁止（默认策略），UI 上表现为计时页不显示图标行。
+    // 迁移：方向应用放行（增量，全局白名单之外额外放行的那部分）。旧数据无此字段 → 空数组。
+    // 空数组 = 只用全局白名单；连全局也空 = 只有自动放行（本 App/桌面/输入法/拨号/系统界面）。
     allowedApps: sanitizePackageList((t as Task & { allowedApps?: unknown }).allowedApps),
-    blockedApps: sanitizePackageList((t as Task & { blockedApps?: unknown }).blockedApps),
     group,
   }
+  // v2：blockedApps 已废弃，从内存对象里抹掉（原始值已在 migrateAppData 里备份）
+  delete next.blockedApps
+  return next
 }
 
 // ---------- 迁移：提醒配置 ----------
@@ -253,13 +262,36 @@ function migrateReminder(r: unknown): ReminderConfig {
       rem.intensity === 'strong' || rem.intensity === 'weak' || rem.intensity === 'silent'
         ? rem.intensity
         : DEFAULT_REMINDER.intensity,
-    // 越界提醒（P3，默认关）：guardEnabled 仅当旧数据显式为 true 才开启，否则保持默认关
-    guardEnabled: rem.guardEnabled === true,
-    guardGraceMinutes:
-      typeof rem.guardGraceMinutes === 'number'
-        ? Math.min(120, Math.max(0, Math.floor(rem.guardGraceMinutes)))
-        : DEFAULT_REMINDER.guardGraceMinutes,
+    // 越界管控（三档，默认关）：旧数据只有 guardEnabled 布尔 →
+    //   true = 'warn'（旧版本来就只提醒，不能擅自升级成会拉回的 'pull'）
+    //   false/缺省 = 'off'
+    guardLevel: migrateGuardLevel(rem),
+    // 宽限时间：旧字段是分钟，×60 换成秒；旧值 5 分钟 = 300 秒，语义不变
+    guardGraceSeconds: migrateGuardGraceSeconds(rem),
   }
+}
+
+// 旧 guardEnabled（布尔）→ 新 guardLevel（三档）。新字段优先。
+function migrateGuardLevel(
+  rem: Partial<ReminderConfig> & { guardEnabled?: unknown },
+): ReminderConfig['guardLevel'] {
+  const lv = rem.guardLevel
+  if (lv === 'off' || lv === 'warn' || lv === 'pull') return lv
+  return rem.guardEnabled === true ? 'warn' : 'off'
+}
+
+// 宽限时间：新字段（秒）优先；旧字段（分钟）×60；都没有则用默认值
+function migrateGuardGraceSeconds(
+  rem: Partial<ReminderConfig> & { guardGraceMinutes?: unknown },
+): number {
+  if (typeof rem.guardGraceSeconds === 'number' && Number.isFinite(rem.guardGraceSeconds)) {
+    // 上限 10 分钟：再长就不叫「宽限」了，等于关掉
+    return Math.min(600, Math.max(0, Math.floor(rem.guardGraceSeconds)))
+  }
+  if (typeof rem.guardGraceMinutes === 'number' && Number.isFinite(rem.guardGraceMinutes)) {
+    return Math.min(600, Math.max(0, Math.floor(rem.guardGraceMinutes * 60)))
+  }
+  return DEFAULT_REMINDER.guardGraceSeconds ?? 5
 }
 
 // ---------- 迁移：单条学习记录 ----------
@@ -333,10 +365,40 @@ function migratePlanDay(p: unknown): PlanDay | null {
   }
 }
 
+// v2：删除 Task.blockedApps 前，把旧值整体 dump 到备份键。
+// 只写一次（已有备份则不覆盖），保证「最早那份用户配置」不会被后续启动冲掉。
+function backupBlockedApps(rawTasks: unknown): void {
+  try {
+    const out: Array<{ taskId: string; taskName: string; blockedApps: string[] }> = []
+    if (Array.isArray(rawTasks)) {
+      for (const raw of rawTasks) {
+        const t = (raw ?? {}) as { id?: unknown; name?: unknown; blockedApps?: unknown }
+        const list = sanitizePackageList(t.blockedApps)
+        if (!list.length) continue
+        out.push({
+          taskId: typeof t.id === 'string' ? t.id : '',
+          taskName: typeof t.name === 'string' ? t.name : '',
+          blockedApps: list,
+        })
+      }
+    }
+    if (!out.length) return
+    if (localStorage.getItem(BLOCKED_BACKUP_KEY)) return
+    localStorage.setItem(
+      BLOCKED_BACKUP_KEY,
+      JSON.stringify({ savedAt: Date.now(), fromSchema: 1, tasks: out }),
+    )
+  } catch {
+    /* ignore：备份失败不阻断迁移 */
+  }
+}
+
 // ---------- 主迁移入口 ----------
 // 接收从 localStorage 读出的原始数据（形态未知），迁移为最新 AppData 结构
 export function migrateAppData(raw: unknown): AppData {
   const parsed = (raw ?? {}) as Partial<AppData>
+  // v2：先把旧的 blockedApps 备份走，再让 migrateTask 把它抹掉
+  backupBlockedApps(parsed.tasks)
   const tasks = (parsed.tasks ?? []).map(migrateTask)
   const records = (parsed.records ?? []).map(migrateRecord)
   const reminder = parsed.reminder
@@ -390,7 +452,16 @@ export function migrateAppData(raw: unknown): AppData {
       if (touched) day.items = items
     }
   }
-  return { tasks, records, reminder, plans, pinnedTasks, appPool }
+  return {
+    tasks,
+    records,
+    reminder,
+    plans,
+    pinnedTasks,
+    appPool,
+    // v2：全局白名单（旧数据没有 → 空数组，等价于只用自动放行）
+    globalAllowedApps: sanitizePackageList(parsed.globalAllowedApps),
+  }
 }
 
 // 读取并标记当前 schema 版本（持久化最新版本号，便于后续升级判定）

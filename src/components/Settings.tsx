@@ -18,7 +18,7 @@ export function Settings({ onOpenBackup }: Props) {
   // 越界提醒设置弹窗（Modal，形态与提醒设置一致）
   const [showGuard, setShowGuard] = useState(false)
   const data = useAppData()
-  const appCount = (data.appPool ?? []).length
+  const globalCount = (data.globalAllowedApps ?? []).length
 
   // 子页右滑返回设置主页（在主列表页右滑为无操作，无副作用）
   useSwipeBack(() => setView('main'))
@@ -64,9 +64,9 @@ export function Settings({ onOpenBackup }: Props) {
         <button className="settings-item" onClick={() => setView('apps')}>
           <span className="si-left">
             <span>
-              <div className="si-name">应用名单</div>
+              <div className="si-name">应用白名单</div>
               <div className="si-desc">
-                {appCount > 0 ? `已记录 ${appCount} 个应用` : '给方向配可直达的应用'}
+                {globalCount > 0 ? `全局 ${globalCount} 个应用，所有方向共用` : '给所有方向配一个共用名单'}
               </div>
             </span>
           </span>
@@ -75,9 +75,11 @@ export function Settings({ onOpenBackup }: Props) {
         <button className="settings-item" onClick={() => setShowGuard(true)}>
           <span className="si-left">
             <span>
-              <div className="si-name">越界提醒</div>
+              <div className="si-name">越界管控</div>
               <div className="si-desc">
-                {data.reminder?.guardEnabled ? '计时期间检测跑偏' : '计时期间检测跑偏（已关）'}
+                {(data.reminder?.guardLevel ?? 'off') === 'off'
+                  ? '计时期间检测跑偏（已关）'
+                  : '计时期间检测跑偏'}
               </div>
             </span>
           </span>
@@ -124,11 +126,12 @@ function HelpContent() {
       </div>
 
       <div className="section">
-        <div className="section-title">应用名单</div>
+        <div className="section-title">应用白名单</div>
         <ul className="help-list">
-          <li><b>允许的应用</b>：只给这些应用入口。计时页会出现它们的图标，点一下直接进入；不在名单里的一律不给入口（默认禁止）。</li>
-          <li><b>分心的应用</b>：本方向明确要躲开的。同样不给入口，列出来是为了让越界提醒逮到时更严厉。</li>
-          <li><b>设置 → 应用名单</b>：只是应用的名字缓存，可看每个应用被哪些方向引用，把不用的清掉。</li>
+          <li><b>全局白名单</b>：所有方向共用一份（词典、识日这类），在「设置 → 应用白名单」里加一次就够。</li>
+          <li><b>方向额外放行</b>：个别方向才用的应用，在方向详情的「编辑」里加，只对本方向生效。</li>
+          <li><b>最终放行 = 两者并集</b>，只加不减。不在其中的应用计时页不给入口，越界时按「越界管控」的强度处理。</li>
+          <li><b>永远放行</b>：本 App、桌面、输入法、电话、系统界面（不加的话按 Home 键或打字都会被判越界）。</li>
           <li><b>注意</b>：不给入口不等于打不开——从桌面仍能启动别的应用，系统层面拦不住（除非装无障碍服务，本项目不做）。</li>
         </ul>
       </div>
