@@ -1,0 +1,3 @@
+# shell 脚本必须保持 LF：Windows 上被 core.autocrlf 转成 CRLF 后，
+# bash 执行会报 $'\r': command not found（set -euo pipefail 首行就挂）
+*.sh text eol=lf
