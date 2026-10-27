@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Modal } from './Modal'
-import { useAppData, updateReminder } from '../store'
+import { useAppData, updateReminder, appLabelOf } from '../store'
 import { getUsageStatsPermissionStatus, openUsageStatsSettings } from '../usageStats'
+import { readGuardLog, clearGuardLog } from '../studyTimer'
+import type { GuardLogEntry } from '../studyTimer'
 import { GUARD_LEVEL_LABELS } from '../types'
 import type { GuardLevel, ReminderConfig } from '../types'
 
@@ -17,6 +19,13 @@ function clampInt(v: number, min: number, max: number): number {
 // 三档顺序：关闭 / 提醒 / 拉回
 const LEVELS: GuardLevel[] = ['off', 'warn', 'pull']
 
+// 判定日志的时间显示：只到秒，够定位「那会儿我在干什么」
+function fmtTime(ts: number): string {
+  const d = new Date(ts)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
 // 越界管控设置：三档 + 宽限秒数 + 权限引导
 // 检测在原生 StudyTimerService 里做（仅学习计时进行中、本 App 在后台时轮询）。
 // 判定依据只有一个：当前前台应用是否在「放行集合」内（全局白名单 ∪ 方向额外放行 ∪ 自动放行）。
@@ -26,6 +35,18 @@ export function GuardSettings({ onClose }: Props) {
   const [permGranted, setPermGranted] = useState<boolean | null>(null)
   const [grace, setGrace] = useState(String(reminder.guardGraceSeconds ?? 5))
   const level: GuardLevel = reminder.guardLevel ?? 'off'
+  // 判定日志（B2）：展开时才去原生读，避免每次打开设置都拉一遍
+  const [logOpen, setLogOpen] = useState(false)
+  const [log, setLog] = useState<GuardLogEntry[] | null>(null)
+
+  const toggleLog = async () => {
+    if (logOpen) {
+      setLogOpen(false)
+      return
+    }
+    setLogOpen(true)
+    setLog(await readGuardLog())
+  }
 
   useEffect(() => {
     getUsageStatsPermissionStatus()
@@ -144,6 +165,73 @@ export function GuardSettings({ onClose }: Props) {
           >
             去设置开启「使用情况访问」
           </button>
+        </div>
+
+        <div className="field" style={{ marginBottom: 0 }}>
+          <div className="row" style={{ alignItems: 'center' }}>
+            <label style={{ marginBottom: 0 }}>判定记录</label>
+            <div className="spacer" />
+            <button className="btn sm" onClick={toggleLog}>
+              {logOpen ? '收起' : '查看'}
+            </button>
+          </div>
+          <p className="faint" style={{ fontSize: 12, marginTop: 6 }}>
+            记「发现离开」和「真的响了」两个时刻，用来判断误报。觉得误报了把这里贴给我，
+            比“好像老响”有用得多。
+          </p>
+
+          {logOpen && (
+            <div style={{ marginTop: 8 }}>
+              {log === null ? (
+                <p className="faint" style={{ fontSize: 12 }}>读取中…</p>
+              ) : log.length === 0 ? (
+                <p className="faint" style={{ fontSize: 12 }}>
+                  还没有记录。开一档强度、跑一次计时，这里就会出现时间线。
+                </p>
+              ) : (
+                <>
+                  <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>
+                    共 {log.length} 条，显示最近 {Math.min(log.length, 30)} 条
+                    （离开 = 发现不在放行集合；已提醒 = 真的发出了通知）
+                  </div>
+                  <div className="app-pool-list">
+                    {[...log]
+                      .reverse()
+                      .slice(0, 30)
+                      .map((e, i) => (
+                        <div key={`${e.ts}-${i}`} className="app-pool-row unused">
+                          <div className="app-pool-main">
+                            <div className="app-pool-name">{appLabelOf(data.appPool, e.pkg)}</div>
+                            <div className="app-pool-refs">
+                              <span className={e.verdict === 'trigger' ? 'tag-warn' : 'tag-allow'}>
+                                {e.verdict === 'trigger' ? '已提醒' : '离开'}
+                              </span>
+                              <span className="faint" style={{ fontSize: 12 }}>
+                                {fmtTime(e.ts)}
+                                {e.verdict === 'trigger'
+                                  ? ` · 离开 ${Math.round(e.awayMs / 1000)} 秒`
+                                  : ''}
+                              </span>
+                            </div>
+                            <div className="app-pool-pkg">{e.pkg}</div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                  <button
+                    className="btn sm"
+                    style={{ marginTop: 8 }}
+                    onClick={async () => {
+                      await clearGuardLog()
+                      setLog([])
+                    }}
+                  >
+                    清空记录
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </Modal>

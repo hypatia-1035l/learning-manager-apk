@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.app.usage.UsageEvents;
 import android.app.usage.UsageStats;
 import android.app.usage.UsageStatsManager;
 import android.content.Context;
@@ -21,6 +22,9 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.telecom.TelecomManager;
 import androidx.core.app.NotificationCompat;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -65,10 +69,10 @@ public class StudyTimerService extends Service {
     // 越界提醒原用 2001，会与「下一项」常驻通知互相覆盖，故移到 3001。
     public static final int GUARD_NOTIF_ID = 3001;
     public static final String GUARD_CHANNEL_ID = "study_guard";
-    // 轮询间隔：原来固定 60s，做不到「离开 5 秒」这种判定。
-    // warn 档 15s（省电优先）；pull 档 3s（要秒级判定，B2 会把 queryUsageStats 换成 queryEvents）。
-    private static final long GUARD_POLL_WARN_MS = 15_000L;
-    private static final long GUARD_POLL_PULL_MS = 3_000L;
+    // 轮询间隔：统一 3 秒。
+    // 宽限时间已经下沉到「秒」级（默认 5 秒），如果轮询比宽限还粗，这个参数就是假的
+    // （15 秒轮询下写 5 秒宽限，实际最早也要 15 秒才响）。
+    private static final long GUARD_POLL_MS = 3_000L;
     private static final long GUARD_WARN_COOLDOWN_MS = 5 * 60 * 1000L; // 同次越界至少隔 5 分钟再提醒
 
     // 标记是否为用户主动停止（用于 onDestroy 中区分主动停止 vs 系统杀死）
@@ -98,7 +102,7 @@ public class StudyTimerService extends Service {
     // 越界管控运行时配置
     private String guardLevel = "off";      // off / warn / pull
     private long guardGraceMs = 5_000L;     // 宽限（毫秒）：由 guardGraceSec × 1000
-    private long guardPollMs = GUARD_POLL_WARN_MS;
+    private long guardPollMs = GUARD_POLL_MS;
     private final Set<String> allowedApps = new HashSet<>();   // 全局白名单 ∪ 方向额外放行
     // 自动放行：本 App / 桌面 / 输入法 / 默认拨号 / systemui。
     // 少放行一个就会满屏误报——尤其桌面：按 Home 后前台是 launcher，不放行会拉回死循环。
@@ -167,7 +171,7 @@ public class StudyTimerService extends Service {
                 // 越界管控配置（仅 start 时更新；update 不改）
                 guardLevel = safeGuardLevel(intent.getStringExtra(EXTRA_GUARD_LEVEL));
                 guardGraceMs = Math.max(0, intent.getIntExtra(EXTRA_GUARD_GRACE_SEC, 5)) * 1000L;
-                guardPollMs = "pull".equals(guardLevel) ? GUARD_POLL_PULL_MS : GUARD_POLL_WARN_MS;
+                guardPollMs = GUARD_POLL_MS;
                 allowedApps.clear();
                 ArrayList<String> allow = intent.getStringArrayListExtra(EXTRA_GUARD_ALLOWED);
                 if (allow != null) allowedApps.addAll(allow);
@@ -320,7 +324,11 @@ public class StudyTimerService extends Service {
     }
 
     private void clearState() {
-        prefs().edit().clear().apply();
+        // 保留判定日志：它是事后分析误报的唯一依据，不能随会话结束被一起清掉
+        String log = prefs().getString(KEY_GUARD_LOG, "");
+        SharedPreferences.Editor ed = prefs().edit().clear();
+        if (!log.isEmpty() && !"[]".equals(log)) ed.putString(KEY_GUARD_LOG, log);
+        ed.apply();
     }
 
     private void restoreState() {
@@ -336,7 +344,7 @@ public class StudyTimerService extends Service {
             startedAtWallMs = System.currentTimeMillis();
             guardLevel = "off";
             guardGraceMs = 5_000L;
-            guardPollMs = GUARD_POLL_WARN_MS;
+            guardPollMs = GUARD_POLL_MS;
             allowedApps.clear();
             autoAllow.clear();
             selfPackage = getPackageName();
@@ -350,7 +358,7 @@ public class StudyTimerService extends Service {
         accumulatedMs = sp.getLong(KEY_ACCUMULATED_MS, 0);
         guardLevel = safeGuardLevel(sp.getString(KEY_GUARD_LEVEL, "off"));
         guardGraceMs = sp.getLong(KEY_GUARD_GRACE_MS, 5_000L);
-        guardPollMs = "pull".equals(guardLevel) ? GUARD_POLL_PULL_MS : GUARD_POLL_WARN_MS;
+        guardPollMs = GUARD_POLL_MS;
         allowedApps.clear();
         allowedApps.addAll(sp.getStringSet(KEY_GUARD_ALLOWED, new HashSet<>()));
         selfPackage = getPackageName();
@@ -420,7 +428,11 @@ public class StudyTimerService extends Service {
 
     /** 供 Plugin.stop 调用：无条件清掉持久化状态（不依赖 onDestroy 是否被调用） */
     public static void clearPersistedState(Context ctx) {
-        prefsOf(ctx).edit().clear().apply();
+        // 同 clearState：判定日志要跨会话保留，否则每次停下就把证据抹了
+        String log = prefsOf(ctx).getString(KEY_GUARD_LOG, "");
+        SharedPreferences.Editor ed = prefsOf(ctx).edit().clear();
+        if (!log.isEmpty() && !"[]".equals(log)) ed.putString(KEY_GUARD_LOG, log);
+        ed.apply();
     }
 
     // ---------- 工具 ----------
@@ -507,29 +519,60 @@ public class StudyTimerService extends Service {
         }
     }
 
-    // 取最近前台应用包名（最近 10s 窗口内 lastTimeUsed 最新、且有过前台时长的应用）
-    private String getRecentForegroundPackage() {
+    /**
+     * 取当前前台包名。
+     *
+     * 必须走 queryEvents，不能用 queryUsageStats：
+     * 聚合查询（INTERVAL_BEST）本身有分钟级延迟，3 秒轮询拿到的还是几分钟前的排序，
+     * 「离开 5 秒」这种判定根本立不住。改成读最近窗口的事件流，取最后一条「界面回到前台」
+     * 的包名 —— 事件是准实时的，代价只是多读几十条记录。
+     *
+     * @param windowMs 回看窗口。取比轮询间隔稍长一点，避免恰好落在两次事件之间读空。
+     */
+    private String getForegroundPackageViaEvents(long windowMs) {
         try {
             UsageStatsManager usm = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
             if (usm == null) return null;
             long now = System.currentTimeMillis();
-            List<UsageStats> stats = usm.queryUsageStats(
-                    UsageStatsManager.INTERVAL_BEST, now - 10_000, now);
-            String top = null;
-            long topTime = -1;
-            if (stats != null) {
-                for (UsageStats s : stats) {
-                    if (s.getTotalTimeInForeground() <= 0) continue;
-                    long last = s.getLastTimeUsed();
-                    if (last > topTime) {
-                        topTime = last;
-                        top = s.getPackageName();
+            UsageEvents events = usm.queryEvents(now - windowMs, now);
+            if (events == null) return null;
+            // API 29 起 ACTIVITY_RESUMED 取代 MOVE_TO_FOREGROUND，两个常量都是编译期内联的 int，
+            // 引旧常量在低版本也不会有运行时查找问题
+            int resumedType = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                    ? UsageEvents.Event.ACTIVITY_RESUMED
+                    : UsageEvents.Event.MOVE_TO_FOREGROUND;
+            int pausedType = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                    ? UsageEvents.Event.ACTIVITY_PAUSED
+                    : UsageEvents.Event.MOVE_TO_BACKGROUND;
+            UsageEvents.Event e = new UsageEvents.Event();
+            String lastResumed = null;
+            String lastPaused = null;
+            long lastResumedAt = 0L;
+            long lastPausedAt = 0L;
+            while (events.hasNextEvent()) {
+                events.getNextEvent(e);
+                int type = e.getEventType();
+                if (type == resumedType) {
+                    if (e.getTimeStamp() >= lastResumedAt) {
+                        lastResumedAt = e.getTimeStamp();
+                        lastResumed = e.getPackageName();
+                    }
+                } else if (type == pausedType) {
+                    if (e.getTimeStamp() >= lastPausedAt) {
+                        lastPausedAt = e.getTimeStamp();
+                        lastPaused = e.getPackageName();
                     }
                 }
             }
-            return top;
+            if (lastResumed == null) return null;
+            // 同一包最后一条是「暂停」而不是「恢复」→ 它已经退到后台，不算前台
+            if (lastPaused != null && lastPaused.equals(lastResumed) && lastPausedAt > lastResumedAt) {
+                return null;
+            }
+            return lastResumed;
         } catch (Exception e) {
-            return null; // 未授权或异常：安全返回 null（不提醒）
+            // 未授权或异常：安全返回 null（不提醒）。宁可漏报，不可乱报。
+            return null;
         }
     }
 
@@ -543,7 +586,7 @@ public class StudyTimerService extends Service {
             firstOffListAt = 0;
             return;
         }
-        String fg = getRecentForegroundPackage();
+        String fg = getForegroundPackageViaEvents(guardPollMs + 4_000L);
         if (fg == null
                 || fg.equals(selfPackage)
                 || autoAllow.contains(fg)
@@ -552,20 +595,67 @@ public class StudyTimerService extends Service {
             return;
         }
         long now = System.currentTimeMillis();
-        if (firstOffListAt == 0) firstOffListAt = now;
-        if (now - firstOffListAt < guardGraceMs) return;
-        // 超宽限才算越界。warn 档发通知；pull 档在 B1 阶段同样只发通知
+        if (firstOffListAt == 0) {
+            firstOffListAt = now;
+            // 每轮越界只记一条起点，避免每 3 秒刷一条把日志灌满
+            appendGuardLog(fg, "away", 0);
+        }
+        long awayMs = now - firstOffListAt;
+        if (awayMs < guardGraceMs) return;
+        // 超宽限才算越界。warn 档发通知；pull 档在 B1/B2 阶段同样只发通知
         // （拉回要 SYSTEM_ALERT_WINDOW，B3 才落地，这里不做半截动作）
-        warnGuard("越界提醒", "你已离开「" + (taskName.isEmpty() ? "学习" : taskName)
+        boolean warned = warnGuard("越界提醒", "你已离开「" + (taskName.isEmpty() ? "学习" : taskName)
                 + "」超过 " + (guardGraceMs / 1000) + " 秒，回来继续吧");
+        // 只有真的发出提醒才记 trigger：日志要和用户实际被响到的次数一致，
+        // 否则拿它算误报率会偏高（节流期内的重复判定不算误报）
+        if (warned) appendGuardLog(fg, "trigger", awayMs);
     }
 
-    // 节流后发送越界通知
-    private void warnGuard(String title, String body) {
+    // 节流后发送越界通知；返回是否真的发出（用于判定日志只记实际提醒）
+    private boolean warnGuard(String title, String body) {
         long now = System.currentTimeMillis();
-        if (now - lastGuardWarnAt < GUARD_WARN_COOLDOWN_MS) return;
+        if (now - lastGuardWarnAt < GUARD_WARN_COOLDOWN_MS) return false;
         lastGuardWarnAt = now;
         sendGuardNotification(title, body);
+        return true;
+    }
+
+    // ---------- 判定日志（B2） ----------
+    // 目的：误报率要有数据可看，不靠感觉。每条记「时间 / 前台包名 / 判定」：
+    //   away    = 刚发现前台不在放行集合（本轮越界的起点）
+    //   trigger = 超过宽限且真的发出了提醒
+    // 只在这两个时机写，不每轮都写 —— 3 秒一条会把日志变成噪声。
+    private static final String KEY_GUARD_LOG = "guardLog";
+    private static final int GUARD_LOG_MAX = 200;
+
+    private void appendGuardLog(String pkg, String verdict, long awayMs) {
+        try {
+            String raw = prefs().getString(KEY_GUARD_LOG, "");
+            JSONArray arr;
+            try {
+                arr = raw.isEmpty() ? new JSONArray() : new JSONArray(raw);
+            } catch (Exception bad) {
+                arr = new JSONArray(); // 坏数据直接重建，不能因为日志坏了让轮询崩掉
+            }
+            JSONObject o = new JSONObject();
+            o.put("ts", System.currentTimeMillis());
+            o.put("pkg", pkg);
+            o.put("verdict", verdict);
+            o.put("awayMs", awayMs);
+            arr.put(o);
+            while (arr.length() > GUARD_LOG_MAX) arr.remove(0);
+            prefs().edit().putString(KEY_GUARD_LOG, arr.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** 供插件读取判定日志（服务可能已经停了，所以从 prefs 读） */
+    public static String getGuardLogFromPrefs(Context ctx) {
+        return prefsOf(ctx).getString(KEY_GUARD_LOG, "[]");
+    }
+
+    public static void clearGuardLog(Context ctx) {
+        prefsOf(ctx).edit().remove(KEY_GUARD_LOG).apply();
     }
 
     // 发送越界提醒通知（独立渠道 + 独立 id，不干扰前台服务通知）

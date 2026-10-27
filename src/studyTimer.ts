@@ -56,6 +56,9 @@ export interface StudyTimerPlugin {
   // 只读取不清除：启动时判断能否直接恢复到结束页（真正消费仍在 LearningSession）
   peekPendingAction(): Promise<StudyTimerPendingAction | null>
   getStatus(): Promise<StudyTimerStatus>
+  // 判定日志（B2）：返回 JSON 字符串，字段形状在 JS 侧解析
+  getGuardLog(): Promise<{ json?: string }>
+  clearGuardLog(): Promise<void>
   addListener(
     eventName: 'studyTimerAction',
     listener: (data: { action: StudyTimerAction }) => void,
@@ -168,5 +171,52 @@ export function onStudyTimerAction(
     if (attached && handle) {
       handle.remove().catch(() => {})
     }
+  }
+}
+
+// ---------- 判定日志（B2） ----------
+// 原生只在这两个时机写一条，避免 3 秒一条把日志变成噪声：
+//   away    = 刚发现前台不在放行集合（本轮越界的起点）
+//   trigger = 超过宽限、且真的发出了提醒
+// 用途：误报率要有数据可看，不靠感觉。
+export interface GuardLogEntry {
+  ts: number
+  pkg: string
+  verdict: 'away' | 'trigger'
+  awayMs: number
+}
+
+/** 读取判定日志（最新在后）；Web 端 / 读失败返回空数组 */
+export async function readGuardLog(): Promise<GuardLogEntry[]> {
+  try {
+    const r = await StudyTimer.getGuardLog()
+    const raw = r?.json
+    if (!raw) return []
+    const arr: unknown = JSON.parse(raw)
+    if (!Array.isArray(arr)) return []
+    const out: GuardLogEntry[] = []
+    for (const x of arr) {
+      if (!x || typeof x !== 'object') continue
+      const o = x as Record<string, unknown>
+      if (typeof o.ts !== 'number' || typeof o.pkg !== 'string') continue
+      out.push({
+        ts: o.ts,
+        pkg: o.pkg,
+        verdict: o.verdict === 'trigger' ? 'trigger' : 'away',
+        awayMs: typeof o.awayMs === 'number' ? o.awayMs : 0,
+      })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+/** 清空判定日志（只清日志，不动计时状态） */
+export async function clearGuardLog(): Promise<void> {
+  try {
+    await StudyTimer.clearGuardLog()
+  } catch {
+    /* ignore */
   }
 }

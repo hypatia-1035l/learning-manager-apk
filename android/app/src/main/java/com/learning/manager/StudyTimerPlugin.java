@@ -181,6 +181,22 @@ public class StudyTimerPlugin extends Plugin {
         call.resolve(r);
     }
 
+    // ---------- 判定日志（B2）：给「误报率」提供可核对的数据 ----------
+    // 返回 JSON 字符串而不是 JSArray：字段形状由 JS 侧解析，原生不用跟着改。
+    @PluginMethod
+    public void getGuardLog(PluginCall call) {
+        Context ctx = getContext();
+        JSObject r = new JSObject();
+        r.put("json", StudyTimerService.getGuardLogFromPrefs(ctx));
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void clearGuardLog(PluginCall call) {
+        StudyTimerService.clearGuardLog(getContext());
+        call.resolve();
+    }
+
     // ---------- 供 Receiver 调用：Bridge 存活时即时回传 JS ----------
     public static void notifyActionIfReady(String action) {
         if (staticBridge == null) return;
