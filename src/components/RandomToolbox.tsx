@@ -9,14 +9,16 @@ import type { WordBank } from '../randomTypes'
 import { WordBankRandomizer } from './random/WordBankRandomizer'
 import { BankManager } from './random/BankManager'
 import { RandomRecords } from './random/RandomRecords'
+import { NameTool } from './random/NameTool'
 
-type Tool = 'number' | 'color' | 'text' | 'wordbank' | 'banks' | 'records'
+type Tool = 'number' | 'color' | 'text' | 'wordbank' | 'name' | 'banks' | 'records'
 
 const TABS: { id: Tool; label: string }[] = [
   { id: 'number', label: '数字' },
   { id: 'color', label: '颜色' },
   { id: 'text', label: '文本' },
   { id: 'wordbank', label: '词库' },
+  { id: 'name', label: '起名' },
   { id: 'banks', label: '管理' },
   { id: 'records', label: '记录' },
 ]
@@ -86,6 +88,11 @@ export function RandomToolbox() {
               selectedIds={selectedBankIds}
               onSelectChange={setSelectedBankIds}
             />
+          </div>
+        </SwiperSlide>
+        <SwiperSlide>
+          <div className="pool-scroll">
+            <NameTool />
           </div>
         </SwiperSlide>
         <SwiperSlide>
