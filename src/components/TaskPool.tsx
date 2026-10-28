@@ -5,6 +5,7 @@ import 'swiper/css'
 import {
   useAppData,
   getCurrentObject,
+  getSequenceProgress,
   setTaskEnabled,
   setCurrentObject,
   reorderTask,
@@ -39,6 +40,25 @@ function minuteLabel(m: number): string {
   return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`
 }
 
+// 时长 → 「1 小时 10 分」/「45 分钟」；0 返回空串
+function fmtDuration(sec: number): string {
+  if (!sec || sec <= 0) return ''
+  const min = Math.round(sec / 60)
+  if (min < 60) return `${min} 分钟`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m ? `${h} 小时 ${m} 分` : `${h} 小时`
+}
+
+// 方向标识色：用 id 做稳定哈希，取 6 色盘之一。
+// 不用随机数、也不加字段——同一个方向每次渲染颜色都一样，重建方向才会换色。
+const TASK_COLORS = ['#8b6f47', '#5b7c99', '#7a8b5b', '#9b6a7a', '#6b6b9b', '#99794f']
+function taskColor(id: string): string {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return TASK_COLORS[h % TASK_COLORS.length]
+}
+
 export function TaskPool({
   onOpenTask,
   onStartSession,
@@ -51,6 +71,8 @@ export function TaskPool({
   const [showPlanForm, setShowPlanForm] = useState(false)
   // 计划 / 方向 两个内部标签页
   const [poolTab, setPoolTab] = useState<'plan' | 'tasks'>(defaultTab)
+  // 排序模式：默认关。四个箭头常驻会把卡片撑到 100px 高，信息反而被挤掉
+  const [sorting, setSorting] = useState(false)
   useEffect(() => {
     setPoolTab(defaultTab)
   }, [defaultTab])
@@ -73,6 +95,10 @@ export function TaskPool({
   const tomorrowPlan = getPlanForDate(data.plans, tomorrowKey)
   const planItems = [...(todayPlan?.items ?? [])].sort((a, b) => a.minuteOfDay - b.minuteOfDay)
   const showPlan = !!todayPlan && planItems.length > 0
+  // 计划页汇总：完成数 + 预计时长（只统计带 durationSec 的项，没有就只显示完成数）
+  const planDone = planItems.filter((i) => i.status === 'done').length
+  const planSec = planItems.reduce((s, i) => s + (i.durationSec ?? 0), 0)
+  const planEstText = fmtDuration(planSec)
 
   // 计划项开始：交给 App 层打开全屏计时会话（方向被删则忽略）
   // 计划项可能绑定了具体序列（固定到每日计划的序列）：先把当前序列切到它，
@@ -173,6 +199,15 @@ export function TaskPool({
           <div className="pool-toolbar">
             <span className="pool-meta">共 {data.tasks.length} 个</span>
             <div className="row" style={{ gap: 8 }}>
+              {data.tasks.length > 1 && (
+                <button
+                  className={`btn sm ${sorting ? 'primary' : ''}`}
+                  onClick={() => setSorting((v) => !v)}
+                  title={sorting ? '退出排序，卡片恢复清爽' : '调整方向顺序（顺序即随机权重外的排列）'}
+                >
+                  {sorting ? '完成排序' : '排序'}
+                </button>
+              )}
               <button className="btn primary" onClick={handleRandomStart}>
                 随机开始
               </button>
@@ -198,6 +233,10 @@ export function TaskPool({
           <div className="pool-scroll">
             {showPlan ? (
               <div className="plan-section">
+                <div className="plan-summary faint">
+                  今日 {planDone}/{planItems.length}
+                  {planEstText ? ` · 预计 ${planEstText}` : ''}
+                </div>
                 <div className="plan-list">
                   {planItems.map((it) => (
                     <PlanItemRow
@@ -237,7 +276,15 @@ export function TaskPool({
                 )}
               </div>
             ) : (
-              <div className="plan-empty faint">今日暂无计划，开启提醒后会在当天生成。</div>
+              <div className="empty-state compact-empty">
+                <p>今日暂无计划</p>
+                <button className="btn primary" onClick={() => setShowPlanForm(true)}>
+                  新建今日计划
+                </button>
+                <p className="faint" style={{ fontSize: 12 }}>
+                  开启提醒后也会在当天自动生成
+                </p>
+              </div>
             )}
           </div>
         </SwiperSlide>
@@ -246,7 +293,13 @@ export function TaskPool({
           <div className="pool-scroll">
             {data.tasks.length === 0 ? (
               <div className="empty-state compact-empty">
-                <p>暂无方向</p>
+                <p>还没有方向</p>
+                <button className="btn primary" onClick={() => setShowForm(true)}>
+                  + 添加第一个方向
+                </button>
+                <p className="faint" style={{ fontSize: 12 }}>
+                  一个方向 = 一个长期目标（阅读 / 绘画 / 编程…）
+                </p>
               </div>
             ) : (
               <div className="task-grid">
@@ -255,15 +308,26 @@ export function TaskPool({
                   const wd = weekdaysShort(task.weekdays)
                   const isFirst = idx === 0
                   const isLast = idx === data.tasks.length - 1
+                  const color = taskColor(task.id)
+                  // 数量型进度才画进度条：位置型（「卷八十九」）没有分母，画不出来
+                  const prog = obj ? getSequenceProgress(obj) : null
+                  const bar =
+                    prog && prog.type === 'count' && prog.target > 0
+                      ? {
+                          pct: Math.max(0, Math.min(100, (prog.current / prog.target) * 100)),
+                          text: `${prog.current}/${prog.target}${prog.unit ? ` ${prog.unit}` : ''}`,
+                        }
+                      : null
                   return (
                     <div
                       key={task.id}
                       className={`task-card ${task.enabled ? '' : 'disabled'}`}
                       onClick={() => onOpenTask(task)}
                     >
+                      {/* 开关必须有文字：单一个复选框，用户看不出它管的是「参与次日计划」 */}
                       <label
                         className="tc-toggle"
-                        title="启用 / 停用"
+                        title="勾上：参与次日计划与随机接续"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -271,10 +335,12 @@ export function TaskPool({
                           checked={task.enabled}
                           onChange={(e) => setTaskEnabled(task.id, e.target.checked)}
                         />
+                        <span className="tc-toggle-label">参与计划</span>
                       </label>
 
                       <div className="tc-body">
                         <div className="tc-title">
+                          <span className="tc-dot" style={{ background: color }} aria-hidden />
                           <span className="tc-name">{task.name}</span>
                           {wd && (
                             <span
@@ -292,42 +358,53 @@ export function TaskPool({
                               ? '未选择'
                               : '暂无'}
                         </div>
+                        {bar && (
+                          <div className="tc-prog">
+                            <div className="tc-bar">
+                              <i style={{ width: `${bar.pct}%`, background: color }} />
+                            </div>
+                            <span className="tc-prog-text faint">{bar.text}</span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="tc-reorder" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="reorder-btn"
-                          disabled={isFirst}
-                          title="置顶"
-                          onClick={() => moveTaskToEdge(task.id, 'top')}
-                        >
-                          ⤒
-                        </button>
-                        <button
-                          className="reorder-btn"
-                          disabled={isFirst}
-                          title="上移"
-                          onClick={() => reorderTask(task.id, 'up')}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          className="reorder-btn"
-                          disabled={isLast}
-                          title="下移"
-                          onClick={() => reorderTask(task.id, 'down')}
-                        >
-                          ↓
-                        </button>
-                        <button
-                          className="reorder-btn"
-                          disabled={isLast}
-                          title="置底"
-                          onClick={() => moveTaskToEdge(task.id, 'bottom')}
-                        >
-                          ⤓
-                        </button>
-                      </div>
+                      {/* 排序箭头只在排序模式下出现：常驻会把卡片撑到 100px，信息被挤掉 */}
+                      {sorting && (
+                        <div className="tc-reorder" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className="reorder-btn"
+                            disabled={isFirst}
+                            title="置顶"
+                            onClick={() => moveTaskToEdge(task.id, 'top')}
+                          >
+                            ⤒
+                          </button>
+                          <button
+                            className="reorder-btn"
+                            disabled={isFirst}
+                            title="上移"
+                            onClick={() => reorderTask(task.id, 'up')}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            className="reorder-btn"
+                            disabled={isLast}
+                            title="下移"
+                            onClick={() => reorderTask(task.id, 'down')}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            className="reorder-btn"
+                            disabled={isLast}
+                            title="置底"
+                            onClick={() => moveTaskToEdge(task.id, 'bottom')}
+                          >
+                            ⤓
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )
                 })}

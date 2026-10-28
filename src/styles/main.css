@@ -67,7 +67,7 @@ select {
   .app {
     max-width: none;
     width: 100%;
-    padding: 14px 8px calc(72px + env(safe-area-inset-bottom));
+    padding: 14px 8px calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
   }
   /* 增大可点击区域，满足移动端 ≥44px 触控目标 */
   .btn {
@@ -2183,8 +2183,8 @@ html {
 }
 body {
   /* 安全区：刘海/状态栏/导航栏 */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right)
-    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  padding: var(--safe-area-inset-top, env(safe-area-inset-top)) var(--safe-area-inset-right, env(safe-area-inset-right))
+    var(--safe-area-inset-bottom, env(safe-area-inset-bottom)) var(--safe-area-inset-left, env(safe-area-inset-left));
   /* 系统字体回退，中文更佳 */
   font-family: 'Georgia', 'Songti SC', 'Source Han Serif SC', sans-serif;
   /* 防止双指缩放/拖拽选中误触 */
@@ -2234,7 +2234,7 @@ textarea {
 
 /* 学习会话：防误触，按钮加大、间距加大 */
 .session-overlay {
-  padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+  padding: var(--safe-area-inset-top, env(safe-area-inset-top)) 16px var(--safe-area-inset-bottom, env(safe-area-inset-bottom));
   /* 防止误触返回时计时丢失：固定全屏 */
   touch-action: manipulation;
 }
@@ -2266,7 +2266,7 @@ textarea {
     border-radius: var(--radius);
     max-width: 100%;
     max-height: calc(100vh - 32px);
-    padding-bottom: max(22px, env(safe-area-inset-bottom));
+    padding-bottom: max(22px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
   }
 }
 
@@ -2369,7 +2369,7 @@ textarea {
 }
 .inner-tab-swiper .pool-scroll {
   height: 100%;
-  padding: 4px 0 calc(8px + env(safe-area-inset-bottom));
+  padding: 4px 0 calc(8px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
 }
 .tabbar {
   position: fixed;
@@ -2380,7 +2380,7 @@ textarea {
   display: flex;
   background: var(--bg-card);
   border-top: 1px solid var(--line);
-  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  padding: 6px 4px calc(6px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
 }
 .tabbar-item {
   flex: 1;
@@ -2899,4 +2899,77 @@ textarea {
 /* 当前设备上找不到的应用：比「未被引用」更弱化 */
 .app-pool-row.missing {
   opacity: 0.55;
+}
+
+/* ===== B4：方向卡片信息层次 =====
+   排序箭头从「常驻」改成「排序模式才出现」，卡片高度从 100px+ 回到内容高度。
+   腾出来的地方放：开关文字、标识色、进度条 —— 都是信息，不是装饰。 */
+.tc-toggle {
+  gap: 6px;
+}
+.tc-toggle-label {
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.task-card .tc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tc-prog {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.tc-bar {
+  flex: 1;
+  min-width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.tc-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+.tc-prog-text {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* 计划页顶部汇总：今日 2/7 · 预计 1 小时 10 分 */
+.plan-summary {
+  font-size: 12px;
+  padding: 2px 0 6px;
+  border-bottom: 1px dashed var(--line);
+  margin-bottom: 8px;
+}
+
+/* ===== B4：把安全区收进容器 =====
+   问题：body 上有 padding-top: var(--safe-area-inset-top, env(...))，但整页滚动时
+   这段 padding 会跟着内容一起滚走，内容照样钻到状态栏底下
+   （截图里「内容序列 / 记录」标签就是这么顶上去的）。padding 只解决「起始位置」，
+   不解决「滚动过程」。
+   改法：body 定高、不滚；由页面容器自己滚。这样滚动区域永远落在安全区以内。
+   注：env(safe-area-inset-*) 已统一换成 var(--safe-area-inset-*, env(...)) 降级链——
+   Capacitor 8 的 SystemBars 会注入前一组变量（WebView ≥140 走 env 直通，更老的由原生给父视图补 padding）。 */
+body {
+  overflow: hidden;
+}
+/* 工作区 Shell 原本 min-height: 100vh（含状态栏高度），body 收窄后底部 tabbar 会被裁掉 */
+.app.app-shell {
+  min-height: 0;
+  height: 100%;
+}
+/* 子页面（任务详情 / 数据备份）：自己当滚动容器 */
+.app:not(.app-shell) {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }

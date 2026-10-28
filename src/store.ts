@@ -729,6 +729,30 @@ export function completeCurrentObject(taskId: string) {
   }))
 }
 
+// ---------- 撤销完成（completeCurrentObject 的逆操作） ----------
+// 为什么单独写一个而不是 updateLearningObject({completed:false})：
+// completeCurrentObject 会把 Task.status 一并改成 completed，只翻序列的 completed
+// 会留下一个「序列未完成、方向却已完成」的不一致状态。这里把 status 一起重算。
+export function uncompleteObject(taskId: string, objectId: string) {
+  setState((prev) => ({
+    ...prev,
+    tasks: prev.tasks.map((t) => {
+      if (t.id !== taskId || !t.group) return t
+      if (!t.group.items.some((i) => i.id === objectId)) return t
+      const items = t.group.items.map((i) =>
+        i.id === objectId ? { ...i, completed: false } : i,
+      )
+      const allDone = items.length > 0 && items.every((i) => i.completed)
+      return {
+        ...t,
+        group: { ...t.group, items },
+        status: allDone ? 'completed' : 'in_progress',
+        updatedAt: Date.now(),
+      }
+    }),
+  }))
+}
+
 // ---------- 学习会话：计时 + 记录 ----------
 // 注：parseProgressNumber 已提升至文件顶部并导出（迁移与学习会话共用）
 

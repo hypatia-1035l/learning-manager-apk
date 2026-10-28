@@ -8,6 +8,7 @@ import {
   updateLearningObject,
   setGroupMode,
   completeCurrentObject,
+  uncompleteObject,
   formatSequenceProgress,
 } from '../store'
 import { GROUP_MODE_LABELS } from '../types'
@@ -420,6 +421,19 @@ export function TaskGroupEditor({ task }: Props) {
                               }}
                             >
                               完成
+                            </button>
+                          )}
+                          {/* 完成必须可回退：手滑点一下就把整卷标记完结、又没有任何入口改回来，
+                              用户只能删了重建，进度全丢。这里给一个明确的撤销。 */}
+                          {item.completed && (
+                            <button
+                              className="icon-btn"
+                              onClick={() => {
+                                uncompleteObject(task.id, item.id)
+                                setMoreOpenId(null)
+                              }}
+                            >
+                              撤销完成
                             </button>
                           )}
                           <button
