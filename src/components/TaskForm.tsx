@@ -11,12 +11,29 @@ interface Props {
   onClose: () => void
 }
 
+// 方向模板：只预填「单位 / 目标 / 时长」这三个最常填的，别的字段不替用户做主。
+// 选中后仍可改，模板只是省掉从零开始的思考成本。
+const TASK_TEMPLATES: Array<{
+  key: string
+  label: string
+  unit: string
+  target: string
+  countdown: string
+}> = [
+  { key: 'reading', label: '阅读', unit: '章', target: '20', countdown: '25' },
+  { key: 'language', label: '语言', unit: '课', target: '12', countdown: '15' },
+  { key: 'drawing', label: '绘画', unit: '张', target: '', countdown: '45' },
+  { key: 'modeling', label: '建模', unit: '个', target: '', countdown: '60' },
+]
+
 export function TaskForm({ onClose }: Props) {
   const [name, setName] = useState('')
   // 插入位置：默认顶部（顺序即权重，新建通常想排前面）
   const [insertAt, setInsertAt] = useState<'top' | 'bottom'>('top')
   // 提醒星期（空 = 每天）
   const [weekdays, setWeekdays] = useState<number[]>([])
+  // 已套用的模板（仅用于高亮，不做别的判断）
+  const [tpl, setTpl] = useState<string>('')
 
   // 序列输入：每行一条，"名称 | 目标 | 单位 | 倒计时分钟" 竖线可选
   const [seqInput, setSeqInput] = useState('')
@@ -93,6 +110,33 @@ export function TaskForm({ onClose }: Props) {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
+        </div>
+
+        <div className="field" style={{ marginBottom: 4 }}>
+          <label>
+            快速模板
+            <span className="faint" style={{ fontSize: 12, marginLeft: 6 }}>
+              只预填单位 / 目标 / 时长，可改
+            </span>
+          </label>
+          <div className="row wrap" style={{ gap: 6 }}>
+            {TASK_TEMPLATES.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                className={`btn sm ${tpl === t.key ? 'primary' : ''}`}
+                onClick={() => {
+                  setTpl(tpl === t.key ? '' : t.key)
+                  if (tpl === t.key) return
+                  setGlobalUnit(t.unit)
+                  setGlobalTarget(t.target)
+                  setGlobalCountdown(t.countdown)
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="field" style={{ marginBottom: 4 }}>
