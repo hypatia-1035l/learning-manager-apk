@@ -157,10 +157,25 @@ bash scripts/build-apk.sh
 - **安全区**
   - `env(safe-area-inset-*)` 共 10 处 → `var(--safe-area-inset-*, env(...))` 降级链：
     Capacitor 8 的 `SystemBars` 注入前一组变量，WebView ≥140 走 `env()` 直通，更老的由原生补 padding。
-  - **结构性修复**：`body{overflow:hidden}` + `.app.app-shell{height:100%}` +
-    `.app:not(.app-shell){height:100%;overflow-y:auto}`。
-    真因是 body 的 padding 会随内容滚走，滚动时内容照样钻到状态栏底下——
-    padding 只解决「起始位置」，不解决「滚动过程」。改成由页面容器自己滚，滚动区域永远在安全区内。
+  - **结构性改动已回退（见 0.8.1）**：曾把 body 改成 `overflow:hidden` 并把滚动交给页面容器
+    （`.app.app-shell{height:100%}` + `.app:not(.app-shell){overflow-y:auto}`）。
+    结果**所有靠整页滚动的页面（设置 / 统计 / 应用白名单）直接划不动** ——
+    这些页面根元素是 `.pool-compact`，里面并没有滚动容器，只是内容高过一屏，原本全靠文档滚动。
+    教训：动滚动模型之前必须逐页确认「这一页有没有自己的 overflow 容器」，不能全局一刀切。
 
 未做（B4b，已登记）：序列表单弹层化（新增/编辑共用、删 inline-edit 与悬空序号）、
 一行录入实时解析 + 预览、记住上次单位/时长、进度节点生成器、方向模板。
+
+## 0.8.1（2026-10-30）修复：设置 / 统计页划不动
+
+- **回退** 0.8.0 的滚动结构改动（`body{overflow:hidden}` 及两条配套规则）。
+  原因：`Settings`、`StatsView`、`AppListSettings` 的根元素都是 `.pool-compact`，
+  内部**没有** `.pool-scroll`，内容高过一屏时靠的是文档滚动；body 一禁滚，这些页面全部卡死。
+  只有 `TaskPool` / `RandomToolbox` 用了 `.inner-tab-swiper` + `.pool-scroll` 的页内滚动模型。
+- **保留** `env()` → `var(--safe-area-inset-*, env(...))` 降级链：纯增益，不碰滚动模型。
+- 顺带修：`main.css` 行尾归一为 CRLF（此前用 shell 追加样式带进了 83 行裸 LF）。
+- 「滚动时标签顶进状态栏」**仍未解决**。正确做法是逐页给内容区包一层滚动容器（照 `.inner-tab-swiper`
+  那套），属于 B4b 的独立改动，不再用全局改滚动模型的方式做。
+
+> 教训（写在这里免得下次再犯）：任何全局性的 `overflow` / `height` 改动，先列出「哪些页面有自己的滚动容器」，
+> 只改有容器的那批，或者先给没有容器的页面补上容器，再谈全局。

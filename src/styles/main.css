@@ -2950,26 +2950,3 @@ textarea {
   border-bottom: 1px dashed var(--line);
   margin-bottom: 8px;
 }
-
-/* ===== B4：把安全区收进容器 =====
-   问题：body 上有 padding-top: var(--safe-area-inset-top, env(...))，但整页滚动时
-   这段 padding 会跟着内容一起滚走，内容照样钻到状态栏底下
-   （截图里「内容序列 / 记录」标签就是这么顶上去的）。padding 只解决「起始位置」，
-   不解决「滚动过程」。
-   改法：body 定高、不滚；由页面容器自己滚。这样滚动区域永远落在安全区以内。
-   注：env(safe-area-inset-*) 已统一换成 var(--safe-area-inset-*, env(...)) 降级链——
-   Capacitor 8 的 SystemBars 会注入前一组变量（WebView ≥140 走 env 直通，更老的由原生给父视图补 padding）。 */
-body {
-  overflow: hidden;
-}
-/* 工作区 Shell 原本 min-height: 100vh（含状态栏高度），body 收窄后底部 tabbar 会被裁掉 */
-.app.app-shell {
-  min-height: 0;
-  height: 100%;
-}
-/* 子页面（任务详情 / 数据备份）：自己当滚动容器 */
-.app:not(.app-shell) {
-  height: 100%;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
