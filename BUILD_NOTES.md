@@ -212,3 +212,29 @@ bash scripts/build-apk.sh
 
 > 要解决状态栏问题，得先给后四行补上滚动容器（照 `.inner-tab-swiper` + `.pool-scroll` 那套），
 > 再逐页验收，不要一次全局改。
+
+## 0.9.1（2026-11-01）B4c：状态栏隔离带（不改滚动模型）
+
+原本打算逐页补滚动容器，实际读代码后换了做法——原因和做法都记在这里，免得下次又绕回来。
+
+**为什么不用「逐页补容器」**：`.shell-main` 不是 flex 容器、`.pool-compact` 的 `flex:1` 在这里不生效，
+所以 `.inner-tab-swiper{height:100%}` 实际也拿不到确定高度——**全站其实都靠文档滚动**，
+所谓「页内滚动」只是看起来像。要让某页真正内部滚动，就得同时改
+`body / .app-shell / .shell-main / .pool-compact` 的 height 链，正是 0.8.0 翻车的那条路。
+
+**改成两层隔离，都不碰滚动模型**：
+
+1. `body::before`：在状态栏高度画一条与页面同色（`var(--bg)`）的不透明带，滚上去的内容被盖住。
+   `position: fixed` + `z-index: 15`（高于 sticky 头部 10 与普通内容，低于 tabbar 50 / 会话遮罩 60 / 弹层 70）。
+2. `.shell-header`：原本 `sticky top: 0`，吸顶时顶端正好落在状态栏里；改为
+   `top: var(--safe-area-inset-top, env(...))`，吸附在隔离带下方。
+   只有第 1 层没有第 2 层的话，头部会嵌在带子下面被切掉一截。
+
+**为什么不会重演 0.8.0**：这次没有一条规则改 `overflow` / `height`，滚动依旧由文档完成；
+Web 预览或无刘海设备上 `--safe-area-inset-top` 为 0，带子高度 0、sticky 仍在 0，**效果与改动前完全一致**。
+
+**与 Capacitor 两条分支的关系**（重要，别改坏）：
+- WebView ≥ 140：`SystemBars` 走 passthrough，`--safe-area-inset-*` 是真值，`env()` 也生效 → 带子与 body padding 同时起作用。
+- WebView < 140：`SystemBars` 给 WebView 父视图设 padding，且注入的变量被置 0 → 带子高度 0、body padding 0，
+  间距由原生负责，不会出现「双份间距」。
+

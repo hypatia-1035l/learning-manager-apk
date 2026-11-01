@@ -2950,3 +2950,28 @@ textarea {
   border-bottom: 1px dashed var(--line);
   margin-bottom: 8px;
 }
+
+/* ===== B4c：状态栏隔离带 =====
+   症状：edge-to-edge 下页面滚动时，内容（典型是详情页的「内容序列 / 记录」标签）会滑进
+   状态栏区域，和时钟、电量叠在一起。
+   处理两层，都**不碰滚动模型**（0.8.0 全局改 overflow 把设置页划不动过一次，教训在此）：
+     1) body::before 在「状态栏高度」画一条与页面同色的不透明带，滚上去的内容被它盖住；
+     2) .shell-header 原本 sticky top:0 —— 吸顶时顶端正好落在状态栏里，改成吸附在隔离带下方。
+   安全性：--safe-area-inset-* 由 Capacitor 的 SystemBars 注入；Web 预览 / 无刘海设备上为 0，
+   此时带子高度 0、sticky 仍在 0，效果与改动前完全一致。
+   层级：15 —— 高于 sticky 头部(10)与普通内容，低于 tabbar(50) / 会话遮罩(60) / 弹层(70)，
+   所以带子不会盖住底部导航和任何弹窗。 */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  background: var(--bg);
+  z-index: 15;
+  pointer-events: none;
+}
+.shell-header {
+  top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+}
