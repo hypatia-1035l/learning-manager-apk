@@ -263,3 +263,23 @@ Web 预览或无刘海设备上 `--safe-area-inset-top` 为 0，带子高度 0�
 - `22-stats-daily-bucket-boundary`：今天 0 点整 / 昨天最后一毫秒 / 昨天 0 点分别落对桶；连续天数 2。
   **故意用 `env: { TZ: 'America/New_York' }` 跑**——哪天有人把 `setDate` 换回减 `86400000`，这个场景就会红。
 
+## 0.9.3（2026-11-01）隔离带在弹层下透出横带的修正
+
+0.9.1 的 `body::before` 隔离带压在 `.modal-overlay`（`rgba(40,32,22,.45)` 半透明遮罩）之下，
+遮罩顶部会透出一条更亮的横带，看着像「顶部多了个色块」。修法：
+
+```css
+body:has(.modal-overlay)::before,
+body:has(.session-overlay)::before { height: 0; }
+```
+
+- 弹层 / 学习会话打开时把带子收掉：这两者自己铺满全屏，不需要带子
+  （会话遮罩本来是不透明渐变，收掉不影响）。
+- `:has()` 需 Chromium 105+；更老的 WebView 会忽略本段，最多留一条浅带，不影响功能。
+
+**关于隔离带本身的定位（保留理由，记在这里免得以后反复）**：它是「遮盖」而不是「根治」。
+根治要让内容根本不进入状态栏区域，即每页自带滚动容器；但本项目全站都靠文档滚动
+（`.shell-main` 非 flex、`.pool-compact` 的 `flex:1` 不生效、`.inner-tab-swiper{height:100%}` 取空高度），
+要做就得动 `body / .app-shell / .shell-main / .pool-compact` 的 height 链 —— 0.8.0 翻车的同一条路。
+在不动滚动模型的前提下，画同色带盖住是唯一可行解，故保留。
+
