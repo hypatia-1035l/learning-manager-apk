@@ -2975,3 +2975,13 @@ body::before {
 .shell-header {
   top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
 }
+
+/* 弹层/会话打开时把带子收掉：
+   .modal-overlay 是半透明遮罩 rgba(40,32,22,.45)，带子在它下面会透出一条更亮的横带，
+   看着像「顶部多了个色块」。遮罩和会话自己铺满全屏，不需要带子；
+   会话遮罩本来就是不透明渐变，收掉也不影响。
+   :has() 需要 Chromium 105+；更老的 WebView 会忽略本段，最多留一条浅带，不影响功能。 */
+body:has(.modal-overlay)::before,
+body:has(.session-overlay)::before {
+  height: 0;
+}
