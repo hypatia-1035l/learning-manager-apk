@@ -2982,6 +2982,10 @@ body::before {
    会话遮罩本来就是不透明渐变，收掉也不影响。
    :has() 需要 Chromium 105+；更老的 WebView 会忽略本段，最多留一条浅带，不影响功能。 */
 body:has(.modal-overlay)::before,
-body:has(.session-overlay)::before {
+body:has(.session-overlay)::before,
+/* 设计令牌层（design-tokens.css）的弹层用 .m-mask / .m-sheet，
+   不并进来就会在新弹层顶部露一条亮带 */
+body:has(.m-mask)::before,
+body:has(.m-sheet)::before {
   height: 0;
 }
