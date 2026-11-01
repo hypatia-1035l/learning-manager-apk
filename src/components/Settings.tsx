@@ -13,9 +13,9 @@ interface Props {
 }
 
 export function Settings({ onOpenBackup }: Props) {
-  // 设置主页 / 说明子页 / 应用名单子页
+  // 设置主页 / 说明子页 / 应用白名单子页
   const [view, setView] = useState<'main' | 'help' | 'apps'>('main')
-  // 越界提醒设置弹窗（Modal，形态与提醒设置一致）
+  // 越界管控设置弹窗（Modal，形态与提醒设置一致）
   const [showGuard, setShowGuard] = useState(false)
   const data = useAppData()
   const globalCount = (data.globalAllowedApps ?? []).length
@@ -137,12 +137,26 @@ function HelpContent() {
       </div>
 
       <div className="section">
+        <div className="section-title">越界管控</div>
+        <ul className="help-list">
+          <li><b>强度三档</b>：关闭 / 离开就提醒 / 离开就拉回。只有后两档才轮询；关闭时零轮询、零耗电。</li>
+          <li><b>宽限时间</b>：离开放行集合超过这么久才算越界，默认 5 秒。判定按 3 秒轮询，实际响应约「宽限 + 最多 3 秒」。</li>
+          <li><b>拉回</b>：需要悬浮窗权限；没权限时这一档是灰的，不给按了没反应的开关。系统拦后台启动时会自动降级成提醒。</li>
+          <li><b>判定记录</b>：记「离开 / 已提醒 / 已拉回」三个时刻与前台包名。觉得误报就把它贴出来，比「好像老响」好定位。</li>
+          <li><b>权限体检</b>：使用情况访问（必需）、悬浮窗（拉回必需）、厂商自启动（状态读不到，只能自己确认）。从系统设置切回来会自动重测。</li>
+          <li><b>紧急退出</b>：计时页长按「结束」再确认，即可放弃本次计时（不写记录），用于被误拦时脱身。</li>
+        </ul>
+      </div>
+
+      <div className="section">
         <div className="section-title">方向详情（内容序列）</div>
         <ul className="help-list">
-          <li><b>序列名 / 单位 / 目标 / 倒计时</b>：添加一条序列时的参数。</li>
-          <li><b>进度</b>：当前已完成的进度值。</li>
-          <li><b>时长</b>：单次计时分钟数，可点快捷或自填。</li>
-          <li><b>进度节点</b>：同新建时的含义。</li>
+          <li><b>新建序列</b>：点「＋ 新建序列」开弹层，一次只编辑一条。默认只露「名称 + 时长」，单位 / 目标 / 当前进度 / 节点收在「更多」里。</li>
+          <li><b>一行录入</b>：在弹层顶部粘「卷三 80 篇 25」会自动拆到各字段，与「批量」是同一套语法；识别到多条时会提示改用批量。</li>
+          <li><b>记住上次</b>：保存过的单位与时长会记住，下次新建自动预填；批量导入里没写的参数也取这一份。</li>
+          <li><b>时长</b>：5 / 15 / 25 / 45 快捷或自填；留空 = 正向计时，计到手动结束。</li>
+          <li><b>进度节点</b>：每行「数字 名称」。可用弹层里的「自动生成」按步长铺刻度（例如步长 10、前缀第、后缀章），上限 100 条。</li>
+          <li><b>完成 / 撤销完成</b>：都收在「更多」里。标记完成后可原路撤销，不会出现「点错就只能删了重建」。</li>
         </ul>
       </div>
 

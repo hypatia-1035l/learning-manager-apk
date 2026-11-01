@@ -111,9 +111,10 @@ function migrateLearningObject(i: LearningObject): LearningObject {
   return merged
 }
 
-// ---------- 迁移：包名列表（方向应用名单） ----------
+// ---------- 迁移：包名列表 ----------
 // 清洗为去重、去空白、去非字符串的 packageName 数组。
-// 空数组与 undefined 语义相同：该方向没有允许的应用 → 默认全部禁止。
+// v2 起语义是「方向在本方向额外放行的应用」（全局白名单之外的增量），
+// 空数组 = 不额外放行；最终放行集合见 store.resolveAllowedApps（只做加法）。
 function sanitizePackageList(v: unknown): string[] {
   if (!Array.isArray(v)) return []
   const out: string[] = []

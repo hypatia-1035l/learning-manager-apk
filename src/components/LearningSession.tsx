@@ -477,7 +477,7 @@ export function LearningSession({ task, onClose }: Props) {
         {pinned ? '★ 已固定' : '☆ 固定'}
       </button>
 
-      {/* 允许的应用：点击直接进入（计时照常跑，通知栏可一键回来） */}
+      {/* 本方向的放行集合（全局白名单 ∪ 额外放行）：点击直接进入（计时照常跑，通知栏可一键回来） */}
       {allowedApps.length > 0 && (
         <div className="session-apps">
           {allowedApps.map((pkg) => {

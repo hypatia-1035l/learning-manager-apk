@@ -130,7 +130,8 @@ export interface AppData {
   // 固定任务：被用户标星固定的方向/序列，每天自动进入计划，直到手动取消
   pinnedTasks?: PinnedTask[]
   // 应用池：曾选入过名单的应用元数据缓存（包名 → 应用名）。
-  // 注意：这里只存元数据，**不带策略立场**——允许/分心全部存在 Task 上，
+  // 注意：这里只存元数据，**不带策略立场**——放行集合全部由方向级的 allowedApps
+  // 与全局 globalAllowedApps 决定（v2 起没有黑名单，见 store.resolveAllowedApps）。
   // 避免「池里有立场、方向里也有立场」的双份真相。
   appPool?: AppEntry[]
   // 全局白名单：所有方向共用的放行应用（词典、识日这类「哪个方向都要用」的）。
