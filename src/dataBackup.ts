@@ -8,6 +8,11 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 const KEY_PREFIX = 'learning-manager:'
 const EXPORT_VERSION = 1
 
+// 主数据键：没有它就没有「学习数据」。
+// 导入时会先清空所有现有持久键、再只写备份里有的键 —— 所以备份缺这个键时，
+// 用户的学习记录会被整体清空且补不回来。必须直接拒绝，不能只提示。
+const MAIN_DATA_KEY = 'learning-manager:data:v1'
+
 // 运行时瞬态键：由当前设备运行状态派生，绝不可纳入备份。
 // 若被导出并在其他设备/时间恢复，会导致：
 //  - session-active=true        → 永久压制提醒
@@ -28,6 +33,18 @@ const TRANSIENT_KEYS = new Set<string>([
   'learning-manager:last-session-end',
 ])
 
+// 本地专用键：既不导出、也不在导入时删除。
+// 目前只有一条 —— v1→v2 迁移前的黑名单存档：它是「删字段前的存底」，
+// 随每份备份反复传播没有意义，也不该在导入时被当成数据写入。
+const LOCAL_ONLY_KEYS = new Set<string>([
+  'learning-manager:data:v1-blocked-backup',
+])
+
+/** 既不是运行时瞬态、也不是本地存档的键，才参与备份的读写 */
+function isBackupParticipant(key: string): boolean {
+  return !TRANSIENT_KEYS.has(key) && !LOCAL_ONLY_KEYS.has(key)
+}
+
 // 备份文件结构
 export interface BackupFile {
   version: number
@@ -45,7 +62,7 @@ export function exportAllData(): BackupFile {
       if (
         key &&
         key.startsWith(KEY_PREFIX) &&
-        !TRANSIENT_KEYS.has(key) // 排除运行时瞬态键，避免恢复后污染运行态
+        isBackupParticipant(key) // 排除运行时瞬态键与本地存档，避免污染运行态 / 反复传播存档
       ) {
         const val = localStorage.getItem(key)
         if (val !== null) data[key] = val
@@ -124,6 +141,8 @@ export function parseBackup(text: string): BackupFile | null {
 export interface ValidationResult {
   ok: boolean
   error?: string
+  /** 可以导入，但用户应当知道的副作用（在确认导入前展示） */
+  warnings?: string[]
   keyCount?: number
   keys?: string[]
 }
@@ -132,6 +151,14 @@ export function validateBackup(backup: BackupFile): ValidationResult {
   const entries = Object.entries(backup.data)
   if (entries.length === 0) {
     return { ok: false, error: '备份文件中没有数据' }
+  }
+  // 版本：只认识「不高于当前导出格式」的备份。
+  // 更新版本的备份可能带当前代码读不懂的字段，硬导会静默丢数据。
+  if (backup.version > EXPORT_VERSION) {
+    return {
+      ok: false,
+      error: `备份来自更新版本的 App（格式 v${backup.version}，当前只认到 v${EXPORT_VERSION}）。为避免丢掉新字段，已阻止导入；请先升级 App。`,
+    }
   }
   // 所有 key 必须以 learning-manager: 开头
   const invalid = entries.filter(([k]) => !k.startsWith(KEY_PREFIX))
@@ -150,10 +177,29 @@ export function validateBackup(backup: BackupFile): ValidationResult {
       error: `发现 ${invalidValues.length} 项数据不是字符串（文件可能被改坏）`,
     }
   }
+  // 主数据必须有：导入流程会先清空现有持久键，缺这条等于「清空学习记录且无处可补」
+  if (!(MAIN_DATA_KEY in backup.data)) {
+    return {
+      ok: false,
+      error:
+        '备份里没有「学习数据」（任务 / 序列 / 记录）。导入会先清空现有数据，而这份文件补不回来 —— 已阻止，请确认选对了文件。',
+    }
+  }
+
+  const warnings: string[] = []
+  if (!('learning-manager:random-toolbox:v1' in backup.data)) {
+    warnings.push('这份备份不含随机工具箱（词库 / 预设 / 随机记录），导入后现有词库会被清空。')
+  }
+  const localOnlyCount = entries.filter(([k]) => LOCAL_ONLY_KEYS.has(k)).length
+  if (localOnlyCount > 0) {
+    warnings.push(`备份里有 ${localOnlyCount} 项本地存档，导入时会忽略（不写回）。`)
+  }
+
   return {
     ok: true,
     keyCount: entries.length,
     keys: entries.map(([k]) => k),
+    warnings: warnings.length > 0 ? warnings : undefined,
   }
 }
 
@@ -176,7 +222,7 @@ export function importBackup(backup: BackupFile): ImportBackupResult {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
-      if (!key || !key.startsWith(KEY_PREFIX) || TRANSIENT_KEYS.has(key)) continue
+      if (!key || !key.startsWith(KEY_PREFIX) || !isBackupParticipant(key)) continue
       const val = localStorage.getItem(key)
       if (val !== null) oldEntries.push([key, val])
     }
@@ -186,7 +232,7 @@ export function importBackup(backup: BackupFile): ImportBackupResult {
   const staleKeys = oldEntries.map(([k]) => k)
   // 2. 待写入项：只写本应用的持久键（跳过任何瞬态键，防御性）
   const newEntries = Object.entries(backup.data).filter(
-    ([key]) => key.startsWith(KEY_PREFIX) && !TRANSIENT_KEYS.has(key),
+    ([key]) => key.startsWith(KEY_PREFIX) && isBackupParticipant(key),
   )
   // 备份里只有瞬态键（或没有可写项）时直接失败：否则会「删光现有数据后什么都不写、再 reload」
   if (newEntries.length === 0) {

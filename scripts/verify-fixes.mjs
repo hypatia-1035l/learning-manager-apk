@@ -519,6 +519,96 @@ assert(res.addedColorRanges === 0 || res.skippedColorRanges > 0, '同环境重�
 assert(res.invalidItems === 0, '合法导出文件没有非法条目')
 `,
   },
+  {
+    // 备份缺主数据 → 导入会「先清空全部持久键、再只写备份里有的键」，
+    // 等于学习记录被清空且无处可补。必须在校验阶段就拦住。
+    name: '19-backup-rejects-missing-main-data',
+    seed: {
+      'learning-manager:data:v1': '{"tasks":[]}',
+    },
+    imports: `import { validateBackup } from './dataBackup'`,
+    body: `
+const base = { version: 1, exportedAt: Date.now(), app: '今天摸啥鱼' }
+const noMain = validateBackup({ ...base, data: { 'learning-manager:random-toolbox:v1': '{}' } })
+assert(noMain.ok === false, '缺主数据的备份被拒绝（否则会清空学习记录）')
+assert(String(noMain.error).includes('学习数据'), '错误信息指明缺的是学习数据')
+
+const withMain = validateBackup({ ...base, data: { 'learning-manager:data:v1': '{}' } })
+assert(withMain.ok === true, '含主数据的备份通过校验')
+assert(Array.isArray(withMain.warnings) && withMain.warnings.length === 1, '缺词库时给出 1 条提醒')
+assert(withMain.warnings[0].includes('词库'), '提醒内容指明会清空词库')
+
+const full = validateBackup({
+  ...base,
+  data: { 'learning-manager:data:v1': '{}', 'learning-manager:random-toolbox:v1': '{}' },
+})
+assert(full.ok === true && full.warnings === undefined, '数据齐全时没有多余提醒')
+`,
+  },
+  {
+    name: '20-backup-rejects-future-version',
+    seed: {},
+    imports: `import { validateBackup } from './dataBackup'`,
+    body: `
+const r = validateBackup({
+  version: 99,
+  exportedAt: Date.now(),
+  app: '今天摸啥鱼',
+  data: { 'learning-manager:data:v1': '{}' },
+})
+assert(r.ok === false, '来自更新版本的备份被拒绝（硬导会静默丢新字段）')
+assert(String(r.error).includes('v99'), '错误信息带出实际版本号')
+assert(String(r.error).includes('升级'), '错误信息给出可执行的下一步')
+`,
+  },
+  {
+    // v1→v2 的黑名单存档只该留在本机，不该随备份反复传播
+    name: '21-backup-skips-local-archive',
+    seed: {
+      'learning-manager:data:v1': '{}',
+      'learning-manager:random-toolbox:v1': '{}',
+      'learning-manager:data:v1-blocked-backup': '{"tasks":[{"id":"t","blockedApps":["a.b"]}]}',
+    },
+    imports: `import { exportAllData } from './dataBackup'`,
+    body: `
+const b = exportAllData()
+assert(!('learning-manager:data:v1-blocked-backup' in b.data), '本地存档不进入备份')
+assert('learning-manager:data:v1' in b.data, '主数据正常导出')
+assert('learning-manager:random-toolbox:v1' in b.data, '词库数据正常导出')
+`,
+  },
+  {
+    // 日桶边界：用 setDate 取本地 0 点（不是减 86400000），
+    // 否则夏令时那天边界整体偏移一小时，0 点附近的记录会落到相邻日期。
+    name: '22-stats-daily-bucket-boundary',
+    seed: {},
+    // 故意跑在有夏令时的时区：若哪天有人把 setDate 改回「减 86400000」，
+    // 夏令时切换那天的桶边界会整体偏一小时，这个场景就会红。
+    env: { TZ: 'America/New_York' },
+    imports: `import { getDailyDurations, getStreakDays } from './store'`,
+    body: `
+const mid = (offset) => {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - offset)
+  return d.getTime()
+}
+const rec = (id, date, duration) => ({
+  id, taskId: 't1', taskName: 'x', sequenceId: 's1', sequenceName: 's', date, duration,
+})
+const recs = [
+  rec('a', mid(0), 60),
+  rec('b', mid(0) - 1, 30),   // 昨天 23:59:59.999
+  rec('c', mid(1), 20),       // 昨天 0 点整
+]
+const d = getDailyDurations(recs, 3)
+assert(d.length === 3, '返回 3 个日桶')
+assert(d[2].duration === 60, '今天 0 点整的记录归入今天')
+assert(d[1].duration === 50, '昨天 0 点与昨天最后一毫秒都归入昨天')
+assert(d[0].duration === 0, '前天没有记录')
+assert(getStreakDays(recs) === 2, '连续天数按本地日期计：昨天 + 今天 = 2')
+`,
+  },
 ]
 
 const alias = {

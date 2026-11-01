@@ -238,3 +238,28 @@ Web 预览或无刘海设备上 `--safe-area-inset-top` 为 0，带子高度 0�
 - WebView < 140：`SystemBars` 给 WebView 父视图设 padding，且注入的变量被置 0 → 带子高度 0、body padding 0，
   间距由原生负责，不会出现「双份间距」。
 
+## 0.9.2（2026-11-01）备份导入的三处硬缺陷 + 日期边界回归用例
+
+**先纠正我上一轮的两处误判**（查了代码才发现的，写在前面免得下次又照着错的去做）：
+- `StatsView` **不是**「只有饼图」：它已有按方向汇总、7/30 天趋势、最近 15 条记录、连续天数。
+- 日桶边界**已经**是对的：`startOfDayOffset` 用 `setDate` 取本地 0 点而不是减 `86400000`，
+  注释里也写了夏令时那天只有 23/25 小时。缺的不是修逻辑，是**没有用例守住它**。
+
+**备份导入的真缺陷（都在 `dataBackup.ts`）**
+
+| # | 缺陷 | 后果 | 修法 |
+|---|---|---|---|
+| A | 备份缺 `learning-manager:data:v1` 时仍可通过校验 | `importBackup` 先清空**所有**持久键、再只写备份里有的键 → **学习记录被整体清空，且补不回来**，还提示导入成功 | `validateBackup` 把主数据列为必备，缺则拒绝并说明原因 |
+| B | 不校验 `backup.version` | 导入更新版本 App 导出的备份，未知字段被静默丢弃 | `version > EXPORT_VERSION` 直接拒绝，提示升级 App |
+| C | `data:v1-blocked-backup`（v1→v2 迁移存档）随备份导出 | 旧黑名单在每个备份里反复传播 | 新增 `LOCAL_ONLY_KEYS` + `isBackupParticipant()`：既不导出，也不在导入时删除 |
+
+另外：`validateBackup` 新增 `warnings`（可导入但需知情），目前覆盖「备份不含词库，导入后现有词库会被清空」；
+`DataBackup.tsx` 在确认前用 notice 块展示；`KEY_LABELS` 补了 `last-seq-defaults` 与迁移存档两条。
+
+**回归用例（`npm run verify`，18 → 22 场景，全通过）**
+- `19-backup-rejects-missing-main-data`：缺主数据被拒；含主数据通过；缺词库给 1 条提醒。
+- `20-backup-rejects-future-version`：`version: 99` 被拒，错误信息含版本号与「升级」。
+- `21-backup-skips-local-archive`：迁移存档不进入备份，主数据与词库正常导出。
+- `22-stats-daily-bucket-boundary`：今天 0 点整 / 昨天最后一毫秒 / 昨天 0 点分别落对桶；连续天数 2。
+  **故意用 `env: { TZ: 'America/New_York' }` 跑**——哪天有人把 `setDate` 换回减 `86400000`，这个场景就会红。
+

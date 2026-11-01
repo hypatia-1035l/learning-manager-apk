@@ -26,6 +26,8 @@ const KEY_LABELS: Record<string, string> = {
   'learning-manager:wb-display-mode': '词库显示模式',
   'learning-manager:paused-task': '暂停的计时会话',
   'learning-manager:paused-elapsed': '暂停会话的已用时长',
+  'learning-manager:last-seq-defaults': '序列录入默认值（上次用的单位 / 时长）',
+  'learning-manager:data:v1-blocked-backup': '旧版黑名单存档（导入时忽略）',
 }
 
 function keyLabel(key: string): string {
@@ -38,6 +40,8 @@ export function DataBackup({ onBack }: Props) {
   // 导入失败提示单独一份：error 在「导出」区渲染，导入失败显示在那里会误导
   const [importError, setImportError] = useState('')
   const [pending, setPending] = useState<BackupFile | null>(null)
+  // 校验通过但需要用户知情的副作用（如备份不含词库，导入会清空现有词库）
+  const [warnings, setWarnings] = useState<string[]>([])
   const [validating, setValidating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -72,6 +76,7 @@ export function DataBackup({ onBack }: Props) {
     setError('')
     setImportError('')
     setPending(null)
+    setWarnings([])
 
     try {
       const text = await readFileAsText(file)
@@ -98,6 +103,7 @@ export function DataBackup({ onBack }: Props) {
         return
       }
       setPending(backup)
+      setWarnings(result.warnings ?? [])
       setMsg(`已读取备份文件，包含 ${result.keyCount} 项数据，请确认导入`)
     } catch {
       setError('读取文件失败')
@@ -208,6 +214,21 @@ export function DataBackup({ onBack }: Props) {
                 ))}
               </ul>
             </div>
+            {warnings.length > 0 && (
+              <div
+                className="notice-block"
+                style={{ marginBottom: 12 }}
+              >
+                <div className="notice-title">⚠️ 导入前请确认</div>
+                <div className="notice-body">
+                  <ul className="notice-list">
+                    {warnings.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
             <div className="row wrap" style={{ gap: 10 }}>
               <button className="btn primary" onClick={handleConfirmImport}>
                 确认导入（覆盖现有数据）
